@@ -1,11 +1,12 @@
 extern crate kiss3d;
 extern crate nalgebra as na;
 
+use kiss3d::camera::FirstPerson;
 use kiss3d::light::Light;
 use kiss3d::window::Window;
 use na::{Translation3, Vector3};
 
-use self::na::{Quaternion, UnitQuaternion};
+use self::na::{Point3, Quaternion, UnitQuaternion};
 use crate::particle::Particle;
 
 pub struct Scene {
@@ -13,19 +14,20 @@ pub struct Scene {
     particles: std::vec::Vec<Particle>,
     particle_radius: f32,
     nodes: std::vec::Vec<kiss3d::scene::SceneNode>,
+    pub camera: FirstPerson,
 }
 
 impl Scene {
     pub fn new(particle_radius: f32) -> Scene {
         let mut scene = Scene {
             window: Window::new("Audran is stupid"),
+            camera: FirstPerson::new(Point3::origin(), Point3::origin()),
             particles: vec![],
             particle_radius,
             nodes: vec![],
         };
 
         scene.window.set_light(Light::StickToCamera);
-        scene.window.set_background_color(1.0, 1.0, 1.0);
 
         scene
     }
@@ -59,6 +61,6 @@ impl Scene {
     }
 
     pub fn render(&mut self) -> bool {
-        self.window.render()
+        self.window.render_with_camera(&mut self.camera)
     }
 }
