@@ -64,8 +64,8 @@ impl Scene
     {
         Scene {
             particles: Vec::new(),
-            particle_radius: 2.,
-            sq_particle_radius: 4.,
+            particle_radius: 1.,
+            sq_particle_radius: 1.,
             rest_density: 3.,
             gravity: Vector3::new(0., -0.005, 0.),
             size: 20.0,
@@ -125,6 +125,7 @@ impl Scene
         particle.neighbours.clear();
 
         particle.density = 0.;
+        particle.density_near = 0.;
 
         for mut n in neighbours {
             // replace dist by weighted dist
@@ -211,22 +212,22 @@ impl Scene
         particle.velocity = particle.position - particle.prev_position;
 
         // apply boundaries
-        particle.force.x -= self.spring_const * match particle.position.x - EPSILON {
-            v if v < 0.0        => v,
-            v if v > self.size  => (v - 3.0),
-            _                   => 0.0,
+        particle.force.x -= self.spring_const * match particle.position.x {
+            v if v < EPSILON                => v - EPSILON,
+            v if v > self.size - EPSILON    => v + EPSILON - self.size,
+            _                               => 0.0,
         };
 
-        particle.force.y -= self.spring_const * match particle.position.y - EPSILON {
-            v if v < 0.0        => v,
-            v if v > self.size  => (v - 3.0),
-            _                   => 0.0,
+        particle.force.y -= self.spring_const * match particle.position.y {
+            v if v < EPSILON                => v - EPSILON,
+            v if v > self.size - EPSILON    => v + EPSILON - self.size,
+            _                               => 0.0,
         };
 
-        particle.force.z -= self.spring_const * match particle.position.z - EPSILON {
-            v if v < 0.0        => v,
-            v if v > self.size  => (v - 3.0),
-            _                   => 0.0,
+        particle.force.z -= self.spring_const * match particle.position.z {
+            v if v < EPSILON                => v - EPSILON,
+            v if v > self.size - EPSILON    => v + EPSILON - self.size,
+            _                               => 0.0,
         };
     }
 
