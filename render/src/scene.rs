@@ -10,7 +10,7 @@ use self::na::{Point3, Quaternion, UnitQuaternion};
 use crate::particle::Particle;
 
 pub struct Scene {
-    window: Window,
+    pub window: Window,
     particles: std::vec::Vec<Particle>,
     particle_radius: f32,
     nodes: std::vec::Vec<kiss3d::scene::SceneNode>,
@@ -30,6 +30,15 @@ impl Scene {
         scene.window.set_light(Light::StickToCamera);
 
         scene
+    }
+
+    pub fn clear(&mut self) {
+        for i in 0..self.particles.len() {
+            self.window.remove_node(&mut self.nodes[i]);
+        }
+
+        self.nodes.clear();
+        self.particles.clear();
     }
 
     pub fn push_particle(&mut self, p: Particle) {

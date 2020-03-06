@@ -78,6 +78,11 @@ impl Scene
         self.particles.len()
     }
 
+    pub fn clear(&mut self)
+    {
+        self.particles.clear();
+    }
+
     pub fn particle(&self, id: usize) -> (f32, f32, f32)
     {
         let vec = self.particles[id].position;
@@ -97,18 +102,21 @@ impl Scene
         self.particles.push(Particle::new(x, y, z))
     }
 
-    pub fn fill(&mut self, px: f32, py: f32, pz: f32)
+    pub fn fill_part(&mut self, fx: f32, fy: f32, fz: f32, px: f32, py: f32, pz: f32)
     {
         let epsize = self.size - 2. * EPSILON;
-        let cx = 2 * (px * epsize / self.particle_radius) as usize;
-        let cy = 2 * (py * epsize / self.particle_radius) as usize;
-        let cz = 2 * (pz * epsize / self.particle_radius) as usize;
+        let jx = (fx * epsize / self.particle_radius) as usize;
+        let jy = (fx * epsize / self.particle_radius) as usize;
+        let jz = (fx * epsize / self.particle_radius) as usize;
+        let cx = 2 * (px * epsize / self.particle_radius) as usize + jx;
+        let cy = 2 * (py * epsize / self.particle_radius) as usize + jy;
+        let cz = 2 * (pz * epsize / self.particle_radius) as usize + jz;
 
         let radius = self.particle_radius * 0.5;
 
-        for x in 0..cx {
-            for y in 0..cy {
-                for z in 0..cz {
+        for x in jx..cx {
+            for y in jy..cy {
+                for z in jz..cz {
                     self.add_particle(
                         EPSILON + radius * x as f32,
                         EPSILON + radius * y as f32,
@@ -117,6 +125,12 @@ impl Scene
                 }
             }
         }
+
+    }
+
+    pub fn fill(&mut self, px: f32, py: f32, pz: f32)
+    {
+        self.fill_part(0.0, 0.0, 0.0, px, py, pz)
     }
 
     fn compute_density(&mut self, id: usize, neighbours: Vec<ParticleNeighbour>)
