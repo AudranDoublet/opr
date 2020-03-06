@@ -1,9 +1,9 @@
-#![feature(test)]
+//#![feature(test)]
 
 mod particle;
 
 pub use particle::*;
-
+/*
 extern crate test;
 use test::Bencher;
 
@@ -16,3 +16,4 @@ fn bench_sph_tick(b: &mut Bencher) {
         sph_scene.tick();
     });
 }
+*/
