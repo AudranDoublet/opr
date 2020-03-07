@@ -248,10 +248,6 @@ impl Scene
     pub fn tick(&mut self)
     {
         for particle in 0..self.particles.len() {
-            self.apply_forces(particle);
-        }
-
-        for particle in 0..self.particles.len() {
             let neighbours = self.compute_neighbours(particle);
             self.compute_density(particle, neighbours);
         }
@@ -262,6 +258,10 @@ impl Scene
 
         for particle in 0..self.particles.len() {
             self.compute_forces(particle);
+        }
+
+        for particle in 0..self.particles.len() {
+            self.apply_forces(particle);
         }
     }
 }
