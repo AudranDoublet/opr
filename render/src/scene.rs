@@ -4,10 +4,11 @@ extern crate nalgebra as na;
 use kiss3d::camera::FirstPerson;
 use kiss3d::light::Light;
 use kiss3d::window::Window;
-use na::{Translation3, Vector3};
+use na::{Translation3};
 
-use self::na::{Point3, Quaternion, UnitQuaternion};
 use crate::particle::Particle;
+
+use self::na::{Point3};
 
 pub struct Scene {
     pub window: Window,

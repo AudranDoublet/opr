@@ -1,15 +1,14 @@
 #![feature(test)]
 
-mod particle;
+extern crate test;
 
 pub use particle::*;
 
-extern crate test;
-
-use test::Bencher;
+mod kernel;
+mod particle;
 
 #[bench]
-fn bench_sph_tick(b: &mut Bencher) {
+fn bench_sph_tick(b: &mut test::Bencher) {
     let mut sph_scene = Scene::new();
     sph_scene.fill(0.5, 0.4, 0.5);
 

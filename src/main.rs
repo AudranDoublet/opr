@@ -1,23 +1,23 @@
 extern crate render;
 extern crate sph_common;
 
-use nalgebra::{Point3, Vector, Vector3};
+use nalgebra::{Point3};
 use sph_common::Scene;
 
 fn main() {
     let mut sph_scene = Scene::new();
-    sph_scene.fill(0.5, 0.4, 0.5);
+    sph_scene.fill(0.3, 0.5, 0.3);
 
     println!("{:?}", sph_scene.len());
 
-    let mut scene = render::scene::Scene::new(sph_scene.particle_radius / 3.);
+    let mut scene = render::scene::Scene::new(sph_scene.particle_size / 3.);
     scene
         .camera
         .look_at(Point3::new(0.0, 20.0, -50.0), Point3::new(10.0, 10.0, 0.0));
 
     for i in 0..sph_scene.len() {
         scene.push_particle(render::particle::Particle {
-            position: sph_scene.particle_dx(i),
+            position: sph_scene.particle(i),
             color: (0., 0., 1.),
         })
     }
@@ -42,7 +42,7 @@ fn main() {
 
                             for i in prev_len..sph_scene.len() {
                                 scene.push_particle(render::particle::Particle {
-                                    position: sph_scene.particle_dx(i),
+                                    position: sph_scene.particle(i),
                                     color: (0., 0., 1.),
                                 });
                             }
