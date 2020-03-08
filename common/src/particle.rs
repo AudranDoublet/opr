@@ -9,7 +9,7 @@ use crate::kernel::{Kernel, kernels, SMOOTHING_LENGTH};
 use self::nalgebra::Vector;
 
 const STIFFNESS: f32 = 2. / 10.;
-const REST_DENSITY: f32 = 3.;
+const REST_DENSITY: f32 = 10.;
 
 const EPSILON: f32 = 1.;
 
@@ -181,7 +181,7 @@ impl Scene
     fn compute_forces(&mut self, id: usize) {
         let forces = {
             let particle = &self.particles[id];
-            let density_sq = particle.density.powi(2);
+            let pdi = particle.pressure / particle.density.powi(2); // idk why I called this variable pdi, probably because it sounds scientific (but it has no meaning)
 
             let mut f_pressure = Vector3::zeros();
             let mut f_viscosity = Vector3::zeros();
@@ -191,19 +191,16 @@ impl Scene
                 let neighbour = &self.particles[neighbour_info.id];
                 let x_ij: Vector3<f32> = &particle.position - &neighbour.position;
 
-                // cf. from eq-23: discretization of Laplace Operator
-                f_viscosity -= REST_DENSITY * (neighbour.mass / neighbour.density)
-                    * (&particle.velocity - &neighbour.velocity)
-                    * (2.0 * kernels::CubicSpine::gradient(&x_ij).norm() / x_ij.norm());
+                let grad_ij = kernels::CubicSpine::gradient(&x_ij);
 
-                // f_viscosity += (neighbour.mass / neighbour.density)
-                //     * (&particle.velocity - &neighbour.velocity)
-                //     * (x_ij.component_mul(&kernels::CubicSpine::gradient(&x_ij)).component_div(&x_ij.component_mul(&x_ij)));
+                // cf. from eq-23: discretization of Laplace Operator
+                f_viscosity -= (neighbour.mass / neighbour.density)
+                    * (&particle.velocity - &neighbour.velocity)
+                    * (2.0 * (grad_ij.norm() / neighbour_info.dist));
 
                 // cf. from eq-19: discrete Lagrangian density estimate derivation
-                f_pressure += neighbour.mass
-                    * (particle.pressure / density_sq + neighbour.pressure / neighbour.density.powi(2))
-                    * kernels::CubicSpine::gradient(&x_ij);
+                let pdj = neighbour.pressure / neighbour.density.powi(2);
+                f_pressure += neighbour.mass * (pdi + pdj) * grad_ij;
             }
 
             f_viscosity *= particle.mass * particle.kinematic_viscosity;
@@ -257,6 +254,6 @@ impl Scene
             v_max = v_max.max(particle.velocity.norm());
         }
         // self.delta_time = 1.;
-        self.delta_time = 0.04 * self.particle_size / v_max;
+        self.delta_time = (0.04 * self.particle_size / v_max).min(1.0);
     }
 }
