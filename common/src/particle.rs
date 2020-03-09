@@ -131,17 +131,16 @@ impl Scene
 
     fn compute_density(&mut self, id: usize)
     {
-        let density = {
+         self.particles[id].density = {
             let particle = &self.particles[id];
             let mut density: f32 = 0.0;
+
             for n in &particle.neighbours {
                 density += self.particles[n.id].mass * kernels::CubicSpine::apply_on_norm(n.dist);
             }
+
             density
         };
-
-        let particle = &mut self.particles[id];
-        particle.density = density;
     }
 
     fn compute_neighbours(&mut self, id: usize)
@@ -179,56 +178,53 @@ impl Scene
     }
 
     fn compute_forces(&mut self, id: usize) {
-        let forces = {
-            let particle = &self.particles[id];
-            let pdi = particle.pressure / particle.density.powi(2); // idk why I called this variable pdi, probably because it sounds scientific (but it has no meaning)
+        let particle = &self.particles[id];
+        let pdi = particle.pressure / particle.density.powi(2); // idk why I called this variable pdi, probably because it sounds scientific (but it has no meaning)
 
-            let mut f_pressure = Vector3::zeros();
-            let mut f_viscosity = Vector3::zeros();
-            let mut f_other = particle.mass * &self.gravity;
+        let mut f_pressure = Vector3::zeros();
+        let mut f_viscosity = Vector3::zeros();
+        let mut f_other = particle.mass * &self.gravity;
 
-            for neighbour_info in &particle.neighbours {
-                let neighbour = &self.particles[neighbour_info.id];
-                let x_ij: Vector3<f32> = &particle.position - &neighbour.position;
+        for neighbour_info in &particle.neighbours {
+            let neighbour = &self.particles[neighbour_info.id];
+            let x_ij: Vector3<f32> = &particle.position - &neighbour.position;
 
-                let grad_ij = kernels::CubicSpine::gradient(&x_ij);
+            let grad_ij = kernels::CubicSpine::gradient(&x_ij);
 
-                // cf. from eq-23: discretization of Laplace Operator
-                f_viscosity -= (neighbour.mass / neighbour.density)
-                    * (&particle.velocity - &neighbour.velocity)
-                    * (2.0 * (grad_ij.norm() / neighbour_info.dist));
 
-                // cf. from eq-19: discrete Lagrangian density estimate derivation
-                let pdj = neighbour.pressure / neighbour.density.powi(2);
-                f_pressure += neighbour.mass * (pdi + pdj) * grad_ij;
-            }
+            // cf. from eq-23: discretization of Laplace Operator
+            f_viscosity -= (neighbour.mass / neighbour.density)
+                * (&particle.velocity - &neighbour.velocity)
+                * (2.0 * (grad_ij.norm() / neighbour_info.dist));
 
-            f_viscosity *= particle.mass * particle.kinematic_viscosity;
-            f_pressure *= -1.0;
+            // cf. from eq-19: discrete Lagrangian density estimate derivation
+            let pdj = neighbour.pressure / neighbour.density.powi(2);
+            f_pressure += neighbour.mass * (pdi + pdj) * grad_ij;
+        }
 
-            // apply boundaries
-            f_other.x -= self.spring_const * match particle.position.x {
-                v if v < EPSILON => v - EPSILON,
-                v if v > self.size - EPSILON => v + EPSILON - self.size,
-                _ => 0.0,
-            };
+        f_viscosity *= particle.mass * particle.kinematic_viscosity;
+        f_pressure *= -1.0;
 
-            f_other.y -= self.spring_const * match particle.position.y {
-                v if v < EPSILON => v - EPSILON,
-                v if v > self.size - EPSILON => v + EPSILON - self.size,
-                _ => 0.0,
-            };
-
-            f_other.z -= self.spring_const * match particle.position.z {
-                v if v < EPSILON => v - EPSILON,
-                v if v > self.size - EPSILON => v + EPSILON - self.size,
-                _ => 0.0,
-            };
-
-            f_pressure + f_viscosity + f_other
+        // apply boundaries
+        f_other.x -= self.spring_const * match particle.position.x {
+            v if v < EPSILON => v - EPSILON,
+            v if v > self.size - EPSILON => v + EPSILON - self.size,
+            _ => 0.0,
         };
 
-        self.particles[id].forces = forces;
+        f_other.y -= self.spring_const * match particle.position.y {
+            v if v < EPSILON => v - EPSILON,
+            v if v > self.size - EPSILON => v + EPSILON - self.size,
+            _ => 0.0,
+        };
+
+        f_other.z -= self.spring_const * match particle.position.z {
+            v if v < EPSILON => v - EPSILON,
+            v if v > self.size - EPSILON => v + EPSILON - self.size,
+            _ => 0.0,
+        };
+
+        self.particles[id].forces = f_pressure + f_viscosity + f_other;;
     }
 
     pub fn tick(&mut self)
@@ -253,7 +249,8 @@ impl Scene
 
             v_max = v_max.max(particle.velocity.norm());
         }
-        // self.delta_time = 1.;
-        self.delta_time = (0.04 * self.particle_size / v_max).min(1.0);
+        self.delta_time = 1.;
+        //self.delta_time = (0.04 * self.particle_size / v_max).min(1.0);
+        println!("{} {}", self.delta_time, v_max);
     }
 }

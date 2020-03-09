@@ -2,7 +2,7 @@ extern crate nalgebra;
 
 use nalgebra::Vector3;
 
-pub const SMOOTHING_LENGTH: f32 = 0.8;
+pub const SMOOTHING_LENGTH: f32 = 1.0;
 
 const SMOOTHING_LENGTH_SQ: f32 = SMOOTHING_LENGTH * SMOOTHING_LENGTH;
 const SMOOTHING_LENGTH_INV: f32 = 1.0 / SMOOTHING_LENGTH;
