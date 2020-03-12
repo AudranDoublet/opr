@@ -2,11 +2,6 @@ extern crate nalgebra;
 
 use nalgebra::Vector3;
 
-pub const SMOOTHING_LENGTH: f32 = 1.0;
-
-const SMOOTHING_LENGTH_SQ: f32 = SMOOTHING_LENGTH * SMOOTHING_LENGTH;
-const SMOOTHING_LENGTH_INV: f32 = 1.0 / SMOOTHING_LENGTH;
-
 pub trait Kernel {
     fn apply_on_norm(r_norm: f32) -> f32;
     fn gradient(r: &Vector3<f32>) -> Vector3<f32>;
@@ -19,46 +14,45 @@ pub mod kernels {
 
     use super::nalgebra::Vector3;
 
-    pub struct CubicSpine;
-
+    pub struct CubicSpine {
+        sigma: f32,
+        h: f32,
+        h2: f32,
+        h3: f32,
+    }
 
     impl CubicSpine {
-        const SIG_3: f32 = 8.0 / (std::f32::consts::PI * SMOOTHING_LENGTH * SMOOTHING_LENGTH * SMOOTHING_LENGTH);
-        const SIG_L: f32 = 48.0 / (std::f32::consts::PI * SMOOTHING_LENGTH * SMOOTHING_LENGTH * SMOOTHING_LENGTH);
+        fn new(smoothing_length: f32) -> CubicSpine {
+            CubicSpine {
+                sigma: 8. / (std::f32::consts::PI * SMOOTHING_LENGTH.powi(3)),
+                h: smoothing_length, 
+                h2: smoothing_length.powi(2),
+                h3: smoothing_length.powi(3),
+            }
+        }
     }
 
     impl Kernel for CubicSpine {
-        fn apply_on_norm(r_norm: f32) -> f32 {
-            let q: f32 = SMOOTHING_LENGTH_INV * r_norm;
 
-            CubicSpine::SIG_3 * match q {
-                q if q <= 1.0 => {
-                    if q <= 0.5 {
-                        let q_2: f32 = q.powi(2);
-                        6.0 * (q_2 * q - q_2) + 1.0
-                    } else {
-                        2.0 * (1.0 - q).powi(3)
-                    }
-                }
+        fn apply_on_norm(r_norm: f32) -> f32 {
+            let q: f32 = r_norm / SMOOTHING_LENGTH;
+
+            self.sigma * match q {
+                q if q <= 0.5 => 6. * (q.powi(3) - q.powi(2)) + 1.,
+                q if q <= 1.0 => 2. * (1. - q).powi(3),
                 _ => 0.0
             }
         }
 
         fn gradient(r: &Vector3<f32>) -> Vector3<f32> {
             let r_norm = r.norm();
-            let q = SMOOTHING_LENGTH_INV * r_norm;
-            if (r_norm <= 1.0e-5) || (q > 1.0) {
-                return Vector3::zeros();
+            let q = r_norm / self.h;
+
+            self.sigma * r * match q {
+                q if q <= 0.0001 || q > 1.0 => 0.0,
+                q if q <= 0.5 => 6. * (3. * r_norm / self.h3 - 2. / self.h2),
+                q => - 6. / self.h * (1. - q).powi(3),
             }
-            let gradq = r * (1.0 / (r_norm * SMOOTHING_LENGTH));
-            CubicSpine::SIG_L * (
-                if q <= 0.5 {
-                    q * (3.0 * q - 2.0) * gradq
-                } else {
-                    let factor = 1.0 - q;
-                    (-factor * factor) * gradq
-                }
-            )
         }
 
         fn radius() -> f32 {
