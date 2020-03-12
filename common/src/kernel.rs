@@ -33,8 +33,7 @@ pub mod kernels {
     }
 
     impl Kernel for CubicSpine {
-
-        fn apply_on_norm(r_norm: f32) -> f32 {
+        fn apply_on_norm(&self, r_norm: f32) -> f32 {
             let q: f32 = r_norm / SMOOTHING_LENGTH;
 
             self.sigma * match q {
@@ -44,7 +43,7 @@ pub mod kernels {
             }
         }
 
-        fn gradient(r: &Vector3<f32>) -> Vector3<f32> {
+        fn gradient(&self, r: &Vector3<f32>) -> Vector3<f32> {
             let r_norm = r.norm();
             let q = r_norm / self.h;
 
@@ -55,12 +54,12 @@ pub mod kernels {
             }
         }
 
-        fn radius() -> f32 {
-            SMOOTHING_LENGTH
+        fn radius(&self) -> f32 {
+            self.h
         }
 
-        fn radius_sq() -> f32 {
-            SMOOTHING_LENGTH_SQ
+        fn radius_sq(&self) -> f32 {
+            self.h2
         }
     }
 }
