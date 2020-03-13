@@ -1,97 +1,92 @@
-extern crate nalgebra;
-
-use std::net::Shutdown::Read;
-
 use nalgebra::Vector3;
+use crate::kernel::{kernels::CubicSpine, Kernel};
 
-use crate::kernel::{Kernel, kernels, SMOOTHING_LENGTH};
+const EPSILON : f32 = 1e-5;
 
-use self::nalgebra::Vector;
-
-const STIFFNESS: f32 = 2. / 10.;
-const REST_DENSITY: f32 = 10.;
-
-const EPSILON: f32 = 1.;
-
-#[derive(Copy, Clone)]
-struct ParticleNeighbour
-{
-    id: usize,
-    dist: f32,
-}
-
-struct Particle
+#[derive(Debug)]
+pub struct Particle
 {
     position: Vector3<f32>,
-    density: f32,
-    neighbours: Vec<ParticleNeighbour>,
-    pressure: f32,
-    mass: f32,
-    kinematic_viscosity: f32,
-    // FIXME
-    forces: Vector3<f32>,
     velocity: Vector3<f32>,
+    acceleration: Vector3<f32>,
+
+    stiffness: f32,
+    density: f32,
+    density_prediction: f32,
+    neighbours: Vec<usize>,
+}
+
+pub struct DFSPH
+{
+    // parameters
+    kernel: CubicSpine,
+    pub particle_radius: f32,
+    size: f32,
+    rest_density: f32,
+
+    correct_density_max_error: f32,
+    correct_divergence_max_error: f32,
+
+    // cfl
+    cfl_min_time_step: f32,
+    cfl_max_time_step: f32,
+    cfl_factor: f32,
+
+
+    // iteration data
+    time_step: f32,
+
+    particles: Vec<Particle>,
 }
 
 impl Particle
 {
-    // FIXME: SMOOTHING_LENGTH and REST_DENSITY should be given as args instead of being constants
-    fn new(x: f32, y: f32, z: f32) -> Particle
-    {
+    pub fn new(x: f32, y: f32, z: f32) -> Particle {
         Particle {
             position: Vector3::new(x, y, z),
-            neighbours: Vec::new(),
-            density: 0.0,
-            pressure: 0.0,
-            mass: SMOOTHING_LENGTH.powi(3) * REST_DENSITY,
-            kinematic_viscosity: 1.787 * 10e-7, // FIXME: hardcoded for water, should be given as arg
-            forces: Vector3::zeros(),
             velocity: Vector3::zeros(),
+            acceleration: Vector3::zeros(),
+
+            stiffness: 0.0, // initialized by init()
+            density: 0.0, // initialized by init()
+            neighbours: Vec::new(), // initialized by init()
+
+            density_prediction: 0.0,
         }
     }
 }
 
-pub struct Scene
+impl DFSPH
 {
-    particles: Vec<Particle>,
-    pub particle_size: f32,
-    delta_time: f32,
-    gravity: Vector3<f32>,
-    pub size: f32,
-    spring_const: f32,
-}
-
-impl Scene
-{
-    pub fn new() -> Scene
+    pub fn new(size: f32) -> DFSPH
     {
-        let scene = Scene {
-            particles: Vec::new(),
-            particle_size: 1.0,
-            delta_time: 1.0,
-            gravity: Vector3::new(0., -0.005, 0.),
-            size: 20.0,
-            spring_const: 1. / 16.,
-        };
+        DFSPH {
+            kernel: CubicSpine::new(0.1), // FIXME ?
+            particle_radius: 0.025, // FIXME !!
+            size: size, // pas FIXME :D
 
-        scene
+            rest_density: 1000.0, //FIXME
+
+            correct_density_max_error: 0.01,
+            correct_divergence_max_error: 0.01,
+
+            // time step
+            cfl_min_time_step: 0.0001,
+            cfl_max_time_step: 0.005,
+            cfl_factor: 1.0,
+            time_step: 0.0001,
+
+            particles: Vec::new(),
+        }
     }
 
-    pub fn len(&self) -> usize
-    {
+    pub fn len(&self) -> usize {
         self.particles.len()
     }
 
-    pub fn clear(&mut self)
-    {
-        self.particles.clear();
-    }
-
-    pub fn particle(&self, id: usize) -> (f32, f32, f32)
-    {
-        let vec = &self.particles[id].position;
-
-        (vec.x, vec.y, vec.z)
+    pub fn particle(&self, i: usize) -> (f32, f32, f32) {
+        let v = self.position(i);
+        (v.x, v.y, v.z)
     }
 
     pub fn add_particle(&mut self, x: f32, y: f32, z: f32)
@@ -101,24 +96,36 @@ impl Scene
 
     pub fn fill_part(&mut self, fx: f32, fy: f32, fz: f32, px: f32, py: f32, pz: f32)
     {
-        let epsize = self.size - 2. * EPSILON;
-        let jx = (fx * epsize / self.particle_size) as usize;
-        let jy = (fy * epsize / self.particle_size) as usize;
-        let jz = (fz * epsize / self.particle_size) as usize;
-        let cx = 2 * (px * epsize / self.particle_size) as usize + jx;
-        let cy = 2 * (py * epsize / self.particle_size) as usize + jy;
-        let cz = 2 * (pz * epsize / self.particle_size) as usize + jz;
+        let epsilon = 1.0;
 
-        let radius = self.particle_size * 0.5;
+        let mut count = 0;
+
+        let epsize = self.size - 2. * epsilon;
+        let jx = (fx * epsize / self.particle_radius) as usize;
+        let jy = (fy * epsize / self.particle_radius) as usize;
+        let jz = (fz * epsize / self.particle_radius) as usize;
+        let cx = 2 * (px * epsize / self.particle_radius) as usize + jx;
+        let cy = 2 * (py * epsize / self.particle_radius) as usize + jy;
+        let cz = 2 * (pz * epsize / self.particle_radius) as usize + jz;
+
+        let radius = self.particle_radius * 1.;
 
         for x in jx..cx {
             for y in jy..cy {
                 for z in jz..cz {
                     self.add_particle(
-                        EPSILON + radius * x as f32,
-                        EPSILON + radius * y as f32,
-                        EPSILON + radius * z as f32,
+                        epsilon + radius * x as f32,
+                        epsilon + radius * y as f32,
+                        epsilon + radius * z as f32,
                     );
+
+                    /*
+                    count += 1;
+
+                    if count == 10 {
+                        return;
+                    }
+                    */
                 }
             }
         }
@@ -129,128 +136,286 @@ impl Scene
         self.fill_part(0.0, 0.0, 0.0, px, py, pz)
     }
 
-    fn compute_density(&mut self, id: usize)
-    {
-         self.particles[id].density = {
-            let particle = &self.particles[id];
-            let mut density: f32 = 0.0;
-
-            for n in &particle.neighbours {
-                density += self.particles[n.id].mass * kernels::CubicSpine::apply_on_norm(n.dist);
-            }
-
-            density
-        };
+    fn gradient(&self, i: usize, j: usize) -> Vector3<f32> {
+        self.kernel.gradient(&(self.particles[i].position - self.particles[j].position))
     }
 
-    fn compute_neighbours(&mut self, id: usize)
-    {
+    fn kernel_apply(&self, i: usize, j: usize) -> f32 {
+        self.kernel.apply_on_norm((self.position(i) - self.position(j)).norm())
+    }
+
+    fn distance_sq(&self, i: usize, j: usize) -> f32 {
+        (self.position(i) - self.position(j)).norm_squared()
+    }
+
+    fn position(&self, i: usize) -> Vector3<f32> {
+        self.particles[i].position
+    }
+
+    fn mass(&self, i: usize) -> f32 {
+        self.particle_radius.powi(3)
+    }
+
+    fn stiffness(&self, i: usize) -> f32 {
+        self.particles[i].stiffness
+    }
+
+    fn density(&self, i: usize) -> f32 {
+        self.particles[i].density
+    }
+
+    fn density_adv(&self, i: usize) -> f32 {
+        self.particles[i].density_prediction
+    }
+
+    fn velocity(&self, i: usize) -> Vector3<f32> {
+        self.particles[i].velocity
+    }
+
+    fn acceleration(&self, i: usize) -> Vector3<f32> {
+        self.particles[i].acceleration
+    }
+
+    fn neighbours_count(&self, i: usize) -> usize {
+        self.particles[i].neighbours.len()
+    }
+
+    fn neighbours_reduce<V>(&self, i: usize, value: V, f: &dyn Fn(V, usize, usize) -> V) -> V {
+        let mut result = value;
+
+        for j in 0..self.neighbours_count(i) {
+            result = f(result, i, j);
+        }
+
+        result
+    }
+
+    fn neighbours_reduce_v(&self, i: usize, f: &dyn Fn(Vector3<f32>, usize, usize) -> Vector3<f32>) -> Vector3<f32> {
+        self.neighbours_reduce(i, Vector3::zeros(), f)
+    }
+
+    fn neighbours_reduce_f(&self, i: usize, f: &dyn Fn(f32, usize, usize) -> f32) -> f32 {
+        self.neighbours_reduce(i, 0.0, f)
+    }
+
+    fn compute_neighbours(&mut self, i: usize) {
         let neighbours = {
-            let particle = &self.particles[id];
             let mut neighbours = Vec::new();
 
-            for j in 0..self.particles.len() {
-                if j == id {
+            for j in 0..self.len() {
+                // we can ignore particles at that distance since they are discarded by the kernel
+                if j == i || self.distance_sq(i, j) >= self.kernel.radius_sq() {
                     continue;
                 }
 
-                let sq_dist = (&self.particles[j].position - &particle.position).norm_squared();
-                if sq_dist > kernels::CubicSpine::radius_sq() {
-                    // we can ignore particles at that distance since they are discarded by the kernel
-                    continue;
-                }
-
-                neighbours.push(ParticleNeighbour {
-                    id: j,
-                    dist: sq_dist.sqrt(),
-                });
+                neighbours.push(j);
             }
 
             neighbours
         };
 
-        self.particles[id].neighbours = neighbours;
+        self.particles[i].neighbours = neighbours;
     }
 
-    fn compute_pressure(&mut self, id: usize) {
-        let particle = &mut self.particles[id];
-        particle.pressure = STIFFNESS * (particle.density / REST_DENSITY - 1.0).max(0.0);
-    }
+    fn adapt_cfl(&mut self) {
+        // Compute max velocity
+        let mut vmax : f32 = 0.0;
 
-    fn compute_forces(&mut self, id: usize) {
-        let particle = &self.particles[id];
-        let pdi = particle.pressure / particle.density.powi(2); // idk why I called this variable pdi, probably because it sounds scientific (but it has no meaning)
-
-        let mut f_pressure = Vector3::zeros();
-        let mut f_viscosity = Vector3::zeros();
-        let mut f_other = particle.mass * &self.gravity;
-
-        for neighbour_info in &particle.neighbours {
-            let neighbour = &self.particles[neighbour_info.id];
-            let x_ij: Vector3<f32> = &particle.position - &neighbour.position;
-
-            let grad_ij = kernels::CubicSpine::gradient(&x_ij);
-
-
-            // cf. from eq-23: discretization of Laplace Operator
-            f_viscosity -= (neighbour.mass / neighbour.density)
-                * (&particle.velocity - &neighbour.velocity)
-                * (2.0 * (grad_ij.norm() / neighbour_info.dist));
-
-            // cf. from eq-19: discrete Lagrangian density estimate derivation
-            let pdj = neighbour.pressure / neighbour.density.powi(2);
-            f_pressure += neighbour.mass * (pdi + pdj) * grad_ij;
+        for i in 0..self.len() {
+            vmax = vmax.max(self.velocity(i).norm_squared());
         }
 
-        f_viscosity *= particle.mass * particle.kinematic_viscosity;
-        f_pressure *= -1.0;
+        vmax = vmax.sqrt();
 
-        // apply boundaries
-        f_other.x -= self.spring_const * match particle.position.x {
-            v if v < EPSILON => v - EPSILON,
-            v if v > self.size - EPSILON => v + EPSILON - self.size,
+        self.time_step = ((self.cfl_factor * self.particle_radius) / vmax)
+            .max(self.cfl_min_time_step)
+            .min(self.cfl_max_time_step);
+    }
+
+    fn compute_density(&mut self, i: usize) {
+        self.particles[i].density = self.neighbours_reduce_f(i, &|density, i, j| density + self.mass(j) * self.kernel_apply(i, j));
+    }
+
+    fn compute_stiffness(&mut self, i: usize) {
+        let sum_a = self.neighbours_reduce_v(i, &|r, i, j| r + self.mass(j) * self.gradient(i, j));
+        let sum_b = self.neighbours_reduce_f(i, &|r, i, j| r + (self.mass(j) * self.gradient(i, j)).norm_squared());
+
+        let sum = sum_a.norm_squared() + sum_b;
+
+        self.particles[i].stiffness = match sum {
+            sum if sum > EPSILON => 1.0 /sum,
             _ => 0.0,
         };
-
-        f_other.y -= self.spring_const * match particle.position.y {
-            v if v < EPSILON => v - EPSILON,
-            v if v > self.size - EPSILON => v + EPSILON - self.size,
-            _ => 0.0,
-        };
-
-        f_other.z -= self.spring_const * match particle.position.z {
-            v if v < EPSILON => v - EPSILON,
-            v if v > self.size - EPSILON => v + EPSILON - self.size,
-            _ => 0.0,
-        };
-
-        self.particles[id].forces = f_pressure + f_viscosity + f_other;;
     }
 
-    pub fn tick(&mut self)
-    {
-        for particle in 0..self.particles.len() {
-            self.compute_neighbours(particle);
-        }
+    fn compute_density_variation(&mut self) {
+        for i in 0..self.len() {
+            let density_adv = if self.neighbours_count(i) < 20 {
+                0.0
+            } else {
+                let delta = self.neighbours_reduce_f(i, &|r, i, j| r + self.mass(j) * (self.velocity(i) - self.velocity(j)).dot(&self.gradient(i, j)));
+                //println!("delta: {}", delta);
+                delta.max(0.0)
+            };
 
-        for particle in 0..self.particles.len() {
-            self.compute_density(particle);
-            self.compute_pressure(particle);
+            self.particles[i].density_prediction = density_adv;
         }
-
-        for particle in 0..self.particles.len() {
-            self.compute_forces(particle);
-        }
-
-        let mut v_max: f32 = 0.0;
-        for particle in &mut self.particles {
-            particle.velocity += (self.delta_time / particle.mass) * &particle.forces;
-            particle.position += self.delta_time * &particle.velocity;
-
-            v_max = v_max.max(particle.velocity.norm());
-        }
-        self.delta_time = 1.;
-        //self.delta_time = (0.04 * self.particle_size / v_max).min(1.0);
-        println!("{} {}", self.delta_time, v_max);
     }
+
+    fn compute_density_advection(&mut self) {
+        for i in 0..self.len() {
+            let delta = self.neighbours_reduce_f(i, &|r, i, j| r + self.mass(j) * (self.velocity(i) - self.velocity(j)).dot(&self.gradient(i, j)));
+            // FIXME: divide by density0 ?: 
+            self.particles[i].density_prediction = (self.density(i)/self.rest_density + self.time_step * delta);
+            //println!("{:?}", self.particles[i].density_prediction);
+        }
+    }
+
+    fn correct_density_error(&mut self) {
+        self.compute_density_advection();
+
+        let mut iter_count = 0;
+        let mut chk = false;
+
+        while (!chk || iter_count <= 1) && iter_count < 1000 {
+            // FIXME pk -1 ? density0 ? sami pas content
+            for i in 0..self.len() {
+                let ki = (self.density_adv(i) - 0.) * self.stiffness(i) / self.time_step.powi(2);
+
+                let diff = self.neighbours_reduce_v(i, &|r, i, j| {
+                    let sum = ki + (self.density_adv(j) - 0.) * self.stiffness(j) / self.time_step.powi(2);
+
+                    //println!("sum: {}" ,sum );
+                    if sum <= EPSILON {
+                        return r;
+                    }
+
+                    r + self.time_step * self.mass(j) * sum * self.gradient(i, j)
+                });
+
+                self.particles[i].velocity -= diff;
+            }
+
+            self.compute_density_advection();
+
+            let mut density_avg = 0.0;
+
+            for i in 0..self.len() {
+                //FIXME multiply by density0 ?
+                density_avg += self.density_adv(i) * self.rest_density - self.rest_density;
+            }
+
+            density_avg /= self.len() as f32;
+            println!("density_avg: {}", density_avg);
+
+            let eta = self.correct_density_max_error * 0.01 * self.rest_density;
+
+            chk |= density_avg < eta;
+            iter_count += 1;
+        }
+    }
+
+    fn correct_divergence_error(&mut self) {
+        self.compute_density_variation();
+
+        let mut iter_count = 0;
+        let mut chk = false;
+
+        while (!chk || iter_count <= 1) && iter_count < 100 {
+            for i in 0..self.len() {
+                let ki = self.density_adv(i) * self.stiffness(i) / self.time_step;
+
+                let diff = self.neighbours_reduce_v(i, &|r, i, j| {
+                    let sum = ki + self.density_adv(j) * self.stiffness(j) / self.time_step;
+
+                    if sum <= EPSILON {
+                        return r;
+                    }
+
+                    r + self.time_step * self.mass(j) * sum * self.gradient(i, j)
+                });
+
+                self.particles[i].velocity -= diff;
+            }
+
+            self.compute_density_variation();
+
+            let mut density_div_avg = 0.0;
+
+            for i in 0..self.len() {
+                //FIXME multiply by density0 ?
+                density_div_avg += self.density_adv(i);
+            }
+
+            density_div_avg /= self.len() as f32;
+
+            println!("density_div_avg: {}", density_div_avg);
+            let eta = 1. / self.time_step * self.correct_divergence_max_error * 0.01 * self.rest_density;
+
+            chk |= density_div_avg < eta;
+            iter_count += 1;
+        }
+    }
+
+    fn compute_non_pressure_forces(&mut self, i: usize) {
+        self.particles[i].acceleration = Vector3::zeros();
+
+        self.particles[i].acceleration += Vector3::new(0.0, -9.81, 0.0);
+    }
+
+    fn predict_velocity(&mut self, i: usize) {
+        let acc = self.acceleration(i);
+        self.particles[i].velocity += acc * self.time_step;
+    }
+
+    fn update_position(&mut self, i: usize) {
+        let vel = self.velocity(i);
+        self.particles[i].position += self.time_step * vel;
+    }
+
+    fn init(&mut self) {
+        for i in 0..self.len() {
+            self.compute_neighbours(i);
+        }
+
+        for i in 0..self.len() {
+            self.compute_density(i);
+        }
+
+        for i in 0..self.len() {
+            self.compute_stiffness(i);
+        }
+    }
+
+    pub fn tick(&mut self) {
+        self.init();
+
+
+        self.correct_divergence_error();
+
+        for i in 0..self.len() {
+            self.compute_non_pressure_forces(i);
+        }
+
+        self.adapt_cfl();
+
+        for i in 0..self.len() {
+            self.predict_velocity(i);
+        }
+
+        self.correct_density_error();
+
+        for i in 0..self.len() {
+            self.update_position(i);
+        }
+
+        for i in 0..self.len() {
+            if self.velocity(i).norm() <= 0.2 {
+                println!("hibou {}", i);
+            }
+        }
+
+        println!("{}", self.velocity(0));
+    }
+
 }

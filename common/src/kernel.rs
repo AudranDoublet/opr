@@ -3,14 +3,14 @@ extern crate nalgebra;
 use nalgebra::Vector3;
 
 pub trait Kernel {
-    fn apply_on_norm(r_norm: f32) -> f32;
-    fn gradient(r: &Vector3<f32>) -> Vector3<f32>;
-    fn radius() -> f32;
-    fn radius_sq() -> f32;
+    fn apply_on_norm(&self, r_norm: f32) -> f32;
+    fn gradient(&self, r: &Vector3<f32>) -> Vector3<f32>;
+    fn radius(&self) -> f32;
+    fn radius_sq(&self) -> f32;
 }
 
 pub mod kernels {
-    use crate::kernel::{Kernel, SMOOTHING_LENGTH, SMOOTHING_LENGTH_INV, SMOOTHING_LENGTH_SQ};
+    use crate::kernel::*;
 
     use super::nalgebra::Vector3;
 
@@ -22,9 +22,9 @@ pub mod kernels {
     }
 
     impl CubicSpine {
-        fn new(smoothing_length: f32) -> CubicSpine {
+        pub fn new(smoothing_length: f32) -> CubicSpine {
             CubicSpine {
-                sigma: 8. / (std::f32::consts::PI * SMOOTHING_LENGTH.powi(3)),
+                sigma: 8. / (std::f32::consts::PI * smoothing_length.powi(3)),
                 h: smoothing_length, 
                 h2: smoothing_length.powi(2),
                 h3: smoothing_length.powi(3),
@@ -34,7 +34,7 @@ pub mod kernels {
 
     impl Kernel for CubicSpine {
         fn apply_on_norm(&self, r_norm: f32) -> f32 {
-            let q: f32 = r_norm / SMOOTHING_LENGTH;
+            let q: f32 = r_norm / self.h;
 
             self.sigma * match q {
                 q if q <= 0.5 => 6. * (q.powi(3) - q.powi(2)) + 1.,
@@ -50,7 +50,7 @@ pub mod kernels {
             self.sigma * r * match q {
                 q if q <= 0.0001 || q > 1.0 => 0.0,
                 q if q <= 0.5 => 6. * (3. * r_norm / self.h3 - 2. / self.h2),
-                q => - 6. / self.h * (1. - q).powi(3),
+                q => - 6. / self.h * (1. - q).powi(2),
             }
         }
 
