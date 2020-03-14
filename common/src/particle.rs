@@ -1,7 +1,8 @@
 use nalgebra::Vector3;
-use crate::kernel::{kernels::CubicSpine, Kernel};
 
-const EPSILON : f32 = 1e-5;
+use crate::kernel::{Kernel, kernels::CubicSpine};
+
+const EPSILON: f32 = 1e-5;
 
 #[derive(Debug)]
 pub struct Particle
@@ -32,9 +33,10 @@ pub struct DFSPH
     cfl_max_time_step: f32,
     cfl_factor: f32,
 
-
     // iteration data
     time_step: f32,
+
+    v_max: f32,
 
     particles: Vec<Particle>,
 }
@@ -61,9 +63,9 @@ impl DFSPH
     pub fn new(size: f32) -> DFSPH
     {
         DFSPH {
-            kernel: CubicSpine::new(0.1), // FIXME ?
-            particle_radius: 0.025, // FIXME !!
-            size: size, // pas FIXME :D
+            kernel: CubicSpine::new(2.), // FIXME ?
+            particle_radius: 0.5, // FIXME !!
+            size, // pas FIXME :D
 
             rest_density: 1000.0, //FIXME
 
@@ -76,8 +78,20 @@ impl DFSPH
             cfl_factor: 1.0,
             time_step: 0.0001,
 
+            v_max: 0.0,
+
             particles: Vec::new(),
         }
+    }
+
+    pub fn clear(&mut self) { self.particles.clear(); }
+
+    pub fn get_v_max(&self) -> f32 {
+        self.v_max
+    }
+
+    pub fn get_time_step(&self) -> f32 {
+        self.time_step
     }
 
     pub fn len(&self) -> usize {
@@ -98,8 +112,6 @@ impl DFSPH
     {
         let epsilon = 1.0;
 
-        let mut count = 0;
-
         let epsize = self.size - 2. * epsilon;
         let jx = (fx * epsize / self.particle_radius) as usize;
         let jy = (fy * epsize / self.particle_radius) as usize;
@@ -118,14 +130,6 @@ impl DFSPH
                         epsilon + radius * y as f32,
                         epsilon + radius * z as f32,
                     );
-
-                    /*
-                    count += 1;
-
-                    if count == 10 {
-                        return;
-                    }
-                    */
                 }
             }
         }
@@ -137,7 +141,7 @@ impl DFSPH
     }
 
     fn gradient(&self, i: usize, j: usize) -> Vector3<f32> {
-        self.kernel.gradient(&(self.particles[i].position - self.particles[j].position))
+        self.kernel.gradient(&(&self.particles[i].position - &self.particles[j].position))
     }
 
     fn kernel_apply(&self, i: usize, j: usize) -> f32 {
@@ -148,11 +152,11 @@ impl DFSPH
         (self.position(i) - self.position(j)).norm_squared()
     }
 
-    fn position(&self, i: usize) -> Vector3<f32> {
-        self.particles[i].position
+    fn position(&self, i: usize) -> &Vector3<f32> {
+        &self.particles[i].position
     }
 
-    fn mass(&self, i: usize) -> f32 {
+    fn mass(&self, _i: usize) -> f32 {
         self.particle_radius.powi(3)
     }
 
@@ -219,15 +223,15 @@ impl DFSPH
 
     fn adapt_cfl(&mut self) {
         // Compute max velocity
-        let mut vmax : f32 = 0.0;
+        let mut v_max: f32 = 0.0;
 
         for i in 0..self.len() {
-            vmax = vmax.max(self.velocity(i).norm_squared());
+            v_max = v_max.max(self.velocity(i).norm_squared());
         }
 
-        vmax = vmax.sqrt();
+        self.v_max = v_max.sqrt();
 
-        self.time_step = ((self.cfl_factor * self.particle_radius) / vmax)
+        self.time_step = ((self.cfl_factor * self.particle_radius) / self.v_max)
             .max(self.cfl_min_time_step)
             .min(self.cfl_max_time_step);
     }
@@ -243,7 +247,7 @@ impl DFSPH
         let sum = sum_a.norm_squared() + sum_b;
 
         self.particles[i].stiffness = match sum {
-            sum if sum > EPSILON => 1.0 /sum,
+            sum if sum > EPSILON => 1.0 / sum,
             _ => 0.0,
         };
     }
@@ -266,7 +270,7 @@ impl DFSPH
         for i in 0..self.len() {
             let delta = self.neighbours_reduce_f(i, &|r, i, j| r + self.mass(j) * (self.velocity(i) - self.velocity(j)).dot(&self.gradient(i, j)));
             // FIXME: divide by density0 ?: 
-            self.particles[i].density_prediction = (self.density(i)/self.rest_density + self.time_step * delta);
+            self.particles[i].density_prediction = self.density(i) / self.rest_density + self.time_step * delta;
             //println!("{:?}", self.particles[i].density_prediction);
         }
     }
@@ -302,7 +306,7 @@ impl DFSPH
 
             for i in 0..self.len() {
                 //FIXME multiply by density0 ?
-                density_avg += self.density_adv(i) * self.rest_density - self.rest_density;
+                density_avg += self.density_adv(i);
             }
 
             density_avg /= self.len() as f32;
@@ -380,17 +384,12 @@ impl DFSPH
 
         for i in 0..self.len() {
             self.compute_density(i);
-        }
-
-        for i in 0..self.len() {
             self.compute_stiffness(i);
         }
     }
 
     pub fn tick(&mut self) {
         self.init();
-
-
         self.correct_divergence_error();
 
         for i in 0..self.len() {
@@ -408,14 +407,5 @@ impl DFSPH
         for i in 0..self.len() {
             self.update_position(i);
         }
-
-        for i in 0..self.len() {
-            if self.velocity(i).norm() <= 0.2 {
-                println!("hibou {}", i);
-            }
-        }
-
-        println!("{}", self.velocity(0));
     }
-
 }
