@@ -85,14 +85,14 @@ impl Scene
 
     pub fn particle(&self, id: usize) -> (f32, f32, f32)
     {
-        let vec = self.particles[id].position;
+        let vec = &self.particles[id].position;
 
         (vec.x, vec.y, vec.z)
     }
 
     pub fn particle_dx(&self, id: usize) -> (f32, f32, f32)
     {
-        let vec = self.particles[id].position - self.particles[id].prev_position;
+        let vec = &self.particles[id].position - &self.particles[id].prev_position;
 
         (vec.x, vec.y, vec.z)
     }
@@ -187,7 +187,7 @@ impl Scene
             let par_self = &self.particles[id];
             let par_neib = &self.particles[nid];
 
-            let dir = par_neib.position - par_self.position;
+            let dir = &par_neib.position - &par_self.position;
 
             // pressure
             let dm = par_self.pressure * 2. * neighbour.dist +
@@ -200,7 +200,7 @@ impl Scene
             let dir = dir.normalize();
 
             // FIXME why viscosity impacts directly velocity and not forces ?
-            let velocity_diff = match (par_self.velocity - par_neib.velocity).dot(&dir)
+            let velocity_diff = match (&par_self.velocity - &par_neib.velocity).dot(&dir)
             {
                 u if u > 0. => (1. - q) * (SIGMA * u + BETA * u*u) * dir * 0.5,
                 _ => Vector3::zeros(),
