@@ -9,24 +9,24 @@ const SIGMA : f32 = 0.2;
 const BETA : f32 = 0.2;
 
 #[derive(Copy, Clone)]
-struct ParticleNeighbour
+pub struct ParticleNeighbour
 {
-    id: usize,
-    dist: f32,
-    sq_dist: f32,
+    pub id: usize,
+    pub dist: f32,
+    pub sq_dist: f32,
 }
 
-struct Particle
+pub struct Particle
 {
-    position: Vector3<f32>,
+    pub position: Vector3<f32>,
     prev_position: Vector3<f32>,
-    density: f32,
+    pub density: f32,
     density_near: f32,
-    neighbours: Vec<ParticleNeighbour>,
+    pub neighbours: Vec<ParticleNeighbour>,
     pressure: f32,
-    pressure_near: f32, // FIXME
+    pressure_near: f32,
     force: Vector3<f32>,
-    velocity: Vector3<f32>,
+    pub velocity: Vector3<f32>,
 }
 
 impl Particle
@@ -106,8 +106,8 @@ impl Scene
     {
         let epsize = self.size - 2. * EPSILON;
         let jx = (fx * epsize / self.particle_radius) as usize;
-        let jy = (fx * epsize / self.particle_radius) as usize;
-        let jz = (fx * epsize / self.particle_radius) as usize;
+        let jy = (fy * epsize / self.particle_radius) as usize;
+        let jz = (fz * epsize / self.particle_radius) as usize;
         let cx = 2 * (px * epsize / self.particle_radius) as usize + jx;
         let cy = 2 * (py * epsize / self.particle_radius) as usize + jy;
         let cz = 2 * (pz * epsize / self.particle_radius) as usize + jz;
@@ -158,8 +158,7 @@ impl Scene
         let mut vec = Vec::new();
 
         for i in 0..self.particles.len() {
-            let dir = self.particles[i].position - particle.position;
-            let sq_dist = (self.particles[i].position - particle.position).norm_squared();
+            let sq_dist = (&self.particles[i].position - &particle.position).norm_squared();
 
             if i != id && sq_dist <= self.sq_particle_radius {
                 vec.push(ParticleNeighbour {

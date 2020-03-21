@@ -1,7 +1,7 @@
 extern crate render;
 extern crate sph_common;
 
-use nalgebra::{Point3, Vector, Vector3};
+use nalgebra::{Point3};
 use sph_common::Scene;
 
 fn main() {
@@ -17,7 +17,7 @@ fn main() {
 
     for i in 0..sph_scene.len() {
         scene.push_particle(render::particle::Particle {
-            position: sph_scene.particle_dx(i),
+            position: sph_scene.particle(i),
             color: (0., 0., 1.),
         })
     }
@@ -33,7 +33,7 @@ fn main() {
                             println!("audran tg");
                             scene.clear();
                             sph_scene.clear();
-                        },
+                        }
                         render::event::Key::Space => {
                             let prev_len = sph_scene.len();
                             sph_scene.fill_part(0.4, 0.6, 0.4, 0.2, 0.4, 0.2);
@@ -42,17 +42,16 @@ fn main() {
 
                             for i in prev_len..sph_scene.len() {
                                 scene.push_particle(render::particle::Particle {
-                                    position: sph_scene.particle_dx(i),
+                                    position: sph_scene.particle(i),
                                     color: (0., 0., 1.),
                                 });
                             }
-                        },
+                        }
                         _ => {}
                     }
-                },
-            _ => {}
+                }
+                _ => {}
             }
-
         }
 
 
