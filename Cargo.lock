@@ -1160,6 +1160,7 @@ name = "sph_common"
 version = "0.1.0"
 dependencies = [
  "nalgebra 0.20.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.104 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
