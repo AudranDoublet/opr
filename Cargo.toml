@@ -11,3 +11,4 @@ sph_common = { path = "common" }
 render = { path = "render" }
 rand = "0.7.3"
 nalgebra = "0.20.0"
+

@@ -1,14 +1,22 @@
 extern crate nalgebra;
+extern crate serde;
 
+use std::fs::File;
+use std::io::{BufWriter, BufReader};
+
+use flate2::Compression;
+use flate2::write::ZlibEncoder;
+use flate2::read::ZlibDecoder;
 use nalgebra::Vector3;
+use serde::{Deserialize, Serialize};
 
-const STIFFNESS : f32 = 2. / 1000.;
-const STIFFNESS_NEAR : f32 = STIFFNESS * 10.;
-const EPSILON : f32 = 1.;
-const SIGMA : f32 = 0.2;
-const BETA : f32 = 0.2;
+const STIFFNESS: f32 = 2. / 1000.;
+const STIFFNESS_NEAR: f32 = STIFFNESS * 10.;
+const EPSILON: f32 = 1.;
+const SIGMA: f32 = 0.2;
+const BETA: f32 = 0.2;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Serialize, Deserialize, Debug)]
 pub struct ParticleNeighbour
 {
     pub id: usize,
@@ -16,6 +24,7 @@ pub struct ParticleNeighbour
     pub sq_dist: f32,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Particle
 {
     pub position: Vector3<f32>,
@@ -47,12 +56,13 @@ impl Particle
     }
 }
 
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Scene
 {
-    particles: Vec<Particle>,
+    pub particles: Vec<Particle>,
     pub particle_radius: f32,
     sq_particle_radius: f32,
-    rest_density: f32,
+    pub rest_density: f32,
     gravity: Vector3<f32>,
     pub size: f32,
     spring_const: f32,
@@ -69,7 +79,7 @@ impl Scene
             rest_density: 3.,
             gravity: Vector3::new(0., -0.005, 0.),
             size: 20.0,
-            spring_const: 1./8.,
+            spring_const: 1. / 8.,
         }
     }
 
@@ -125,7 +135,6 @@ impl Scene
                 }
             }
         }
-
     }
 
     pub fn fill(&mut self, px: f32, py: f32, pz: f32)
@@ -143,11 +152,11 @@ impl Scene
 
         for mut n in neighbours {
             // replace dist by weighted dist
-            n.dist      = 1. - n.dist / self.particle_radius;
-            n.sq_dist   = n.dist * n.dist;
+            n.dist = 1. - n.dist / self.particle_radius;
+            n.sq_dist = n.dist * n.dist;
 
-            particle.density        += n.sq_dist;
-            particle.density_near   += n.sq_dist * n.dist;
+            particle.density += n.sq_dist;
+            particle.density_near += n.sq_dist * n.dist;
             particle.neighbours.push(n);
         }
     }
@@ -175,8 +184,8 @@ impl Scene
     fn compute_pressure(&mut self, id: usize)
     {
         let particle = &mut self.particles[id];
-        particle.pressure       = STIFFNESS * (particle.density - self.rest_density);
-        particle.pressure_near  = STIFFNESS_NEAR * particle.density_near;
+        particle.pressure = STIFFNESS * (particle.density - self.rest_density);
+        particle.pressure_near = STIFFNESS_NEAR * particle.density_near;
     }
 
     fn compute_forces(&mut self, id: usize)
@@ -191,7 +200,7 @@ impl Scene
 
             // pressure
             let dm = par_self.pressure * 2. * neighbour.dist +
-                        (par_self.pressure_near + par_neib.pressure_near) * neighbour.sq_dist;
+                (par_self.pressure_near + par_neib.pressure_near) * neighbour.sq_dist;
 
             let force_diff = dir.normalize() * dm;
 
@@ -202,15 +211,15 @@ impl Scene
             // FIXME why viscosity impacts directly velocity and not forces ?
             let velocity_diff = match (&par_self.velocity - &par_neib.velocity).dot(&dir)
             {
-                u if u > 0. => (1. - q) * (SIGMA * u + BETA * u*u) * dir * 0.5,
+                u if u > 0. => (1. - q) * (SIGMA * u + BETA * u * u) * dir * 0.5,
                 _ => Vector3::zeros(),
             };
 
             // apply
-            self.particles[nid].force       += force_diff;
-            self.particles[id].force        -= force_diff;
-            self.particles[nid].velocity    += velocity_diff;
-            self.particles[id].velocity     -= velocity_diff;
+            self.particles[nid].force += force_diff;
+            self.particles[id].force -= force_diff;
+            self.particles[nid].velocity += velocity_diff;
+            self.particles[id].velocity -= velocity_diff;
         }
     }
 
@@ -226,21 +235,21 @@ impl Scene
 
         // apply boundaries
         particle.force.x -= self.spring_const * match particle.position.x {
-            v if v < EPSILON                => v - EPSILON,
-            v if v > self.size - EPSILON    => v + EPSILON - self.size,
-            _                               => 0.0,
+            v if v < EPSILON => v - EPSILON,
+            v if v > self.size - EPSILON => v + EPSILON - self.size,
+            _ => 0.0,
         };
 
         particle.force.y -= self.spring_const * match particle.position.y {
-            v if v < EPSILON                => v - EPSILON,
-            v if v > self.size - EPSILON    => v + EPSILON - self.size,
-            _                               => 0.0,
+            v if v < EPSILON => v - EPSILON,
+            v if v > self.size - EPSILON => v + EPSILON - self.size,
+            _ => 0.0,
         };
 
         particle.force.z -= self.spring_const * match particle.position.z {
-            v if v < EPSILON                => v - EPSILON,
-            v if v > self.size - EPSILON    => v + EPSILON - self.size,
-            _                               => 0.0,
+            v if v < EPSILON => v - EPSILON,
+            v if v > self.size - EPSILON => v + EPSILON - self.size,
+            _ => 0.0,
         };
     }
 
@@ -262,5 +271,21 @@ impl Scene
         for particle in 0..self.particles.len() {
             self.compute_forces(particle);
         }
+    }
+
+    pub fn dump(&self, path: &str) -> Result<(), std::io::Error> {
+        let buffer = BufWriter::new(File::create(path)?);
+        let encoder = ZlibEncoder::new(buffer, Compression::default());
+        serde_json::to_writer(encoder,self)?;
+
+        Ok(())
+    }
+
+    pub fn load(path: &str) -> Result<Scene, std::io::Error> {
+        let buffer = BufReader::new(File::open(path)?);
+        let decoder = ZlibDecoder::new(buffer);
+        let r = serde_json::from_reader(decoder)?;
+
+        Ok(r)
     }
 }
