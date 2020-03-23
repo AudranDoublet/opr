@@ -2,13 +2,17 @@ extern crate nalgebra;
 extern crate serde;
 
 use std::fs::File;
-use std::io::{BufWriter, BufReader};
+use std::io::{BufReader, BufWriter};
 
 use flate2::Compression;
-use flate2::write::ZlibEncoder;
 use flate2::read::ZlibDecoder;
+use flate2::write::ZlibEncoder;
 use nalgebra::Vector3;
 use serde::{Deserialize, Serialize};
+
+use crate::kernel::Kernel;
+use crate::kernel::kernels::CubicSpine;
+use crate::mesher::FluidSnapshot;
 
 const STIFFNESS: f32 = 2. / 1000.;
 const STIFFNESS_NEAR: f32 = STIFFNESS * 10.;
@@ -65,7 +69,31 @@ pub struct Scene
     pub rest_density: f32,
     gravity: Vector3<f32>,
     pub size: f32,
+    kernel: CubicSpine,
     spring_const: f32,
+}
+
+impl FluidSnapshot for Scene {
+    fn particles(&self) -> Vec<Vector3<f32>> {
+        let mut v = vec![Vector3::zeros(); self.particles.len()];
+        for i in 0..self.particles.len() {
+            v[i] = self.particles[i].position;
+        }
+        v
+    }
+
+    fn density_at(&self, position: Vector3<f32>) -> f32 {
+        let mut density = 0.;
+        for i in 0..self.particles.len() {
+            let neighbour = &self.particles[i];
+            let sq_dist = (&neighbour.position - &position).norm_squared();
+
+            if sq_dist <= self.sq_particle_radius {
+                density += sq_dist;
+            }
+        }
+        density
+    }
 }
 
 impl Scene
@@ -79,6 +107,7 @@ impl Scene
             rest_density: 3.,
             gravity: Vector3::new(0., -0.005, 0.),
             size: 20.0,
+            kernel: CubicSpine::new(1.),
             spring_const: 1. / 8.,
         }
     }
@@ -276,7 +305,7 @@ impl Scene
     pub fn dump(&self, path: &str) -> Result<(), std::io::Error> {
         let buffer = BufWriter::new(File::create(path)?);
         let encoder = ZlibEncoder::new(buffer, Compression::default());
-        serde_json::to_writer(encoder,self)?;
+        serde_json::to_writer(encoder, self)?;
 
         Ok(())
     }
