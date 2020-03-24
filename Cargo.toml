@@ -8,6 +8,9 @@ edition = "2018"
 
 [dependencies]
 sph_common = { path = "common" }
+sph_scene = { path = "scene" }
 render = { path = "render" }
 rand = "0.7.3"
 nalgebra = "0.20.0"
+image = "0.23.2"
+clap = {version = "~2.33.0", features = ["yaml"]}
