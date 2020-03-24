@@ -10,6 +10,7 @@ use nalgebra::Vector3;
 pub struct Mesh
 {
     bsh: BoundingSphereHierarchy,
+    distance_mult: f32,
     pub bounding_min: Vector3<f32>,
     pub bounding_max: Vector3<f32>,
 }
@@ -81,16 +82,24 @@ impl Mesh
 
         Ok(Mesh {
             bsh: BoundingSphereHierarchy::new(&mut triangles, 15),
+            distance_mult: 1.0,
             bounding_min: Vector3::new(min[0], min[1], min[2]),
             bounding_max: Vector3::new(max[0], max[1], max[2]),
         })
     }
 
     /**
+     * Invert mesh distances
+     */
+    pub fn invert(&mut self) {
+        self.distance_mult = -self.distance_mult;
+    }
+
+    /**
      * Compute the minimal (abs) signed distance between the point and the mesh
      */
     pub fn minimal_signed_distance(&self, p: Vector3<f32>) -> f32 {
-        self.bsh.minimal_signed_distance(p)
+        self.bsh.minimal_signed_distance(p) * self.distance_mult
     }
 
     /**
