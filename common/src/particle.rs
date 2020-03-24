@@ -88,8 +88,9 @@ impl FluidSnapshot for Scene {
             let neighbour = &self.particles[i];
             let sq_dist = (&neighbour.position - &position).norm_squared();
 
-            if sq_dist <= self.sq_particle_radius {
-                density += sq_dist;
+            if sq_dist >= 0.01 && sq_dist <= self.sq_particle_radius {
+                // density += sq_dist;
+                density += self.kernel.apply_on_norm(sq_dist.sqrt());
             }
         }
         density
