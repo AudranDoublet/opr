@@ -3,17 +3,18 @@ extern crate serde_yaml;
 use std::fs::File;
 use std::path::Path;
 
-use sph_common::{RigidObject};
+use sph_common::{RigidObject, DFSPH};
 
 use serde_derive::*;
-use crate::Solid;
+use crate::{Solid, LiquidZone};
 
 #[derive(Debug, Deserialize)]
 pub struct Configuration
 {
     #[serde(default)]
     pub gravity: [f32; 3],
-    pub kernel_radius: f32,
+    pub kernel_radius: f32, //FIXME mark as default ?
+    pub particle_radius: f32,
 }
 
 impl Default for Configuration
@@ -21,7 +22,8 @@ impl Default for Configuration
     fn default() -> Self {
         Configuration {
             gravity: [0.0, -9.81, 0.0],
-            kernel_radius: 0.0, // FIXME default ?
+            kernel_radius: 0.1,
+            particle_radius: 0.025,
         }
     }
 }
@@ -51,6 +53,7 @@ pub struct Scene
     pub global_config: CommandLineConfiguration,
     pub config: Configuration,
     pub solids: Vec<Solid>,
+    pub liquids_blocks: Vec<LiquidZone>,
 }
 
 impl Scene
@@ -72,6 +75,19 @@ impl Scene
         }
 
         Ok(solids)
+    }
+
+    pub fn load(&self) -> Result<DFSPH, Box<dyn std::error::Error>> {
+        self.create_cache_dir()?;
+
+        let _solids = self.load_solids()?;
+        let mut result = DFSPH::new(self.config.kernel_radius, self.config.particle_radius);
+
+        for liquid in &self.liquids_blocks {
+            liquid.create_particles(&mut result);
+        }
+
+        Ok(result)
     }
 }
 

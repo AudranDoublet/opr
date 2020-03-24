@@ -1,11 +1,18 @@
-extern crate render;
-extern crate sph_common;
+//extern crate render;
+//extern crate sph_common;
+//
+//use std::time::Instant;
+//
+//use kiss3d::camera::camera::Camera;
+//use nalgebra::Point3;
+//use sph_common::DFSPH;
 
-use std::time::Instant;
+extern crate sph_scene;
 
-use kiss3d::camera::camera::Camera;
-use nalgebra::Point3;
-use sph_common::DFSPH;
+#[macro_use]
+extern crate clap;
+
+use clap::App;
 
 /*
 fn main() {
@@ -20,8 +27,32 @@ fn main() {
 }
 */
 
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let conf = load_yaml!("cli.yml");
+    let matches = App::from_yaml(conf).get_matches();
 
-fn main() {
+    let scene_file = matches.value_of("SCENE").unwrap();
+    let mut scene = sph_scene::load_scene(scene_file)?;
+
+    if matches.is_present("nocache") {
+        println!("Cache disabled");
+        scene.global_config.use_cache = false;
+    }
+
+    if let Some(data_dir) = matches.value_of("data_dir") {
+        println!("Custom data directory: {}", data_dir);
+        scene.global_config.data_path = data_dir.to_string();
+    }
+
+    if let Some(cache_dir) = matches.value_of("cache_dir") {
+        println!("Custom cache directory: {}", cache_dir);
+        scene.global_config.cache_path = cache_dir.to_string();
+    }
+
+    let _scene = scene.load()?;
+
+    Ok(())
+/*
     let mut sph_scene = DFSPH::new(20.0);
     sph_scene.fill(0.2, 0.2, 0.2);
 
@@ -96,4 +127,5 @@ fn main() {
         // refresh rendering
         scene.update();
     }
+*/
 }

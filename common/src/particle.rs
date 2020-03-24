@@ -1,8 +1,7 @@
 use nalgebra::Vector3;
+use crate::kernel::{kernels::CubicSpine, Kernel};
 
-use crate::kernel::{Kernel, kernels::CubicSpine};
-
-const EPSILON: f32 = 1e-5;
+const EPSILON : f32 = 1e-5;
 
 #[derive(Debug)]
 pub struct Particle
@@ -22,7 +21,7 @@ pub struct DFSPH
     // parameters
     kernel: CubicSpine,
     pub particle_radius: f32,
-    size: f32,
+
     rest_density: f32,
 
     correct_density_max_error: f32,
@@ -60,12 +59,11 @@ impl Particle
 
 impl DFSPH
 {
-    pub fn new(size: f32) -> DFSPH
+    pub fn new(kernel_radius: f32, particle_radius: f32) -> DFSPH
     {
         DFSPH {
-            kernel: CubicSpine::new(2.), // FIXME ?
-            particle_radius: 0.5, // FIXME !!
-            size, // pas FIXME :D
+            kernel: CubicSpine::new(kernel_radius),
+            particle_radius: particle_radius,
 
             rest_density: 1000.0, //FIXME
 
@@ -108,38 +106,6 @@ impl DFSPH
         self.particles.push(Particle::new(x, y, z))
     }
 
-    pub fn fill_part(&mut self, fx: f32, fy: f32, fz: f32, px: f32, py: f32, pz: f32)
-    {
-        let epsilon = 1.0;
-
-        let epsize = self.size - 2. * epsilon;
-        let jx = (fx * epsize / self.particle_radius) as usize;
-        let jy = (fy * epsize / self.particle_radius) as usize;
-        let jz = (fz * epsize / self.particle_radius) as usize;
-        let cx = 2 * (px * epsize / self.particle_radius) as usize + jx;
-        let cy = 2 * (py * epsize / self.particle_radius) as usize + jy;
-        let cz = 2 * (pz * epsize / self.particle_radius) as usize + jz;
-
-        let radius = self.particle_radius * 1.;
-
-        for x in jx..cx {
-            for y in jy..cy {
-                for z in jz..cz {
-                    self.add_particle(
-                        epsilon + radius * x as f32,
-                        epsilon + radius * y as f32,
-                        epsilon + radius * z as f32,
-                    );
-                }
-            }
-        }
-    }
-
-    pub fn fill(&mut self, px: f32, py: f32, pz: f32)
-    {
-        self.fill_part(0.0, 0.0, 0.0, px, py, pz)
-    }
-
     fn gradient(&self, i: usize, j: usize) -> Vector3<f32> {
         self.kernel.gradient(&(&self.particles[i].position - &self.particles[j].position))
     }
@@ -154,6 +120,10 @@ impl DFSPH
 
     fn position(&self, i: usize) -> &Vector3<f32> {
         &self.particles[i].position
+    }
+
+    pub fn particle_radius(&self) -> f32 {
+        self.particle_radius
     }
 
     fn mass(&self, _i: usize) -> f32 {
