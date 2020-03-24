@@ -44,6 +44,12 @@ impl DiscreteGrid {
         Ok(result)
     }
 
+    pub fn save(&self, file: &File) -> Result<(), Box<dyn std::error::Error>> {
+        serde_cbor::to_writer(file, &self)?;
+
+        Ok(())
+    }
+
     pub fn new(domain_min: Vector3<f32>, domain_max: Vector3<f32>, resolution: Vector3<u32>) -> DiscreteGrid {
         let diff = domain_max - domain_min;
 
