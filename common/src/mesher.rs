@@ -15,13 +15,16 @@ pub trait FluidSnapshot {
 
     /// Returns an Axis-Aligned bounding box partition of the space where the liquid is located
     ///
+    /// # Arguments
+    /// * `min_dist` - Minimum distance between bounding boxes
+    ///
     /// # Default Implementation
     /// By default, an iteration over all samples is performed to find the bottom left front and
     /// the top right back vertices of the AABB containing the whole fluid and returns them
     ///
     /// # Optimization
     /// To decrease the cpu/memory consummation, it's better to split the fluid into multiple AABB
-    fn aabb(&self) -> std::vec::Vec<(Vector3<f32>, Vector3<f32>)> {
+    fn aabb(&self, min_dist: f32) -> std::vec::Vec<(Vector3<f32>, Vector3<f32>)> {
         // FIXME: the default implementation is too naive, it'd be better to split the fluid into multiple AABB
         let mut a = Vector3::new(f32::MAX, f32::MAX, f32::MAX); // bottom left front
         let mut b = Vector3::new(f32::MIN, f32::MIN, f32::MIN); // top right back
@@ -38,7 +41,7 @@ pub trait FluidSnapshot {
                 b.z = b.z.max(p.z);
             });
 
-        vec![(a, b)]
+        vec![(a - Vector3::new(min_dist, min_dist, min_dist), b + Vector3::new(min_dist, min_dist, min_dist))]
     }
 }
 
@@ -109,7 +112,7 @@ impl Mesher {
             let pos = self.to_world(origin, points[i]);
             let density = scene.density_at(pos);
             index |= match density {
-                v if v >= self.iso_value => 1,
+                v if v <= self.iso_value => 1,
                 _ => 0
             } << i;
         }
@@ -184,7 +187,7 @@ impl Mesher {
     }
 
     fn to_mesh_fluid(&self, scene: &impl FluidSnapshot) -> (Vec<Vertex>, Vec<Normal>, Vec<TriangleCoordinates>) {
-        let bounding_boxes = scene.aabb();
+        let bounding_boxes = scene.aabb(self.cube_size);
 
         let mut r_vertices = Vec::new();
         let mut r_normals = Vec::new();
