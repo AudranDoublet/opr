@@ -280,7 +280,6 @@ impl DFSPH
             }
 
             density_avg /= self.len() as f32;
-            println!("density_avg: {}", density_avg);
 
             let eta = self.correct_density_max_error * 0.01 * self.rest_density;
 
@@ -323,7 +322,6 @@ impl DFSPH
 
             density_div_avg /= self.len() as f32;
 
-            println!("density_div_avg: {}", density_div_avg);
             let eta = 1. / self.time_step * self.correct_divergence_max_error * 0.01 * self.rest_density;
 
             chk |= density_div_avg < eta;

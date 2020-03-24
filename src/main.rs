@@ -1,11 +1,10 @@
-//extern crate render;
+extern crate render;
 //extern crate sph_common;
 //
-//use std::time::Instant;
-//
-//use kiss3d::camera::camera::Camera;
-//use nalgebra::Point3;
-//use sph_common::DFSPH;
+use std::time::Instant;
+
+use kiss3d::camera::camera::Camera;
+use nalgebra::Point3;
 
 extern crate sph_scene;
 
@@ -49,20 +48,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         scene.global_config.cache_path = cache_dir.to_string();
     }
 
-    let _scene = scene.load()?;
-
-    Ok(())
-/*
-    let mut sph_scene = DFSPH::new(20.0);
-    sph_scene.fill(0.2, 0.2, 0.2);
-
-    println!("{:?}", sph_scene.len());
+    let mut sph_scene = scene.load()?;
     let mut total_time = 0.0;
 
-    let mut scene = render::scene::Scene::new(sph_scene.particle_radius / 2.);
-    scene.camera
-        .look_at(Point3::new(30., 5., 0.), Point3::new(0., 0., 5.));
-
+    let mut scene = render::scene::Scene::new(sph_scene.particle_radius() / 2.);
+    scene.camera.look_at(Point3::new(0.0, 1., -2.), Point3::new(0., 0., 5.)); //FIXME make camera configurable
 
     for i in 0..sph_scene.len() {
         scene.push_particle(render::particle::Particle {
@@ -87,7 +77,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                         render::event::Key::Space => {
                             let prev_len = sph_scene.len();
-                            sph_scene.fill_part(0.4, 0.6, 0.4, 0.2, 0.4, 0.2);
+                            //sph_scene.fill_part(0.4, 0.6, 0.4, 0.2, 0.4, 0.2);
 
                             println!("{:?}", sph_scene.len());
 
@@ -127,5 +117,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // refresh rendering
         scene.update();
     }
-*/
+
+    Ok(())
 }
