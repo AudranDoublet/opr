@@ -38,8 +38,6 @@ pub trait FluidSnapshot {
                 b.z = b.z.max(p.z);
             });
 
-        println!("a: {} | b: {}", a, b);
-
         vec![(a, b)]
     }
 }
@@ -101,7 +99,7 @@ impl Mesher {
         let b: Vector3<f32> = origin + nalgebra::convert::<Vector3<i32>, Vertex>(b) / 2. * self.cube_size;
         let c: Vector3<f32> = origin + nalgebra::convert::<Vector3<i32>, Vertex>(c) / 2. * self.cube_size;
 
-        (b - a).cross(&(c - a)).normalize()
+        (c - a).cross(&(b - a)).normalize()
     }
 
     fn search_configuration(&self, scene: &impl FluidSnapshot, origin: &Vertex, points: &[Vector3<i32>; 8]) -> usize {
@@ -110,7 +108,6 @@ impl Mesher {
         for i in 0..points.len() {
             let pos = self.to_world(origin, points[i]);
             let density = scene.density_at(pos);
-            println!("density: {} | pos: {}", density, pos);
             index |= match density {
                 v if v >= self.iso_value => 1,
                 _ => 0
