@@ -7,14 +7,14 @@ const EPSILON: f32 = 1e-5;
 #[derive(Debug)]
 pub struct Particle
 {
-    position: Vector3<f32>,
-    velocity: Vector3<f32>,
-    acceleration: Vector3<f32>,
+    pub position: Vector3<f32>,
+    pub velocity: Vector3<f32>,
+    pub acceleration: Vector3<f32>,
 
-    stiffness: f32,
-    density: f32,
-    density_prediction: f32,
-    neighbours: Vec<usize>,
+    pub stiffness: f32,
+    pub density: f32,
+    pub density_prediction: f32,
+    pub neighbours: Vec<usize>,
 }
 
 pub struct DFSPH
