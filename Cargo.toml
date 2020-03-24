@@ -14,3 +14,4 @@ rand = "0.7.3"
 nalgebra = "0.20.0"
 image = "0.23.2"
 clap = {version = "~2.33.0", features = ["yaml"]}
+kiss3d = "0.23.0"
