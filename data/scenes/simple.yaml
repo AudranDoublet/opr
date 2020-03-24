@@ -1,0 +1,11 @@
+config:
+    kernel_radius: 0.1
+solids:
+    - mesh: objects/box.obj
+      mesh_invert: true
+      resolution: [11, 11, 11]
+
+      scale: [1.0, 1.0, 1.0]
+      position: [0.0, 0.0, 0.0]
+      rotation_axis: [0.0, 0.0, 0.0]
+      rotation_angle: 0.0
