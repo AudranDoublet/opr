@@ -99,6 +99,7 @@ impl Solid {
             grid
         };
 
+        println!("{:?}", grid.interpolate(1, Vector3::new(0.5, 0.5, 0.5), true));
         println!("{} loaded!", self.mesh);
 
         let mut object = RigidObject::new(grid);

@@ -1,5 +1,8 @@
+use rayon::prelude::*;
+
 use nalgebra::Vector3;
 use crate::kernel::{kernels::CubicSpine, Kernel};
+use crate::RigidObject;
 
 const EPSILON : f32 = 1e-5;
 
@@ -38,6 +41,7 @@ pub struct DFSPH
     v_max: f32,
 
     particles: Vec<Particle>,
+    solids: Vec<RigidObject>,
 }
 
 impl Particle
@@ -59,7 +63,7 @@ impl Particle
 
 impl DFSPH
 {
-    pub fn new(kernel_radius: f32, particle_radius: f32) -> DFSPH
+    pub fn new(kernel_radius: f32, particle_radius: f32, solids: Vec<RigidObject>) -> DFSPH
     {
         DFSPH {
             kernel: CubicSpine::new(kernel_radius),
@@ -67,7 +71,7 @@ impl DFSPH
 
             rest_density: 1000.0, //FIXME
 
-            correct_density_max_error: 0.01,
+            correct_density_max_error: 0.001,
             correct_divergence_max_error: 0.01,
 
             // time step
@@ -78,6 +82,7 @@ impl DFSPH
 
             v_max: 0.0,
 
+            solids: solids,
             particles: Vec::new(),
         }
     }
@@ -110,8 +115,16 @@ impl DFSPH
         self.kernel.gradient(&(&self.particles[i].position - &self.particles[j].position))
     }
 
+    fn gradient_solid(&self, i: usize, j: Vector3<f32>) -> Vector3<f32> {
+        self.kernel.gradient(&(&self.particles[i].position - &j))
+    }
+
     fn kernel_apply(&self, i: usize, j: usize) -> f32 {
         self.kernel.apply_on_norm((self.position(i) - self.position(j)).norm())
+    }
+
+    fn kernel_apply_solid(&self, i: usize, j: Vector3<f32>) -> f32 {
+        self.kernel.apply_on_norm((self.position(i) - j).norm())
     }
 
     fn distance_sq(&self, i: usize, j: usize) -> f32 {
@@ -128,6 +141,11 @@ impl DFSPH
 
     fn mass(&self, _i: usize) -> f32 {
         self.particle_radius.powi(3)
+    }
+
+    fn volume(&self, _i: usize) -> f32 {
+        //self.particle_radius.powi(3)
+        5.12e-5
     }
 
     fn stiffness(&self, i: usize) -> f32 {
@@ -158,7 +176,21 @@ impl DFSPH
         let mut result = value;
 
         for j in 0..self.neighbours_count(i) {
-            result = f(result, i, j);
+            result = f(result, i, self.particles[i].neighbours[j]);
+        }
+
+        result
+    }
+
+    fn solids_reduce<V>(&self, i: usize, value: V, f: &dyn Fn(V, f32, Vector3<f32>) -> V) -> V {
+        let mut result = value;
+
+        for s in &self.solids {
+            let volume = s.particle_volume(i);
+
+            if volume > 0.0 {
+                result = f(result, volume, s.particle_boundary_x(i));
+            }
         }
 
         result
@@ -170,6 +202,14 @@ impl DFSPH
 
     fn neighbours_reduce_f(&self, i: usize, f: &dyn Fn(f32, usize, usize) -> f32) -> f32 {
         self.neighbours_reduce(i, 0.0, f)
+    }
+
+    fn solids_reduce_v(&self, i: usize, f: &dyn Fn(Vector3<f32>, f32, Vector3<f32>) -> Vector3<f32>) -> Vector3<f32> {
+        self.solids_reduce(i, Vector3::zeros(), f)
+    }
+
+    fn solids_reduce_f(&self, i: usize, f: &dyn Fn(f32, f32, Vector3<f32>) -> f32) -> f32 {
+        self.solids_reduce(i, 0.0, f)
     }
 
     fn compute_neighbours(&mut self, i: usize) {
@@ -207,17 +247,27 @@ impl DFSPH
     }
 
     fn compute_density(&mut self, i: usize) {
-        self.particles[i].density = self.neighbours_reduce_f(i, &|density, i, j| density + self.mass(j) * self.kernel_apply(i, j));
+        let self_dens = self.volume(i) * self.kernel_apply(i, i);
+        let neighbour_dens = self.neighbours_reduce_f(i, &|density, i, j| {
+            density + self.volume(j) * self.kernel_apply(i, j)
+        });
+        let solids_dens = self.solids_reduce_f(i, &|r, v, x| r + v * self.kernel_apply_solid(i, x));
+
+        self.particles[i].density = (self_dens + neighbour_dens + solids_dens) * self.rest_density; // mass
     }
 
     fn compute_stiffness(&mut self, i: usize) {
-        let sum_a = self.neighbours_reduce_v(i, &|r, i, j| r + self.mass(j) * self.gradient(i, j));
-        let sum_b = self.neighbours_reduce_f(i, &|r, i, j| r + (self.mass(j) * self.gradient(i, j)).norm_squared());
+        let sum_a = self.neighbours_reduce_v(i, &|r, i, j| r + self.volume(j) * self.gradient(i, j));
+        let sum_b = self.neighbours_reduce_f(i, &|r, i, j| {
+            r + (self.volume(j) * self.gradient(i, j)).norm_squared()
+        });
 
+        // boundaries
+        let sum_a = sum_a + self.solids_reduce_v(i, &|total, v, p| total + v * self.gradient_solid(i, p));
         let sum = sum_a.norm_squared() + sum_b;
 
         self.particles[i].stiffness = match sum {
-            sum if sum > EPSILON => 1.0 / sum,
+            sum if sum > EPSILON => -1.0 / sum,
             _ => 0.0,
         };
     }
@@ -227,8 +277,12 @@ impl DFSPH
             let density_adv = if self.neighbours_count(i) < 20 {
                 0.0
             } else {
-                let delta = self.neighbours_reduce_f(i, &|r, i, j| r + self.mass(j) * (self.velocity(i) - self.velocity(j)).dot(&self.gradient(i, j)));
-                //println!("delta: {}", delta);
+                let mut delta = self.neighbours_reduce_f(i, &|r, i, j| r + self.volume(j) * (self.velocity(i) - self.velocity(j)).dot(&self.gradient(i, j)));
+                delta += self.solids_reduce_f(i, &|r, v, x| {
+                    let vj = Vector3::zeros(); //FIXME compute velocity for moving solids
+                    r + v * (self.velocity(i) - vj).dot(&self.gradient_solid(i, x))
+                });
+
                 delta.max(0.0)
             };
 
@@ -238,10 +292,13 @@ impl DFSPH
 
     fn compute_density_advection(&mut self) {
         for i in 0..self.len() {
-            let delta = self.neighbours_reduce_f(i, &|r, i, j| r + self.mass(j) * (self.velocity(i) - self.velocity(j)).dot(&self.gradient(i, j)));
-            // FIXME: divide by density0 ?: 
-            self.particles[i].density_prediction = self.density(i) / self.rest_density + self.time_step * delta;
-            //println!("{:?}", self.particles[i].density_prediction);
+            let mut delta = self.neighbours_reduce_f(i, &|r, i, j| r + self.volume(j) * (self.velocity(i) - self.velocity(j)).dot(&self.gradient(i, j)));
+            delta += self.solids_reduce_f(i, &|r, v, x| {
+                let vj = Vector3::zeros(); //FIXME compute velocity for moving solids
+                r + v * (self.velocity(i) - vj).dot(&self.gradient_solid(i, x))
+            });
+
+            self.particles[i].density_prediction = (self.density(i) / self.rest_density + self.time_step * delta).max(1.0);
         }
     }
 
@@ -252,22 +309,32 @@ impl DFSPH
         let mut chk = false;
 
         while (!chk || iter_count <= 1) && iter_count < 1000 {
-            // FIXME pk -1 ? density0 ? sami pas content
             for i in 0..self.len() {
-                let ki = (self.density_adv(i) - 0.) * self.stiffness(i) / self.time_step.powi(2);
+                let ki = (self.density_adv(i) - 1.) * self.stiffness(i) / self.time_step.powi(2);
 
                 let diff = self.neighbours_reduce_v(i, &|r, i, j| {
-                    let sum = ki + (self.density_adv(j) - 0.) * self.stiffness(j) / self.time_step.powi(2);
+                    let sum = ki + (self.density_adv(j) - 1.) * self.stiffness(j) / self.time_step.powi(2);
 
                     //println!("sum: {}" ,sum );
-                    if sum <= EPSILON {
+                    if sum.abs() <= EPSILON {
                         return r;
                     }
 
-                    r + self.time_step * self.mass(j) * sum * self.gradient(i, j)
+                    let grad = -self.volume(j) * self.gradient(i, j);
+
+                    r - self.time_step * sum * grad
                 });
 
-                self.particles[i].velocity -= diff;
+                let boundary_diff = match ki.abs() {
+                    v if v > EPSILON => self.solids_reduce_v(i, &|r, v, x| {
+                            let grad = -v * self.gradient_solid(i, x);
+                            //FIXME add force to solid
+                            r + (-self.time_step * 1.0 * ki * grad)
+                        }),
+                    _ => Vector3::zeros(),
+                };
+
+                self.particles[i].velocity += diff + boundary_diff;
             }
 
             self.compute_density_advection();
@@ -275,8 +342,7 @@ impl DFSPH
             let mut density_avg = 0.0;
 
             for i in 0..self.len() {
-                //FIXME multiply by density0 ?
-                density_avg += self.density_adv(i);
+                density_avg += self.density_adv(i) * self.rest_density - self.rest_density;
             }
 
             density_avg /= self.len() as f32;
@@ -301,14 +367,20 @@ impl DFSPH
                 let diff = self.neighbours_reduce_v(i, &|r, i, j| {
                     let sum = ki + self.density_adv(j) * self.stiffness(j) / self.time_step;
 
-                    if sum <= EPSILON {
+                    if sum.abs() <= EPSILON {
                         return r;
                     }
 
-                    r + self.time_step * self.mass(j) * sum * self.gradient(i, j)
+                    r + self.time_step * self.volume(j) * sum * self.gradient(i, j)
                 });
 
-                self.particles[i].velocity -= diff;
+                let boundary_diff = self.solids_reduce_v(i, &|r, v, x| {
+                    let grad = -v * self.gradient_solid(i, x);
+                    //FIXME add force to solid
+                    r + self.time_step * 1.0 * ki * grad
+                });
+
+                self.particles[i].velocity -= diff + boundary_diff;
             }
 
             self.compute_density_variation();
@@ -316,8 +388,7 @@ impl DFSPH
             let mut density_div_avg = 0.0;
 
             for i in 0..self.len() {
-                //FIXME multiply by density0 ?
-                density_div_avg += self.density_adv(i);
+                density_div_avg += self.density_adv(i) * self.rest_density - self.rest_density;
             }
 
             density_div_avg /= self.len() as f32;
@@ -345,10 +416,24 @@ impl DFSPH
         self.particles[i].position += self.time_step * vel;
     }
 
+    fn minmax(&self, name: &str, f: &dyn Fn(usize) -> f32) {
+        let mut min = std::f32::INFINITY;
+        let mut max = std::f32::NEG_INFINITY;
+
+        for i in 0..self.len() {
+            min = min.min(f(i));
+            max = max.max(f(i));
+        }
+
+        println!("{} min {} max {}", name, min, max);
+    }
+
     fn init(&mut self) {
         for i in 0..self.len() {
             self.compute_neighbours(i);
         }
+
+        self.init_boundaries();
 
         for i in 0..self.len() {
             self.compute_density(i);
@@ -356,9 +441,23 @@ impl DFSPH
         }
     }
 
+    fn init_boundaries(&mut self) {
+        let pr = self.particle_radius;
+        let kr = self.kernel.radius();
+        let dt = self.time_step;
+
+        for solid in &mut self.solids {
+            let (volume, boundary_x) : (Vec<f32>, Vec<Vector3<f32>>) =
+               self.particles.par_iter_mut().map(|v| solid.compute_volume_and_boundary_x(v, pr, kr, dt)).unzip();
+
+            solid.set_volume_and_boundary_x(volume, boundary_x);
+        }
+    }
+
     pub fn tick(&mut self) {
         self.init();
-        self.correct_divergence_error();
+
+        //self.correct_divergence_error();
 
         for i in 0..self.len() {
             self.compute_non_pressure_forces(i);

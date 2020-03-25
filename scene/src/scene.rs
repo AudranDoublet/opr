@@ -80,8 +80,8 @@ impl Scene
     pub fn load(&self) -> Result<DFSPH, Box<dyn std::error::Error>> {
         self.create_cache_dir()?;
 
-        let _solids = self.load_solids()?;
-        let mut result = DFSPH::new(self.config.kernel_radius, self.config.particle_radius);
+        let solids = self.load_solids()?;
+        let mut result = DFSPH::new(self.config.kernel_radius, self.config.particle_radius, solids);
 
         for liquid in &self.liquids_blocks {
             liquid.create_particles(&mut result);

@@ -27,7 +27,7 @@ impl LiquidZone
         let from = self.from();
         let to = self.to();
 
-        let radius = scene.particle_radius();
+        let radius = scene.particle_radius() * 2.;
         let step_count = (to - from) / radius;
 
         let mut count = 0;
@@ -38,7 +38,7 @@ impl LiquidZone
                 let y = y as f32 * radius;
                 for x in 0..step_count.x as usize {
                     let x = x as f32 * radius;
-                    scene.add_particle(to.x + x, to.y + y, to.z + z);
+                    scene.add_particle(from.x + x, from.y + y, from.z + z);
 
                     count += 1;
                 }

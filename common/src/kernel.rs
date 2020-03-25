@@ -47,10 +47,10 @@ pub mod kernels {
             let r_norm = r.norm();
             let q = r_norm / self.h;
 
-            self.sigma * r * match q {
-                q if q <= 0.0001 || q > 1.0 => 0.0,
-                q if q <= 0.5 => 6. * (3. * r_norm / self.h3 - 2. / self.h2),
-                q => - 6. / self.h * (1. - q).powi(2),
+            6. * self.sigma * r * (1. / (r_norm * self.h)) * match q {
+                q if r_norm <= 1e-5 || q > 1.0 => 0.0,
+                q if q <= 0.5 => q * (3.*q - 2.),
+                q => -(1. - q).powi(2),
             }
         }
 

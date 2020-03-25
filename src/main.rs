@@ -51,7 +51,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut sph_scene = scene.load()?;
     let mut total_time = 0.0;
 
-    let mut scene = render::scene::Scene::new(sph_scene.particle_radius() / 2.);
+    let mut scene = render::scene::Scene::new(sph_scene.particle_radius());
     scene.camera.look_at(Point3::new(0.0, 1., -2.), Point3::new(0., 0., 5.)); //FIXME make camera configurable
 
     for i in 0..sph_scene.len() {
@@ -60,6 +60,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             color: (0., 0., 1.),
         })
     }
+
+    let mut cespartit: bool = false;
 
     while scene.render() {
         let timer = Instant::now();
@@ -70,16 +72,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 render::event::WindowEvent::Key(key, render::event::Action::Release, _) => {
                     match key {
                         render::event::Key::R => {
-                            scene.clear();
-                            sph_scene.clear();
+                            //scene.clear();
+                            //sph_scene.clear();
                             // println!("{:?}", scene.camera);
-                            // sph_scene.tick();
+                            //sph_scene.tick();
                         }
                         render::event::Key::Space => {
+                            cespartit = !cespartit;
                             let prev_len = sph_scene.len();
                             //sph_scene.fill_part(0.4, 0.6, 0.4, 0.2, 0.4, 0.2);
-
-                            println!("{:?}", sph_scene.len());
 
                             for i in prev_len..sph_scene.len() {
                                 scene.push_particle(render::particle::Particle {
@@ -96,7 +97,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         // fluid simulation
-        sph_scene.tick();
+        if cespartit {
+            sph_scene.tick();
+        }
 
         // particles position sync in 3d renderin
         for i in 0..sph_scene.len() {
