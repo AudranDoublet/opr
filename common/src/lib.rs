@@ -5,10 +5,8 @@ extern crate test;
 pub use particle::*;
 
 mod particle;
-
-pub mod constants;
-pub mod kernel;
 pub mod mesher;
+pub mod kernel;
 
 #[bench]
 fn bench_sph_tick(b: &mut Bencher) {

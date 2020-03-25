@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::kernel::Kernel;
 use crate::kernel::kernels::CubicSpine;
-use crate::mesher::FluidSnapshot;
+use crate::mesher::types::FluidSnapshot;
 
 const STIFFNESS: f32 = 2. / 1000.;
 const STIFFNESS_NEAR: f32 = STIFFNESS * 10.;

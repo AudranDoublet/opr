@@ -21,7 +21,7 @@ fn main() -> Result<(), std::io::Error> {
         .camera
         .look_at(Point3::new(0.0, 20.0, -50.0), Point3::new(10.0, 10.0, 0.0));
 
-    let sample_dir = Path::new("./sample");
+    let sample_dir = Path::new("./");
     let mut files: Vec<PathBuf> = fs::read_dir(sample_dir)?
         .filter_map(Result::ok)
         .filter(|d| if let Some(e) = d.path().extension() { e == "obj" } else { false })
@@ -42,6 +42,8 @@ fn main() -> Result<(), std::io::Error> {
 
     // Teapot
     let mut obj = scene.window.add_obj(&files[i_obj], &sample_dir, scale);
+    obj.enable_backface_culling(false);
+    // obj.modify_normals(&mut |n| n.iter().for_each());
 
     let mut pause = true;
     let mut now = Instant::now();
@@ -54,6 +56,8 @@ fn main() -> Result<(), std::io::Error> {
             i_obj = (i_obj + 1) % files.len();
             scene.window.remove_node(&mut obj);
             obj = scene.window.add_obj(&files[i_obj], &sample_dir, scale);
+            obj.enable_backface_culling(false);
+            // obj.recompute_normals();
             // scene.render();
             now = Instant::now();
         }

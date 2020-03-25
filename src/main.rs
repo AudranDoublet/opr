@@ -4,12 +4,13 @@ extern crate sph_common;
 use std::fs::File;
 use std::time::Instant;
 
-use nalgebra::{Point3};
-use sph_common::mesher::Mesher;
+use nalgebra::Point3;
 use sph_common::Scene;
+use sph_common::mesher::interpolation::InterpolationAlgorithms;
+use sph_common::mesher::Mesher;
 
 fn main() -> Result<(), std::io::Error> {
-    let mesher = Mesher::new(0.3, 0.1);
+    let mesher = Mesher::new(2., 0.5, InterpolationAlgorithms::None);
 
     let mut sph_scene = Scene::new();
     sph_scene.fill(0.5, 0.4, 0.5);
@@ -79,6 +80,13 @@ fn main() -> Result<(), std::io::Error> {
                 _ => {}
             }
         }
+
+        let path = &format!("{:08}.obj", iter_idx);
+        println!("Meshing scene as `{}`", path);
+        let buffer = &mut File::create(path)?;
+        let now = Instant::now();
+        mesher.to_obj(&sph_scene, buffer);
+        println!("> `Simulation::meshing()` elapsed time: {} s", now.elapsed().as_secs_f32());
 
         // fluid simulation
         if !pause {
