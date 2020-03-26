@@ -13,8 +13,6 @@ pub struct Particle
     pub velocity: Vector3<f32>,
     pub acceleration: Vector3<f32>,
 
-    pub stiffness: f32,
-    pub density: f32,
     pub density_prediction: f32,
 }
 
@@ -23,6 +21,7 @@ pub struct DFSPH
     // parameters
     kernel: CubicSpine,
     pub particle_radius: f32,
+    volume: f32,
 
     rest_density: f32,
 
@@ -41,6 +40,10 @@ pub struct DFSPH
 
     particles: Vec<Particle>,
     solids: Vec<RigidObject>,
+
+    // Particle data
+    density: Vec<f32>,
+    stiffness: Vec<f32>,
     neighbours: Vec<Vec<usize>>,
 }
 
@@ -51,9 +54,6 @@ impl Particle
             position: Vector3::new(x, y, z),
             velocity: Vector3::zeros(),
             acceleration: Vector3::zeros(),
-
-            stiffness: 0.0, // initialized by init()
-            density: 0.0, // initialized by init()
 
             density_prediction: 0.0,
         }
@@ -67,8 +67,9 @@ impl DFSPH
         DFSPH {
             kernel: CubicSpine::new(kernel_radius),
             particle_radius: particle_radius,
+            volume: 4. * std::f32::consts::PI * particle_radius.powi(3) / 3., // FIXME how to compute it ? 5.12e-5
 
-            rest_density: 1000.0, //FIXME
+            rest_density: 1000.0,
 
             correct_density_max_error: 0.001,
             correct_divergence_max_error: 0.01,
@@ -85,6 +86,8 @@ impl DFSPH
             particles: Vec::new(),
 
             neighbours: Vec::new(),
+            density: Vec::new(),
+            stiffness: Vec::new(),
         }
     }
 
@@ -140,21 +143,16 @@ impl DFSPH
         self.particle_radius
     }
 
-    fn mass(&self, _i: usize) -> f32 {
-        self.particle_radius.powi(3)
-    }
-
     fn volume(&self, _i: usize) -> f32 {
-        //self.particle_radius.powi(3)
-        5.12e-5
+        self.volume
     }
 
     fn stiffness(&self, i: usize) -> f32 {
-        self.particles[i].stiffness
+        self.stiffness[i]
     }
 
     fn density(&self, i: usize) -> f32 {
-        self.particles[i].density
+        self.density[i]
     }
 
     fn density_adv(&self, i: usize) -> f32 {
@@ -243,7 +241,7 @@ impl DFSPH
             .min(self.cfl_max_time_step);
     }
 
-    fn compute_density(&mut self, i: usize) {
+    fn compute_density(&self, i: usize) -> f32 {
         let self_dens = 0.0;
         //let self_dens = self.volume(i) * self.kernel_apply(i, i); // FIXME
         let neighbour_dens = self.neighbours_reduce_f(i, &|density, i, j| {
@@ -251,10 +249,10 @@ impl DFSPH
         });
         let solids_dens = self.solids_reduce_f(i, &|r, v, x| r + v * self.kernel_apply_solid(i, x));
 
-        self.particles[i].density = (self_dens + neighbour_dens + solids_dens) * self.rest_density; // mass
+        (self_dens + neighbour_dens + solids_dens) * self.rest_density
     }
 
-    fn compute_stiffness(&mut self, i: usize) {
+    fn compute_stiffness(&self, i: usize) -> f32 {
         let sum_a = self.neighbours_reduce_v(i, &|r, i, j| r + self.volume(j) * self.gradient(i, j));
         let sum_b = self.neighbours_reduce_f(i, &|r, i, j| {
             r + (self.volume(j) * self.gradient(i, j)).norm_squared()
@@ -264,10 +262,10 @@ impl DFSPH
         let sum_a = sum_a + self.solids_reduce_v(i, &|total, v, p| total + v * self.gradient_solid(i, p));
         let sum = sum_a.norm_squared() + sum_b;
 
-        self.particles[i].stiffness = match sum {
+        match sum {
             sum if sum > EPSILON => -1.0 / sum,
             _ => 0.0,
-        };
+        }
     }
 
     fn compute_density_variation(&mut self) {
@@ -419,10 +417,8 @@ impl DFSPH
 
         self.init_boundaries();
 
-        for i in 0..self.len() {
-            self.compute_density(i);
-            self.compute_stiffness(i);
-        }
+        self.density = (0..self.len()).into_par_iter().map(|i| self.compute_density(i)).collect();
+        self.stiffness = (0..self.len()).into_par_iter().map(|i| self.compute_stiffness(i)).collect();
     }
 
     fn init_boundaries(&mut self) {
