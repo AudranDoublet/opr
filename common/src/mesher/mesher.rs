@@ -115,7 +115,7 @@ impl Mesher {
 
             r_vertices.extend(mesh.vertices);
             r_normals.extend(mesh.normals.iter()
-                .map(|normals| normals.iter().fold(Vector3::zeros(), |a, b| a + b) / normals.len() as f32));
+                .map(|normals| normals.iter().fold(Vector3::zeros(), |a, b| a + b).normalize() ));
             r_triangles.extend(mesh.triangles.iter()
                 .map(|vertex_idx| (vertex_idx.0 + vertex_offset, vertex_idx.1 + vertex_offset, vertex_idx.2 + vertex_offset)));
         }
@@ -132,7 +132,7 @@ impl Mesher {
         });
 
         normals.iter().for_each(|vn| {
-            write!(writer, "VertexLocal {} {} {}\n", vn.x, vn.y, vn.z).expect(&error_msg_on_write);
+            write!(writer, "vn {} {} {}\n", vn.x, vn.y, vn.z).expect(&error_msg_on_write);
         });
 
         triangles.iter().for_each(|t| {

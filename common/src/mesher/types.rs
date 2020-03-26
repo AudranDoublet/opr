@@ -17,8 +17,15 @@ pub struct CubeVertices {
 }
 
 impl CubeVertices {
-    pub fn edge_indices_to_local_position(&self, edge: &EdgeIndices) -> EdgeLocalExtremes {
-        (self.vertices_local[edge.0], self.vertices_local[edge.1])
+    pub fn edge_indices_to_local_positions(&self, edge: &EdgeIndices) -> EdgeLocalExtremes {
+        let a = self.vertices_local[edge.0];
+        let b = self.vertices_local[edge.1];
+
+        if a.x < b.x || a.y < b.y || a.z < b.z {
+            (a, b)
+        } else {
+            (b, a)
+        }
     }
 }
 

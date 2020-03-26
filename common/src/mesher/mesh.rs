@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::mesher::types::*;
 use std::collections::hash_map::Entry;
+use std::alloc::dealloc;
 
 pub struct Mesh {
     edge_map: HashMap<EdgeLocalExtremes, usize>, // map an edge to its vertex index
@@ -23,7 +24,7 @@ impl Mesh {
 
     fn add_edge(&mut self, cube_vertices: &CubeVertices, e: &EdgeIndices, interpolator: &Box<dyn Fn(&CubeVertices, &EdgeIndices) -> VertexWorld>) -> usize {
         let idx = self.edge_map.len();
-        let entry = self.edge_map.entry(cube_vertices.edge_indices_to_local_position(e));
+        let entry = self.edge_map.entry(cube_vertices.edge_indices_to_local_positions(e));
         *match entry {
             Entry::Occupied(ref entry) => {
                 entry.get()
@@ -34,8 +35,8 @@ impl Mesh {
                 self.vertices.push(vertex);
                 self.normals.push(vec![]);
 
-                debug_assert_eq!(self.vertices.len(), idx + 1);
-                debug_assert_eq!(self.vertices.len(), self.normals.len());
+                assert_eq!(self.vertices.len(), idx + 1);
+                assert_eq!(self.vertices.len(), self.normals.len());
 
                 entry.insert(idx)
             }
@@ -47,7 +48,7 @@ impl Mesh {
         let b = &self.vertices[triangle.1];
         let c = &self.vertices[triangle.2];
 
-        (b - a).cross(&(c - a)).normalize()
+        (c - a).cross(&(b - a))
     }
 
     fn add_normals(&mut self, triangle: &(usize, usize, usize)) {
