@@ -3,11 +3,12 @@ extern crate nalgebra as na;
 
 use kiss3d::camera::FirstPerson;
 use kiss3d::light::Light;
+use kiss3d::text::Font;
 use kiss3d::window::Window;
-use na::{Translation3};
 
-use self::na::{Point3};
 use crate::particle::Particle;
+
+use self::na::{Point2, Point3, Translation3};
 
 pub struct Scene {
     pub window: Window,
@@ -67,6 +68,10 @@ impl Scene {
         for i in 0..self.nodes.len() {
             self._sync_particle(i);
         }
+    }
+
+    pub fn debug_text(&mut self, text: &str) {
+        self.window.draw_text(text, &Point2::new(10., 0.), 30.0, &Font::default(), &Point3::new(1., 1., 1.))
     }
 
     pub fn render(&mut self) -> bool {

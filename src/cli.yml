@@ -1,0 +1,23 @@
+name: OPR
+version: "1.0"
+author: "Audran Doublet <audran.doublet@epita.fr>, Sami Issaadi <sami.issaadi@epita.fr>"
+about: Fluid Simulator
+args:
+    - nocache:
+        long: --no-cache
+        help: Should the simulator use cache
+        takes_value: false
+    - data_dir:
+        long: data-dir
+        value_name: FILE
+        help: Sets a custom data directory
+        takes_value: true
+    - cache_dir:
+        long: cache-dir
+        value_name: FILE
+        help: Sets a custom cache directory
+        takes_value: true
+    - SCENE:
+        help: Sets the scene file
+        required: true
+        index: 1

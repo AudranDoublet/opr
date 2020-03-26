@@ -1,70 +1,84 @@
+#[macro_use]
+extern crate clap;
 extern crate render;
-extern crate sph_common;
+extern crate sph_scene;
 
-use std::fs;
-use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-use nalgebra::{Point3, Vector3};
+use clap::App;
+use kiss3d::camera::camera::Camera;
+use nalgebra::Point3;
+use sph_common::DFSPH;
 
-fn main() -> Result<(), std::io::Error> {
-    let scale: Vector3<f32> = Vector3::new(0.5, 0.5, 0.5);
+fn add_particles(range: std::ops::Range<usize>, dfsph: &DFSPH, scene: &mut render::scene::Scene) {
+    for i in range {
+        scene.push_particle(render::particle::Particle {
+            position: dfsph.particle(i),
+            color: (0., 0., 1.),
+        })
+    }
+}
 
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let conf = load_yaml!("cli.yml");
+    let matches = App::from_yaml(conf).get_matches();
 
-    let mut scene = render::scene::Scene::new(3.);
-    scene
-        .camera
-        .look_at(Point3::new(0.0, 20.0, -50.0), Point3::new(10.0, 10.0, 0.0));
+    let scene_file = matches.value_of("SCENE").unwrap();
+    let mut scene_c = sph_scene::load_scene(scene_file)?;
 
-    let sample_dir = Path::new("./");
-    let mut files: Vec<PathBuf> = fs::read_dir(sample_dir)?
-        .filter_map(Result::ok)
-        .filter(|d| if let Some(e) = d.path().extension() { e == "obj" } else { false })
-        .map(|d| d.path())
-        .collect();
-
-    files.sort();
-
-    if files.len() == 0 {
-        panic!("no obj");
+    if matches.is_present("nocache") {
+        println!("Cache disabled");
+        scene_c.global_config.use_cache = false;
     }
 
-    let mut i_obj: usize = 0;
+    if let Some(data_dir) = matches.value_of("data_dir") {
+        println!("Custom data directory: {}", data_dir);
+        scene_c.global_config.data_path = data_dir.to_string();
+    }
 
-    // Teapot
-    let mut obj = scene.window.add_obj(&files[i_obj], &sample_dir, scale);
-    obj.enable_backface_culling(false);
+    if let Some(cache_dir) = matches.value_of("cache_dir") {
+        println!("Custom cache directory: {}", cache_dir);
+        scene_c.global_config.cache_path = cache_dir.to_string();
+    }
 
-    let mut pause = true;
-    let mut now = Instant::now();
+    let mut sph_scene = scene_c.load()?;
+    let mut total_time = 0.0;
 
-    let mut time_step = 0.;
+    let mut scene = render::scene::Scene::new(sph_scene.particle_radius());
+    scene.camera.look_at(Point3::new(0.0, 1., -2.), Point3::new(0., 0., 5.)); //FIXME make camera configurable
 
-    // consume events
+    add_particles(0..sph_scene.len(), &sph_scene, &mut scene);
+
+    let mut run: bool = false;
+
     while scene.render() {
-        if !pause && now.elapsed().as_secs_f32() > time_step {
-            i_obj = (i_obj + 1) % files.len();
-            scene.window.remove_node(&mut obj);
-            obj = scene.window.add_obj(&files[i_obj], &sample_dir, scale);
-            obj.enable_backface_culling(false);
-            // obj.recompute_normals();
-            // scene.render();
-            now = Instant::now();
-        }
+        let timer = Instant::now();
 
+        // consume events
         for event in scene.window.events().iter() {
-
             match event.value {
                 render::event::WindowEvent::Key(key, render::event::Action::Release, _) => {
                     match key {
-                        render::event::Key::P => {
-                            pause = !pause;
+                        render::event::Key::R => {
+                            total_time = 0.0;
+
+                            scene_c.recreate(&mut sph_scene);
+                            scene.clear();
+                            add_particles(0..sph_scene.len(), &sph_scene, &mut scene);
                         }
-                        render::event::Key::PageUp => {
-                            time_step = (time_step + 0.1).min(3.);
+                        render::event::Key::A => {
+                            add_particles(scene_c.add_blocks(&mut sph_scene), &sph_scene, &mut scene);
                         }
-                        render::event::Key::PageDown => {
-                            time_step = (time_step - 0.1).max(0.);
+                        render::event::Key::Space => {
+                            run = !run;
+                            let prev_len = sph_scene.len();
+
+                            for i in prev_len..sph_scene.len() {
+                                scene.push_particle(render::particle::Particle {
+                                    position: sph_scene.particle(i),
+                                    color: (0., 0., 1.),
+                                });
+                            }
                         }
                         _ => {}
                     }
@@ -72,101 +86,32 @@ fn main() -> Result<(), std::io::Error> {
                 _ => {}
             }
         }
+
+        // fluid simulation
+        if run {
+            sph_scene.tick();
+        }
+
+        // particles position sync in 3d renderin
+        for i in 0..sph_scene.len() {
+            scene.get_particle(i).position = sph_scene.particle(i);
+        }
+
+        total_time += sph_scene.get_time_step();
+
+        scene.debug_text(&format!("\
+            dt: {:.6} s\n\
+            total: {:.6} s\n\
+            nb_particle: {}\n\
+            v_max: {:.5} m/s\n\
+            fps: {:.3} frame/s\n\
+            eye: {}\
+        ", sph_scene.get_time_step(), total_time, sph_scene.len(), sph_scene.get_v_max(), 60. / timer.elapsed().as_secs_f32(), scene.camera.eye()));
+
+        // refresh rendering
+        scene.update();
     }
 
     Ok(())
 }
-// fn main() -> Result<(), std::io::Error> {
-//     let mesher = Mesher::new(0.3, 0.1);
-//
-//     let mut sph_scene = Scene::new();
-//     sph_scene.fill(0.5, 0.4, 0.5);
-//
-//     println!("{:?}", sph_scene.len());
-//
-//     let mut scene = render::scene::Scene::new(sph_scene.particle_radius / 3.);
-//     scene
-//         .camera
-//         .look_at(Point3::new(0.0, 20.0, -50.0), Point3::new(10.0, 10.0, 0.0));
-//
-//     for i in 0..sph_scene.len() {
-//         scene.push_particle(render::particle::Particle {
-//             position: sph_scene.particle(i),
-//             color: (0., 0., 1.),
-//         })
-//     }
-//
-//     let mut pause = false;
-//
-//     let mut iter_idx: usize = 0;
-//     while scene.render() {
-//         // consume events
-//         for event in scene.window.events().iter() {
-//             match event.value {
-//                 render::event::WindowEvent::Key(key, render::event::Action::Release, _) => {
-//                     match key {
-//                         render::event::Key::R => {
-//                             println!("audran tg");
-//                             scene.clear();
-//                             sph_scene.clear();
-//                         }
-//                         render::event::Key::Space => {
-//                             let prev_len = sph_scene.len();
-//                             sph_scene.fill_part(0.4, 0.6, 0.4, 0.2, 0.4, 0.2);
-//
-//                             println!("{:?}", sph_scene.len());
-//
-//                             for i in prev_len..sph_scene.len() {
-//                                 scene.push_particle(render::particle::Particle {
-//                                     position: sph_scene.particle(i),
-//                                     color: (0., 0., 1.),
-//                                 });
-//                             }
-//                         }
-//                         render::event::Key::D => {
-//                             let path = &format!("{:05}.bin", iter_idx);
-//                             println!("Dumping scene as `{}`", path);
-//                             let now = Instant::now();
-//                             sph_scene.dump(path)?;
-//                             println!("> `Simulation::dump()` elapsed time: {} s", now.elapsed().as_secs_f32());
-//                         }
-//                         render::event::Key::A => {
-//                             let path = &format!("{:08}.obj", iter_idx);
-//                             println!("Meshing scene as `{}`", path);
-//                             let buffer = &mut File::create(path)?;
-//                             let now = Instant::now();
-//                             mesher.to_obj(&sph_scene, buffer);
-//                             println!("> `Simulation::meshing()` elapsed time: {} s", now.elapsed().as_secs_f32());
-//                         }
-//                         render::event::Key::P => {
-//                             pause = !pause;
-//                         }
-//                         _ => {}
-//                     }
-//                 }
-//                 _ => {}
-//             }
-//         }
-//
-//         // fluid simulation
-//         if !pause {
-//             let now = Instant::now();
-//             sph_scene.tick();
-//             println!("> `Simulation::tick()` elapsed time: {} s", now.elapsed().as_secs_f32());
-//         }
-//
-//         // particles position sync in 3d rendering
-//         for i in 0..sph_scene.len() {
-//             scene.get_particle(i).position = sph_scene.particle(i);
-//         }
-//
-//         // refresh rendering
-//         if !pause {
-//             scene.update();
-//         }
-//
-//         iter_idx += 1;
-//     }
-//
-//     Ok(())
-// }
+

@@ -1,19 +1,15 @@
-#![feature(test)]
-
-extern crate test;
-
-pub use particle::*;
+#![feature(clamp)]
 
 mod particle;
+mod discretegrid;
+mod rigid_object;
+mod kernel;
+
+pub mod utils;
+pub mod mesh;
 pub mod mesher;
-pub mod kernel;
 
-#[bench]
-fn bench_sph_tick(b: &mut Bencher) {
-    let mut sph_scene = Scene::new();
-    sph_scene.fill(0.5, 0.4, 0.5);
-
-    b.iter(|| {
-        sph_scene.tick();
-    });
-}
+pub use particle::*;
+pub use discretegrid::*;
+pub use kernel::*;
+pub use rigid_object::*;

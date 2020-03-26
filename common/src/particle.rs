@@ -8,72 +8,72 @@ use flate2::Compression;
 use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
 use nalgebra::Vector3;
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::kernel::Kernel;
-use crate::kernel::kernels::CubicSpine;
+use crate::kernel::{Kernel, kernels::CubicSpine};
 use crate::mesher::types::FluidSnapshot;
+use crate::RigidObject;
 
-const STIFFNESS: f32 = 2. / 1000.;
-const STIFFNESS_NEAR: f32 = STIFFNESS * 10.;
-const EPSILON: f32 = 1.;
-const SIGMA: f32 = 0.2;
-const BETA: f32 = 0.2;
-
-#[derive(Copy, Clone, Serialize, Deserialize, Debug)]
-pub struct ParticleNeighbour
-{
-    pub id: usize,
-    pub dist: f32,
-    pub sq_dist: f32,
-}
+const EPSILON: f32 = 1e-5;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Particle
 {
     pub position: Vector3<f32>,
-    prev_position: Vector3<f32>,
-    pub density: f32,
-    density_near: f32,
-    pub neighbours: Vec<ParticleNeighbour>,
-    pressure: f32,
-    pressure_near: f32,
-    force: Vector3<f32>,
     pub velocity: Vector3<f32>,
+    pub acceleration: Vector3<f32>,
+
+    pub density_prediction: f32,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DFSPH
+{
+    // parameters
+    kernel: CubicSpine,
+    pub particle_radius: f32,
+    volume: f32,
+
+    rest_density: f32,
+
+    correct_density_max_error: f32,
+    correct_divergence_max_error: f32,
+
+    // cfl
+    cfl_min_time_step: f32,
+    cfl_max_time_step: f32,
+    cfl_factor: f32,
+
+    // iteration data
+    time_step: f32,
+
+    v_max: f32,
+
+    particles: Vec<Particle>,
+    solids: Vec<RigidObject>,
+
+    // Particle data
+    density: Vec<f32>,
+    stiffness: Vec<f32>,
+    neighbours: Vec<Vec<usize>>,
 }
 
 impl Particle
 {
-    fn new(x: f32, y: f32, z: f32) -> Particle
-    {
+    pub fn new(x: f32, y: f32, z: f32) -> Particle {
         Particle {
             position: Vector3::new(x, y, z),
-            prev_position: Vector3::new(0., 0., 0.),
-            neighbours: Vec::new(),
-            density: 0.0,
-            density_near: 0.0,
-            pressure: 0.0,
-            pressure_near: 0.0,
-            force: Vector3::zeros(),
             velocity: Vector3::zeros(),
+            acceleration: Vector3::zeros(),
+
+            density_prediction: 0.0,
         }
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Scene
-{
-    pub particles: Vec<Particle>,
-    pub particle_radius: f32,
-    sq_particle_radius: f32,
-    pub rest_density: f32,
-    gravity: Vector3<f32>,
-    pub size: f32,
-    kernel: CubicSpine,
-    spring_const: f32,
-}
 
-impl FluidSnapshot for Scene {
+impl FluidSnapshot for DFSPH {
     fn particles(&self) -> Vec<Vector3<f32>> {
         let mut v = vec![Vector3::zeros(); self.particles.len()];
         for i in 0..self.particles.len() {
@@ -82,59 +82,59 @@ impl FluidSnapshot for Scene {
         v
     }
 
-    fn density_at(&self, position: Vector3<f32>) -> f32 {
-        let mut density = 0.;
-        for i in 0..self.particles.len() {
-            let neighbour = &self.particles[i];
-            let sq_dist = (&neighbour.position - &position).norm_squared();
-
-            if sq_dist >= 0.01 && sq_dist <= self.sq_particle_radius {
-                // density += sq_dist;
-                density += self.kernel.apply_on_norm(sq_dist.sqrt());
-            }
-        }
-        density
+    fn density_at(&self, _position: Vector3<f32>) -> f32 {
+        0.
     }
 }
 
-impl Scene
+impl DFSPH
 {
-    pub fn new() -> Scene
+    pub fn new(kernel_radius: f32, particle_radius: f32, solids: Vec<RigidObject>) -> DFSPH
     {
-        Scene {
+        DFSPH {
+            kernel: CubicSpine::new(kernel_radius),
+            particle_radius,
+            volume: 4. * std::f32::consts::PI * particle_radius.powi(3) / 3., // FIXME how to compute it ? 5.12e-5
+
+            rest_density: 1000.0,
+
+            correct_density_max_error: 0.001,
+            correct_divergence_max_error: 0.01,
+
+            // time step
+            cfl_min_time_step: 0.0001,
+            cfl_max_time_step: 0.005,
+            cfl_factor: 1.0,
+            time_step: 0.0001,
+
+            v_max: 0.0,
+
+            solids,
             particles: Vec::new(),
-            particle_radius: 1.,
-            sq_particle_radius: 1.,
-            rest_density: 3.,
-            gravity: Vector3::new(0., -0.005, 0.),
-            size: 20.0,
-            kernel: CubicSpine::new(1.),
-            spring_const: 1. / 8.,
+
+            neighbours: Vec::new(),
+            density: Vec::new(),
+            stiffness: Vec::new(),
         }
     }
 
-    pub fn len(&self) -> usize
-    {
+    pub fn clear(&mut self) { self.particles.clear(); }
+
+    pub fn get_v_max(&self) -> f32 {
+        self.v_max
+    }
+
+    pub fn get_time_step(&self) -> f32 {
+        self.time_step
+    }
+
+    pub fn len(&self) -> usize {
         self.particles.len()
     }
 
-    pub fn clear(&mut self)
-    {
-        self.particles.clear();
-    }
-
-    pub fn particle(&self, id: usize) -> (f32, f32, f32)
-    {
-        let vec = &self.particles[id].position;
-
-        (vec.x, vec.y, vec.z)
-    }
-
-    pub fn particle_dx(&self, id: usize) -> (f32, f32, f32)
-    {
-        let vec = &self.particles[id].position - &self.particles[id].prev_position;
-
-        (vec.x, vec.y, vec.z)
+    pub fn particle(&self, i: usize) -> (f32, f32, f32) {
+        let v = self.position(i);
+        (v.x, v.y, v.z)
     }
 
     pub fn add_particle(&mut self, x: f32, y: f32, z: f32)
@@ -142,164 +142,343 @@ impl Scene
         self.particles.push(Particle::new(x, y, z))
     }
 
-    pub fn fill_part(&mut self, fx: f32, fy: f32, fz: f32, px: f32, py: f32, pz: f32)
-    {
-        let epsize = self.size - 2. * EPSILON;
-        let jx = (fx * epsize / self.particle_radius) as usize;
-        let jy = (fy * epsize / self.particle_radius) as usize;
-        let jz = (fz * epsize / self.particle_radius) as usize;
-        let cx = 2 * (px * epsize / self.particle_radius) as usize + jx;
-        let cy = 2 * (py * epsize / self.particle_radius) as usize + jy;
-        let cz = 2 * (pz * epsize / self.particle_radius) as usize + jz;
+    fn gradient(&self, i: usize, j: usize) -> Vector3<f32> {
+        self.kernel.gradient(&(&self.particles[i].position - &self.particles[j].position))
+    }
 
-        let radius = self.particle_radius * 0.5;
+    fn gradient_solid(&self, i: usize, j: Vector3<f32>) -> Vector3<f32> {
+        self.kernel.gradient(&(&self.particles[i].position - &j))
+    }
 
-        for x in jx..cx {
-            for y in jy..cy {
-                for z in jz..cz {
-                    self.add_particle(
-                        EPSILON + radius * x as f32,
-                        EPSILON + radius * y as f32,
-                        EPSILON + radius * z as f32,
-                    );
-                }
+    fn kernel_apply(&self, i: usize, j: usize) -> f32 {
+        self.kernel.apply_on_norm((self.position(i) - self.position(j)).norm())
+    }
+
+    fn kernel_apply_solid(&self, i: usize, j: Vector3<f32>) -> f32 {
+        self.kernel.apply_on_norm((self.position(i) - j).norm())
+    }
+
+    fn distance_sq(&self, i: usize, j: usize) -> f32 {
+        (self.position(i) - self.position(j)).norm_squared()
+    }
+
+    fn position(&self, i: usize) -> &Vector3<f32> {
+        &self.particles[i].position
+    }
+
+    pub fn particle_radius(&self) -> f32 {
+        self.particle_radius
+    }
+
+    fn volume(&self, _i: usize) -> f32 {
+        self.volume
+    }
+
+    fn stiffness(&self, i: usize) -> f32 {
+        self.stiffness[i]
+    }
+
+    fn density(&self, i: usize) -> f32 {
+        self.density[i]
+    }
+
+    fn density_adv(&self, i: usize) -> f32 {
+        self.particles[i].density_prediction
+    }
+
+    fn velocity(&self, i: usize) -> Vector3<f32> {
+        self.particles[i].velocity
+    }
+
+    fn acceleration(&self, i: usize) -> Vector3<f32> {
+        self.particles[i].acceleration
+    }
+
+    fn neighbours_count(&self, i: usize) -> usize {
+        self.neighbours[i].len()
+    }
+
+    fn neighbours_reduce<V>(&self, i: usize, value: V, f: &dyn Fn(V, usize, usize) -> V) -> V {
+        let mut result = value;
+
+        for j in 0..self.neighbours_count(i) {
+            result = f(result, i, self.neighbours[i][j]);
+        }
+
+        result
+    }
+
+    fn solids_reduce<V>(&self, i: usize, value: V, f: &dyn Fn(V, f32, Vector3<f32>) -> V) -> V {
+        let mut result = value;
+
+        for s in &self.solids {
+            let volume = s.particle_volume(i);
+
+            if volume > 0.0 {
+                result = f(result, volume, s.particle_boundary_x(i));
             }
         }
+
+        result
     }
 
-    pub fn fill(&mut self, px: f32, py: f32, pz: f32)
-    {
-        self.fill_part(0.0, 0.0, 0.0, px, py, pz)
+    fn neighbours_reduce_v(&self, i: usize, f: &dyn Fn(Vector3<f32>, usize, usize) -> Vector3<f32>) -> Vector3<f32> {
+        self.neighbours_reduce(i, Vector3::zeros(), f)
     }
 
-    fn compute_density(&mut self, id: usize, neighbours: Vec<ParticleNeighbour>)
-    {
-        let particle = &mut self.particles[id];
-        particle.neighbours.clear();
+    fn neighbours_reduce_f(&self, i: usize, f: &dyn Fn(f32, usize, usize) -> f32) -> f32 {
+        self.neighbours_reduce(i, 0.0, f)
+    }
 
-        particle.density = 0.;
-        particle.density_near = 0.;
+    fn solids_reduce_v(&self, i: usize, f: &dyn Fn(Vector3<f32>, f32, Vector3<f32>) -> Vector3<f32>) -> Vector3<f32> {
+        self.solids_reduce(i, Vector3::zeros(), f)
+    }
 
-        for mut n in neighbours {
-            // replace dist by weighted dist
-            n.dist = 1. - n.dist / self.particle_radius;
-            n.sq_dist = n.dist * n.dist;
+    fn solids_reduce_f(&self, i: usize, f: &dyn Fn(f32, f32, Vector3<f32>) -> f32) -> f32 {
+        self.solids_reduce(i, 0.0, f)
+    }
 
-            particle.density += n.sq_dist;
-            particle.density_near += n.sq_dist * n.dist;
-            particle.neighbours.push(n);
+    fn compute_neighbours(&self, i: usize) -> Vec<usize> {
+        let mut neighbours = Vec::new();
+
+        for j in 0..self.len() {
+            // we can ignore particles at that distance since they are discarded by the kernel
+            if j == i || self.distance_sq(i, j) >= self.kernel.radius_sq() {
+                continue;
+            }
+
+            neighbours.push(j);
+        }
+
+        neighbours
+    }
+
+    fn adapt_cfl(&mut self) {
+        // Compute max velocity
+        let mut v_max: f32 = 0.0;
+
+        for i in 0..self.len() {
+            v_max = v_max.max(self.velocity(i).norm_squared());
+        }
+
+        self.v_max = v_max.sqrt();
+
+        self.time_step = ((self.cfl_factor * self.particle_radius) / self.v_max)
+            .max(self.cfl_min_time_step)
+            .min(self.cfl_max_time_step);
+    }
+
+    fn compute_density(&self, i: usize) -> f32 {
+        let self_dens = 0.0;
+        //let self_dens = self.volume(i) * self.kernel_apply(i, i); // FIXME
+        let neighbour_dens = self.neighbours_reduce_f(i, &|density, i, j| {
+            density + self.volume(j) * self.kernel_apply(i, j)
+        });
+        let solids_dens = self.solids_reduce_f(i, &|r, v, x| r + v * self.kernel_apply_solid(i, x));
+
+        (self_dens + neighbour_dens + solids_dens) * self.rest_density
+    }
+
+    fn compute_stiffness(&self, i: usize) -> f32 {
+        let sum_a = self.neighbours_reduce_v(i, &|r, i, j| r + self.volume(j) * self.gradient(i, j));
+        let sum_b = self.neighbours_reduce_f(i, &|r, i, j| {
+            r + (self.volume(j) * self.gradient(i, j)).norm_squared()
+        });
+
+        // boundaries
+        let sum_a = sum_a + self.solids_reduce_v(i, &|total, v, p| total + v * self.gradient_solid(i, p));
+        let sum = sum_a.norm_squared() + sum_b;
+
+        match sum {
+            sum if sum > EPSILON => -1.0 / sum,
+            _ => 0.0,
         }
     }
 
-    fn compute_neighbours(&self, id: usize) -> Vec<ParticleNeighbour>
-    {
-        let particle = &self.particles[id];
-        let mut vec = Vec::new();
-
-        for i in 0..self.particles.len() {
-            let sq_dist = (&self.particles[i].position - &particle.position).norm_squared();
-
-            if i != id && sq_dist <= self.sq_particle_radius {
-                vec.push(ParticleNeighbour {
-                    id: i,
-                    dist: sq_dist.sqrt(),
-                    sq_dist: 0.,
+    fn compute_density_variation(&mut self) {
+        for i in 0..self.len() {
+            let density_adv = if self.neighbours_count(i) < 20 {
+                0.0
+            } else {
+                let mut delta = self.neighbours_reduce_f(i, &|r, i, j| r + self.volume(j) * (self.velocity(i) - self.velocity(j)).dot(&self.gradient(i, j)));
+                delta += self.solids_reduce_f(i, &|r, v, x| {
+                    let vj = Vector3::zeros(); //FIXME compute velocity for moving solids
+                    r + v * (self.velocity(i) - vj).dot(&self.gradient_solid(i, x))
                 });
-            }
-        }
 
-        vec
-    }
-
-    fn compute_pressure(&mut self, id: usize)
-    {
-        let particle = &mut self.particles[id];
-        particle.pressure = STIFFNESS * (particle.density - self.rest_density);
-        particle.pressure_near = STIFFNESS_NEAR * particle.density_near;
-    }
-
-    fn compute_forces(&mut self, id: usize)
-    {
-        for neighbour in &self.particles[id].neighbours.to_owned() {
-            let nid = neighbour.id;
-
-            let par_self = &self.particles[id];
-            let par_neib = &self.particles[nid];
-
-            let dir = &par_neib.position - &par_self.position;
-
-            // pressure
-            let dm = par_self.pressure * 2. * neighbour.dist +
-                (par_self.pressure_near + par_neib.pressure_near) * neighbour.sq_dist;
-
-            let force_diff = dir.normalize() * dm;
-
-            // viscosity
-            let q = dir.norm() / self.particle_radius;
-            let dir = dir.normalize();
-
-            // FIXME why viscosity impacts directly velocity and not forces ?
-            let velocity_diff = match (&par_self.velocity - &par_neib.velocity).dot(&dir)
-            {
-                u if u > 0. => (1. - q) * (SIGMA * u + BETA * u * u) * dir * 0.5,
-                _ => Vector3::zeros(),
+                delta.max(0.0)
             };
 
-            // apply
-            self.particles[nid].force += force_diff;
-            self.particles[id].force -= force_diff;
-            self.particles[nid].velocity += velocity_diff;
-            self.particles[id].velocity -= velocity_diff;
+            self.particles[i].density_prediction = density_adv;
         }
     }
 
-    fn apply_forces(&mut self, id: usize)
-    {
-        let particle = &mut self.particles[id];
+    fn compute_density_advection(&mut self) {
+        for i in 0..self.len() {
+            let mut delta = self.neighbours_reduce_f(i, &|r, i, j| r + self.volume(j) * (self.velocity(i) - self.velocity(j)).dot(&self.gradient(i, j)));
+            delta += self.solids_reduce_f(i, &|r, v, x| {
+                let vj = Vector3::zeros(); //FIXME compute velocity for moving solids
+                r + v * (self.velocity(i) - vj).dot(&self.gradient_solid(i, x))
+            });
 
-        particle.prev_position = particle.position;
-        particle.position += particle.velocity + particle.force;
-
-        particle.force = self.gravity;
-        particle.velocity = particle.position - particle.prev_position;
-
-        // apply boundaries
-        particle.force.x -= self.spring_const * match particle.position.x {
-            v if v < EPSILON => v - EPSILON,
-            v if v > self.size - EPSILON => v + EPSILON - self.size,
-            _ => 0.0,
-        };
-
-        particle.force.y -= self.spring_const * match particle.position.y {
-            v if v < EPSILON => v - EPSILON,
-            v if v > self.size - EPSILON => v + EPSILON - self.size,
-            _ => 0.0,
-        };
-
-        particle.force.z -= self.spring_const * match particle.position.z {
-            v if v < EPSILON => v - EPSILON,
-            v if v > self.size - EPSILON => v + EPSILON - self.size,
-            _ => 0.0,
-        };
+            self.particles[i].density_prediction = (self.density(i) / self.rest_density + self.time_step * delta).max(1.0);
+        }
     }
 
-    pub fn tick(&mut self)
-    {
-        for particle in 0..self.particles.len() {
-            self.apply_forces(particle);
+    fn correct_density_error(&mut self) {
+        self.compute_density_advection();
+
+        let mut iter_count = 0;
+        let mut chk = false;
+
+        while (!chk || iter_count <= 1) && iter_count < 1000 {
+            for i in 0..self.len() {
+                let ki = (self.density_adv(i) - 1.) * self.stiffness(i) / self.time_step.powi(2);
+
+                let diff = self.neighbours_reduce_v(i, &|r, i, j| {
+                    let sum = ki + (self.density_adv(j) - 1.) * self.stiffness(j) / self.time_step.powi(2);
+
+                    if sum.abs() <= EPSILON {
+                        return r;
+                    }
+
+                    let grad = -self.volume(j) * self.gradient(i, j);
+
+                    r - self.time_step * sum * grad
+                });
+
+                let boundary_diff = match ki.abs() {
+                    v if v > EPSILON => self.solids_reduce_v(i, &|r, v, x| {
+                        let grad = -v * self.gradient_solid(i, x);
+                        //FIXME add force to solid
+                        r + (-self.time_step * 1.0 * ki * grad)
+                    }),
+                    _ => Vector3::zeros(),
+                };
+
+                self.particles[i].velocity += diff + boundary_diff;
+            }
+
+            self.compute_density_advection();
+
+            let mut density_avg = 0.0;
+
+            for i in 0..self.len() {
+                density_avg += self.density_adv(i) * self.rest_density - self.rest_density;
+            }
+
+            density_avg /= self.len() as f32;
+
+            let eta = self.correct_density_max_error * 0.01 * self.rest_density;
+
+            chk |= density_avg < eta;
+            iter_count += 1;
+        }
+    }
+
+    fn correct_divergence_error(&mut self) {
+        self.compute_density_variation();
+
+        let mut iter_count = 0;
+        let mut chk = false;
+
+        while (!chk || iter_count <= 1) && iter_count < 100 {
+            for i in 0..self.len() {
+                let ki = self.density_adv(i) * self.stiffness(i) / self.time_step;
+
+                let diff = self.neighbours_reduce_v(i, &|r, i, j| {
+                    let sum = ki + self.density_adv(j) * self.stiffness(j) / self.time_step;
+
+                    if sum.abs() <= EPSILON {
+                        return r;
+                    }
+
+                    let grad = -self.volume(j) * self.gradient(i, j);
+                    r - self.time_step * sum * grad
+                });
+
+                let boundary_diff = self.solids_reduce_v(i, &|r, v, x| {
+                    let grad = -v * self.gradient_solid(i, x);
+                    //FIXME add force to solid
+                    r + (-self.time_step * 1.0 * ki * grad)
+                });
+
+                self.particles[i].velocity += diff + boundary_diff;
+            }
+
+            self.compute_density_variation();
+
+            let mut density_div_avg = 0.0;
+
+            for i in 0..self.len() {
+                density_div_avg += self.density_adv(i) * self.rest_density - self.rest_density;
+            }
+
+            density_div_avg /= self.len() as f32;
+
+            let eta = 1. / self.time_step * self.correct_divergence_max_error * 0.01 * self.rest_density;
+
+            chk |= density_div_avg < eta;
+            iter_count += 1;
+        }
+    }
+
+    fn compute_non_pressure_forces(&mut self, i: usize) {
+        self.particles[i].acceleration = Vector3::zeros();
+        self.particles[i].acceleration += Vector3::new(0.0, -9.81, 0.0);
+    }
+
+    fn predict_velocity(&mut self, i: usize) {
+        let acc = self.acceleration(i);
+        self.particles[i].velocity += acc * self.time_step;
+    }
+
+    fn update_position(&mut self, i: usize) {
+        let vel = self.velocity(i);
+        self.particles[i].position += self.time_step * vel;
+    }
+
+    fn init(&mut self) {
+        self.neighbours = (0..self.len()).into_par_iter().map(|i| self.compute_neighbours(i)).collect();
+
+        self.init_boundaries();
+
+        self.density = (0..self.len()).into_par_iter().map(|i| self.compute_density(i)).collect();
+        self.stiffness = (0..self.len()).into_par_iter().map(|i| self.compute_stiffness(i)).collect();
+    }
+
+    fn init_boundaries(&mut self) {
+        let pr = self.particle_radius;
+        let kr = self.kernel.radius();
+        let dt = self.time_step;
+
+        for solid in &mut self.solids {
+            let (volume, boundary_x): (Vec<f32>, Vec<Vector3<f32>>) =
+                self.particles.par_iter_mut().map(|v| solid.compute_volume_and_boundary_x(v, pr, kr, dt)).unzip();
+
+            solid.set_volume_and_boundary_x(volume, boundary_x);
+        }
+    }
+
+    pub fn tick(&mut self) {
+        self.init();
+
+        self.correct_divergence_error();
+
+        for i in 0..self.len() {
+            self.compute_non_pressure_forces(i);
         }
 
-        for particle in 0..self.particles.len() {
-            let neighbours = self.compute_neighbours(particle);
-            self.compute_density(particle, neighbours);
+        self.adapt_cfl();
+
+        for i in 0..self.len() {
+            self.predict_velocity(i);
         }
 
-        for particle in 0..self.particles.len() {
-            self.compute_pressure(particle);
-        }
+        self.correct_density_error();
 
-        for particle in 0..self.particles.len() {
-            self.compute_forces(particle);
+        for i in 0..self.len() {
+            self.update_position(i);
         }
     }
 
@@ -311,7 +490,7 @@ impl Scene
         Ok(())
     }
 
-    pub fn load(path: &str) -> Result<Scene, std::io::Error> {
+    pub fn load(path: &str) -> Result<DFSPH, std::io::Error> {
         let buffer = BufReader::new(File::open(path)?);
         let decoder = ZlibDecoder::new(buffer);
         let r = serde_json::from_reader(decoder)?;
