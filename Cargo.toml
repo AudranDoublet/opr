@@ -20,3 +20,4 @@ kiss3d = "0.23.0"
 
 # CLI
 clap = {version = "~2.33.0", features = ["yaml"]}
+indicatif = "0.14.0"

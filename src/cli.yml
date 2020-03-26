@@ -1,23 +1,53 @@
 name: OPR
 version: "1.0"
 author: "Audran Doublet <audran.doublet@epita.fr>, Sami Issaadi <sami.issaadi@epita.fr>"
-about: Fluid Simulator
-args:
-    - nocache:
-        long: --no-cache
-        help: Should the simulator use cache
-        takes_value: false
-    - data_dir:
-        long: data-dir
-        value_name: FILE
-        help: Sets a custom data directory
-        takes_value: true
-    - cache_dir:
-        long: cache-dir
-        value_name: FILE
-        help: Sets a custom cache directory
-        takes_value: true
-    - SCENE:
-        help: Sets the scene file
-        required: true
-        index: 1
+about: Fluid Simulator And Renderer
+subcommands:
+    -   simulate:
+            about: run a DFSPH simulation of the given scene
+            args:
+                -   nocache:
+                        long: --no-cache
+                        help: Should the simulator use cache
+                        takes_value: false
+                -   data_dir:
+                        long: data-dir
+                        value_name: FILE
+                        help: Sets a custom data directory
+                        takes_value: true
+                -   cache_dir:
+                        long: cache-dir
+                        value_name: FILE
+                        help: Sets a custom cache directory
+                        takes_value: true
+                -   scene:
+                        help: Sets the scene file
+                        required: true
+                        index: 1
+                -   dump_all:
+                        long: dump-all
+                        help: dump the whole generated simulation states
+                -   dump_directory:
+                        long: dump-directory
+                        value_name: FILE
+                        help: folder where the dump files should be stored (default="./")
+                        takes_value: true
+    -   polygonize:
+            about: polygonize a fluid simulation into 3d objs
+            args:
+                -   render:
+                        short: r
+                        long: render
+                        help: if present, the fluid simulation is rendered during the polygonization
+                -   dump_directory:
+                        help: folder that contains the dumps of a simulation
+                        required: true
+                        index: 1
+                -   output_directory:
+                        help: folder where the generated mesh should be saved
+                        value_name: FILE
+                        takes_value: true
+                -   disable_interpolation:
+                        long: disable-interpolation
+                        help: disable triangles vertices interpolation
+    -   render:
