@@ -18,7 +18,6 @@ pub mod kernels {
         sigma: f32,
         h: f32,
         h2: f32,
-        h3: f32,
     }
 
     impl CubicSpine {
@@ -27,7 +26,6 @@ pub mod kernels {
                 sigma: 8. / (std::f32::consts::PI * smoothing_length.powi(3)),
                 h: smoothing_length, 
                 h2: smoothing_length.powi(2),
-                h3: smoothing_length.powi(3),
             }
         }
     }

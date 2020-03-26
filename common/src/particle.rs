@@ -16,7 +16,6 @@ pub struct Particle
     pub stiffness: f32,
     pub density: f32,
     pub density_prediction: f32,
-    pub neighbours: Vec<usize>,
 }
 
 pub struct DFSPH
@@ -42,6 +41,7 @@ pub struct DFSPH
 
     particles: Vec<Particle>,
     solids: Vec<RigidObject>,
+    neighbours: Vec<Vec<usize>>,
 }
 
 impl Particle
@@ -54,7 +54,6 @@ impl Particle
 
             stiffness: 0.0, // initialized by init()
             density: 0.0, // initialized by init()
-            neighbours: Vec::new(), // initialized by init()
 
             density_prediction: 0.0,
         }
@@ -84,6 +83,8 @@ impl DFSPH
 
             solids: solids,
             particles: Vec::new(),
+
+            neighbours: Vec::new(),
         }
     }
 
@@ -169,14 +170,14 @@ impl DFSPH
     }
 
     fn neighbours_count(&self, i: usize) -> usize {
-        self.particles[i].neighbours.len()
+        self.neighbours[i].len()
     }
 
     fn neighbours_reduce<V>(&self, i: usize, value: V, f: &dyn Fn(V, usize, usize) -> V) -> V {
         let mut result = value;
 
         for j in 0..self.neighbours_count(i) {
-            result = f(result, i, self.particles[i].neighbours[j]);
+            result = f(result, i, self.neighbours[i][j]);
         }
 
         result
@@ -212,23 +213,19 @@ impl DFSPH
         self.solids_reduce(i, 0.0, f)
     }
 
-    fn compute_neighbours(&mut self, i: usize) {
-        let neighbours = {
-            let mut neighbours = Vec::new();
+    fn compute_neighbours(&self, i: usize) -> Vec<usize> {
+        let mut neighbours = Vec::new();
 
-            for j in 0..self.len() {
-                // we can ignore particles at that distance since they are discarded by the kernel
-                if j == i || self.distance_sq(i, j) >= self.kernel.radius_sq() {
-                    continue;
-                }
-
-                neighbours.push(j);
+        for j in 0..self.len() {
+            // we can ignore particles at that distance since they are discarded by the kernel
+            if j == i || self.distance_sq(i, j) >= self.kernel.radius_sq() {
+                continue;
             }
 
-            neighbours
-        };
+            neighbours.push(j);
+        }
 
-        self.particles[i].neighbours = neighbours;
+        neighbours
     }
 
     fn adapt_cfl(&mut self) {
@@ -247,7 +244,8 @@ impl DFSPH
     }
 
     fn compute_density(&mut self, i: usize) {
-        let self_dens = self.volume(i) * self.kernel_apply(i, i);
+        let self_dens = 0.0;
+        //let self_dens = self.volume(i) * self.kernel_apply(i, i); // FIXME
         let neighbour_dens = self.neighbours_reduce_f(i, &|density, i, j| {
             density + self.volume(j) * self.kernel_apply(i, j)
         });
@@ -315,7 +313,6 @@ impl DFSPH
                 let diff = self.neighbours_reduce_v(i, &|r, i, j| {
                     let sum = ki + (self.density_adv(j) - 1.) * self.stiffness(j) / self.time_step.powi(2);
 
-                    //println!("sum: {}" ,sum );
                     if sum.abs() <= EPSILON {
                         return r;
                     }
@@ -371,16 +368,17 @@ impl DFSPH
                         return r;
                     }
 
-                    r + self.time_step * self.volume(j) * sum * self.gradient(i, j)
+                    let grad = -self.volume(j) * self.gradient(i, j);
+                    r - self.time_step * sum * grad
                 });
 
                 let boundary_diff = self.solids_reduce_v(i, &|r, v, x| {
                     let grad = -v * self.gradient_solid(i, x);
                     //FIXME add force to solid
-                    r + self.time_step * 1.0 * ki * grad
+                    r + (-self.time_step * 1.0 * ki * grad)
                 });
 
-                self.particles[i].velocity -= diff + boundary_diff;
+                self.particles[i].velocity += diff + boundary_diff;
             }
 
             self.compute_density_variation();
@@ -416,22 +414,8 @@ impl DFSPH
         self.particles[i].position += self.time_step * vel;
     }
 
-    fn minmax(&self, name: &str, f: &dyn Fn(usize) -> f32) {
-        let mut min = std::f32::INFINITY;
-        let mut max = std::f32::NEG_INFINITY;
-
-        for i in 0..self.len() {
-            min = min.min(f(i));
-            max = max.max(f(i));
-        }
-
-        println!("{} min {} max {}", name, min, max);
-    }
-
     fn init(&mut self) {
-        for i in 0..self.len() {
-            self.compute_neighbours(i);
-        }
+        self.neighbours = (0..self.len()).into_par_iter().map(|i| self.compute_neighbours(i)).collect();
 
         self.init_boundaries();
 
@@ -457,7 +441,7 @@ impl DFSPH
     pub fn tick(&mut self) {
         self.init();
 
-        //self.correct_divergence_error();
+        self.correct_divergence_error();
 
         for i in 0..self.len() {
             self.compute_non_pressure_forces(i);
