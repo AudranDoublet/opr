@@ -6,6 +6,8 @@ use std::time::Instant;
 use kiss3d::camera::camera::Camera;
 use nalgebra::Point3;
 
+use sph_common::DFSPH;
+
 extern crate sph_scene;
 
 #[macro_use]
@@ -26,42 +28,46 @@ fn main() {
 }
 */
 
+fn add_particles(range: std::ops::Range<usize>, dfsph: &DFSPH, scene: &mut render::scene::Scene) {
+    for i in range {
+        scene.push_particle(render::particle::Particle {
+            position: dfsph.particle(i),
+            color: (0., 0., 1.),
+        })
+    }
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let conf = load_yaml!("cli.yml");
     let matches = App::from_yaml(conf).get_matches();
 
     let scene_file = matches.value_of("SCENE").unwrap();
-    let mut scene = sph_scene::load_scene(scene_file)?;
+    let mut scene_c = sph_scene::load_scene(scene_file)?;
 
     if matches.is_present("nocache") {
         println!("Cache disabled");
-        scene.global_config.use_cache = false;
+        scene_c.global_config.use_cache = false;
     }
 
     if let Some(data_dir) = matches.value_of("data_dir") {
         println!("Custom data directory: {}", data_dir);
-        scene.global_config.data_path = data_dir.to_string();
+        scene_c.global_config.data_path = data_dir.to_string();
     }
 
     if let Some(cache_dir) = matches.value_of("cache_dir") {
         println!("Custom cache directory: {}", cache_dir);
-        scene.global_config.cache_path = cache_dir.to_string();
+        scene_c.global_config.cache_path = cache_dir.to_string();
     }
 
-    let mut sph_scene = scene.load()?;
+    let mut sph_scene = scene_c.load()?;
     let mut total_time = 0.0;
 
     let mut scene = render::scene::Scene::new(sph_scene.particle_radius());
     scene.camera.look_at(Point3::new(0.0, 1., -2.), Point3::new(0., 0., 5.)); //FIXME make camera configurable
 
-    for i in 0..sph_scene.len() {
-        scene.push_particle(render::particle::Particle {
-            position: sph_scene.particle(i),
-            color: (0., 0., 1.),
-        })
-    }
+    add_particles(0..sph_scene.len(), &sph_scene, &mut scene);
 
-    let mut cespartit: bool = false;
+    let mut run: bool = false;
 
     while scene.render() {
         let timer = Instant::now();
@@ -72,15 +78,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 render::event::WindowEvent::Key(key, render::event::Action::Release, _) => {
                     match key {
                         render::event::Key::R => {
-                            //scene.clear();
-                            //sph_scene.clear();
-                            // println!("{:?}", scene.camera);
-                            //sph_scene.tick();
+                            total_time = 0.0;
+
+                            scene_c.recreate(&mut sph_scene);
+                            scene.clear();
+                            add_particles(0..sph_scene.len(), &sph_scene, &mut scene);
+                        }
+                        render::event::Key::A => {
+                            add_particles(scene_c.add_blocks(&mut sph_scene), &sph_scene, &mut scene);
                         }
                         render::event::Key::Space => {
-                            cespartit = !cespartit;
+                            run = !run;
                             let prev_len = sph_scene.len();
-                            //sph_scene.fill_part(0.4, 0.6, 0.4, 0.2, 0.4, 0.2);
 
                             for i in prev_len..sph_scene.len() {
                                 scene.push_particle(render::particle::Particle {
@@ -97,7 +106,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         // fluid simulation
-        if cespartit {
+        if run {
             sph_scene.tick();
         }
 

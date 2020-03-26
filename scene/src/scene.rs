@@ -54,6 +54,7 @@ pub struct Scene
     pub config: Configuration,
     pub solids: Vec<Solid>,
     pub liquids_blocks: Vec<LiquidZone>,
+    pub liquids_add_blocks: Vec<LiquidZone>,
 }
 
 impl Scene
@@ -83,11 +84,27 @@ impl Scene
         let solids = self.load_solids()?;
         let mut result = DFSPH::new(self.config.kernel_radius, self.config.particle_radius, solids);
 
-        for liquid in &self.liquids_blocks {
-            liquid.create_particles(&mut result);
-        }
+        self.recreate(&mut result);
 
         Ok(result)
+    }
+
+    pub fn recreate(&self, scene: &mut DFSPH) {
+        scene.clear();
+
+        for liquid in &self.liquids_blocks {
+            liquid.create_particles(scene);
+        }
+    }
+
+    pub fn add_blocks(&self, scene: &mut DFSPH) -> std::ops::Range<usize> {
+        let prev_size = scene.len();
+
+        for liquid in &self.liquids_add_blocks {
+            liquid.create_particles(scene);
+        }
+
+        prev_size..scene.len()
     }
 }
 
