@@ -7,9 +7,11 @@ use clap::App;
 
 use crate::polygonization::main_polygonization;
 use crate::simulation::main_simulation;
+use crate::viewer::main_viewer;
 
 mod polygonization;
 mod simulation;
+mod viewer;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let conf = load_yaml!("cli.yml");
@@ -19,6 +21,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         main_simulation(args)?;
     } else if let Some(args) = matches.subcommand_matches("polygonize") {
         main_polygonization(args)?;
+    } else if let Some(args) = matches.subcommand_matches("view") {
+        main_viewer(args)?;
     } else {
         println!("Please refer to the usage:\n{}", matches.usage())
     }
