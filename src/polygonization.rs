@@ -16,7 +16,7 @@ use crate::simulation::add_particles;
 fn get_simulation_dumps_paths(folder: &Path) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
     let mut files: Vec<PathBuf> = fs::read_dir(folder)?
         .filter_map(Result::ok)
-        .filter(|d| d.path().ends_with(".sim.bin"))
+        .filter_map(|d| d.path().to_str().and_then(|f| if f.ends_with(".sim.bin") { Some(d) } else { None }))
         .map(|d| d.path())
         .collect();
 
