@@ -1,5 +1,7 @@
 use nalgebra::Vector3;
 
+use std::f32;
+
 pub type VertexWorld = Vector3<f32>;
 pub type VertexLocal = Vector3<i32>;
 

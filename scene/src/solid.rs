@@ -20,6 +20,7 @@ pub struct Solid {
     pub rotation_angle: f32,
 
     pub resolution: [u32; 3],
+    pub display: bool,
 }
 
 impl Solid {

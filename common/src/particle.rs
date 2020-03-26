@@ -118,7 +118,17 @@ impl DFSPH
         }
     }
 
-    pub fn clear(&mut self) { self.particles.clear(); }
+    pub fn clear(&mut self) {
+        self.particles.clear();
+    }
+
+    pub fn solid_count(&self) -> usize {
+        self.solids.len()
+    }
+
+    pub fn solid(&self, i: usize) -> &RigidObject {
+        &self.solids[i]
+    }
 
     pub fn get_v_max(&self) -> f32 {
         self.v_max

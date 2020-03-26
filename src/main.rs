@@ -4,10 +4,11 @@ extern crate render;
 extern crate sph_scene;
 
 use std::time::Instant;
+use std::path::Path;
 
 use clap::App;
 use kiss3d::camera::camera::Camera;
-use nalgebra::Point3;
+use nalgebra::{Point3, Translation3};
 use sph_common::DFSPH;
 
 fn add_particles(range: std::ops::Range<usize>, dfsph: &DFSPH, scene: &mut render::scene::Scene) {
@@ -19,6 +20,20 @@ fn add_particles(range: std::ops::Range<usize>, dfsph: &DFSPH, scene: &mut rende
     }
 }
 
+fn add_meshes(dfsph: &DFSPH, config: &sph_scene::Scene, scene: &mut render::scene::Scene) {
+    for i in 0..config.solids.len() {
+        let solid = &config.solids[i];
+
+        if !solid.display {
+            continue;
+        }
+
+        let data = Path::new(&config.global_config.data_path);
+        let mut obj = scene.window.add_obj(&solid.file(data), data, solid.scale());
+        obj.set_local_translation(Translation3::new(solid.position[0], solid.position[1], solid.position[2]));
+    }
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let conf = load_yaml!("cli.yml");
     let matches = App::from_yaml(conf).get_matches();
@@ -26,6 +41,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let scene_file = matches.value_of("SCENE").unwrap();
     let mut scene_c = sph_scene::load_scene(scene_file)?;
 
+    //scene.window
     if matches.is_present("nocache") {
         println!("Cache disabled");
         scene_c.global_config.use_cache = false;
@@ -48,6 +64,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     scene.camera.look_at(Point3::new(0.0, 1., -2.), Point3::new(0., 0., 5.)); //FIXME make camera configurable
 
     add_particles(0..sph_scene.len(), &sph_scene, &mut scene);
+    add_meshes(&sph_scene, &scene_c, &mut scene);
 
     let mut run: bool = false;
 
