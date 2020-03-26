@@ -141,7 +141,7 @@ impl BoundingSphereHierarchy
     fn minimal_distance_left(&self, coord: usize, p: Vector3<f32>) -> f32 {
         match self {
             BoundingSphereHierarchy::Leaf{..} => self.minimal_distance_sphere(p).max(0.0),
-            BoundingSphereHierarchy::Node{l_split, l_child, ..} => (p[coord % 3] - l_split).max(l_child.minimal_distance_sphere(p)).max(0.0)
+            BoundingSphereHierarchy::Node{l_split, l_child, ..} => (p[coord % 3] - l_split).min(l_child.minimal_distance_sphere(p)).max(0.0)
         }
     }
 
