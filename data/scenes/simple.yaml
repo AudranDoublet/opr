@@ -2,6 +2,14 @@ config:
     kernel_radius: 0.08
     particle_radius: 0.02
 solids:
+    - mesh: objects/dragon.obj
+      mesh_invert: false
+      resolution: [31, 31, 31]
+      scale: [0.3, 0.3, 0.3]
+      position: [0.0, -0.3, 0.0]
+      rotation_axis: [0.0, 0.0, 0.0]
+      rotation_angle: 0.0
+      display: true
     - mesh: objects/box.obj
       mesh_invert: true
       resolution: [11, 11, 11]
@@ -9,11 +17,16 @@ solids:
       position: [0.0, 0.0, 0.0]
       rotation_axis: [0.0, 0.0, 0.0]
       rotation_angle: 0.0
+      display: false
 liquids_blocks:
     - from: [-0.430, -0.450, -0.430]
-      to: [-0.130, 0.200, -0.130]
+      to: [-0.130, 0.450, -0.130]
+    - from: [0.130, -0.450, -0.430]
+      to: [0.430, 0.450, -0.130]
     - from: [0.130, -0.450, 0.130]
-      to: [0.430, 0.200, 0.430]
+      to: [0.430, 0.450, 0.430]
+    - from: [-0.430, -0.450, 0.130]
+      to: [-0.130, 0.450, 0.430]
 liquids_add_blocks:
     - from:  [-0.100, 0.200, -0.100]
       to:  [0.100, 0.400, 0.100]
