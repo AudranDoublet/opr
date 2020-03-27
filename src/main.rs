@@ -16,6 +16,7 @@ fn add_particles(range: std::ops::Range<usize>, dfsph: &DFSPH, scene: &mut rende
         scene.push_particle(render::particle::Particle {
             position: dfsph.particle(i),
             color: (0., 0., 1.),
+            visible: true
         })
     }
 }
@@ -59,6 +60,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut sph_scene = scene_c.load()?;
     let mut total_time = 0.0;
+    let mut display_high_speed_only = false;
+    let mut pause_on_speed_explosion= false;
 
     let mut scene = render::scene::Scene::new(sph_scene.particle_radius());
     scene.camera.look_at(Point3::new(0.0, 1., -2.), Point3::new(0., 0., 5.)); //FIXME make camera configurable
@@ -83,19 +86,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             scene.clear();
                             add_particles(0..sph_scene.len(), &sph_scene, &mut scene);
                         }
+                        render::event::Key::H => {
+                            display_high_speed_only = !display_high_speed_only;
+                        }
+                        render::event::Key::P => {
+                            pause_on_speed_explosion = !pause_on_speed_explosion;
+                        }
                         render::event::Key::A => {
                             add_particles(scene_c.add_blocks(&mut sph_scene), &sph_scene, &mut scene);
                         }
                         render::event::Key::Space => {
                             run = !run;
-                            let prev_len = sph_scene.len();
-
-                            for i in prev_len..sph_scene.len() {
-                                scene.push_particle(render::particle::Particle {
-                                    position: sph_scene.particle(i),
-                                    color: (0., 0., 1.),
-                                });
-                            }
                         }
                         _ => {}
                     }
@@ -109,21 +110,39 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             sph_scene.tick();
         }
 
-        // particles position sync in 3d renderin
+        let d_v_mean_sq = sph_scene.debug_get_v_mean_sq();
+        let d_v_max_sq_deviation = sph_scene.debug_get_v_max_sq() / d_v_mean_sq;
+
+        // particles position sync in 3d rendering
         for i in 0..sph_scene.len() {
-            scene.get_particle(i).position = sph_scene.particle(i);
+            let mut particle = scene.get_particle(i);
+            let particle_speed_ratio = if !d_v_max_sq_deviation.is_nan() {
+                sph_scene.velocity(i).norm_squared() / d_v_max_sq_deviation
+            } else {
+                0.
+            };
+
+            if pause_on_speed_explosion && particle_speed_ratio > 0.95 {
+                run = false;
+            }
+
+            particle.visible = !display_high_speed_only || particle_speed_ratio > 0.5;
+            particle.color = (particle_speed_ratio.min(1.), 0., (1. - particle_speed_ratio).max(0.));
+            particle.position = sph_scene.particle(i);
         }
 
         total_time += sph_scene.get_time_step();
 
         scene.debug_text(&format!("\
+            pause_on_speed_explosion: {} \n\
+            show_only_high_velocity: {} \n\
             dt: {:.6} s\n\
             total: {:.6} s\n\
             nb_particle: {}\n\
             v_max: {:.5} m/s\n\
             fps: {:.3} frame/s\n\
             eye: {}\
-        ", sph_scene.get_time_step(), total_time, sph_scene.len(), sph_scene.get_v_max(), 60. / timer.elapsed().as_secs_f32(), scene.camera.eye()));
+        ", pause_on_speed_explosion, display_high_speed_only, sph_scene.get_time_step(), total_time, sph_scene.len(), sph_scene.get_v_max(), 1. / timer.elapsed().as_secs_f32(), scene.camera.eye()));
 
         // refresh rendering
         scene.update();
