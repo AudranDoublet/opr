@@ -17,7 +17,7 @@ pub struct Mesh
 
 impl Mesh
 {
-    pub fn load_obj(path: &Path) -> Result<Mesh, Box<dyn Error>> {
+    pub fn load_obj(path: &Path, scale: Vector3<f32>) -> Result<Mesh, Box<dyn Error>> {
         let (models, _materials) = tobj::load_obj(path)?;
 
         let mut triangles = Vec::new();
@@ -32,7 +32,7 @@ impl Mesh
             {
                 vertices.push(Vector3::new(mesh.positions[i + 0],
                                            mesh.positions[i + 1],
-                                           mesh.positions[i + 2]));
+                                           mesh.positions[i + 2]).component_mul(&scale));
             }
 
             let mut vertices_normal = vec![];

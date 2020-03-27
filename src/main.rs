@@ -20,7 +20,7 @@ fn add_particles(range: std::ops::Range<usize>, dfsph: &DFSPH, scene: &mut rende
     }
 }
 
-fn add_meshes(dfsph: &DFSPH, config: &sph_scene::Scene, scene: &mut render::scene::Scene) {
+fn add_meshes(config: &sph_scene::Scene, scene: &mut render::scene::Scene) {
     for i in 0..config.solids.len() {
         let solid = &config.solids[i];
 
@@ -64,7 +64,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     scene.camera.look_at(Point3::new(0.0, 1., -2.), Point3::new(0., 0., 5.)); //FIXME make camera configurable
 
     add_particles(0..sph_scene.len(), &sph_scene, &mut scene);
-    add_meshes(&sph_scene, &scene_c, &mut scene);
+    add_meshes(&scene_c, &mut scene);
 
     let mut run: bool = false;
 

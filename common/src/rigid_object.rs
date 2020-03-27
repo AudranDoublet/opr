@@ -45,7 +45,7 @@ impl RigidObject
 
     pub fn position_in_mesh_space(&self, p: Vector3<f32>) -> Vector3<f32>
     {
-        (p - self.position).component_div(&self.scale) //FIXME rotation
+        p - self.position//.component_mul(&self.scale) //FIXME rotation
     }
 
     pub fn set_volume_and_boundary_x(&mut self, volume: Vec<f32>, boundary_x: Vec<Vector3<f32>>)
@@ -71,7 +71,7 @@ impl RigidObject
                     //FIXME unrotate normal
 
                     if normal.norm() > 1e-5 { // != 0
-                        boundary_x = particle.position - dist * normal.normalize();
+                        boundary_x =particle.position - dist * normal.normalize();
                     }
                 }
             }

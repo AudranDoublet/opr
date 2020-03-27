@@ -51,12 +51,15 @@ impl Solid {
 
     pub fn cache_file(&self, cache_path: &Path, radius: f32) -> PathBuf
     {
-        let cache_file = format!("{}_{}_{}_{}_{}_{}.cache",
+        let cache_file = format!("{}_{}_{}_{}_{}_{}_{}_{}_{}.cache",
                                     self.mesh.replace("/", "_"),
                                     self.mesh_invert,
                                     self.resolution[0],
                                     self.resolution[1],
                                     self.resolution[2],
+                                    self.scale[0],
+                                    self.scale[1],
+                                    self.scale[2],
                                     radius,
                          );
 
@@ -78,7 +81,7 @@ impl Solid {
             println!("Compute sdf and volume for {}", self.mesh);
             let extend = 2. * Vector3::new(kradius, kradius, kradius);
 
-            let mut mesh = Mesh::load_obj(&mesh_file)?;
+            let mut mesh = Mesh::load_obj(&mesh_file, self.scale())?;
 
             if self.mesh_invert {
                 mesh.invert();
