@@ -142,7 +142,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             v_max: {:.5} m/s\n\
             fps: {:.3} frame/s\n\
             eye: {}\
-        ", pause_on_speed_explosion, display_high_speed_only, sph_scene.get_time_step(), total_time, sph_scene.len(), sph_scene.get_v_max(), 60. / timer.elapsed().as_secs_f32(), scene.camera.eye()));
+        ", pause_on_speed_explosion, display_high_speed_only, sph_scene.get_time_step(), total_time, sph_scene.len(), sph_scene.get_v_max(), 1. / timer.elapsed().as_secs_f32(), scene.camera.eye()));
 
         // refresh rendering
         scene.update();
