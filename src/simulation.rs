@@ -104,15 +104,15 @@ fn simulate(scene: Scene, dump_all: bool, dump_folder: &Path) -> Result<(), Box<
 
             fluid_simulation.tick();
 
-
-            let v_max = fluid_simulation.get_v_max();
+            let d_v_mean_sq = fluid_simulation.debug_get_v_mean_sq();
+            let d_v_max_sq_deviation = fluid_simulation.debug_get_v_max_sq() / d_v_mean_sq;
 
             // particles position sync in 3d rendering
             for i in 0..fluid_simulation.len() {
                 let mut particle = renderer.get_particle(i);
 
-                let particle_speed_ratio = if v_max > 0.00001 {
-                    fluid_simulation.velocity(i).norm() / v_max
+                let particle_speed_ratio = if !d_v_max_sq_deviation.is_nan() {
+                    fluid_simulation.velocity(i).norm_squared() / d_v_max_sq_deviation
                 } else {
                     0.
                 };
@@ -133,8 +133,6 @@ fn simulate(scene: Scene, dump_all: bool, dump_folder: &Path) -> Result<(), Box<
 
         if show_info {
             renderer.debug_text(&format!("\
-                pause_on_speed_explosion: {} \n\
-                show_only_high_velocity: {} \n\
                 iteration: {}\n\
                 dt: {:.6} s\n\
                 total: {:.6} s\n\
@@ -142,7 +140,7 @@ fn simulate(scene: Scene, dump_all: bool, dump_folder: &Path) -> Result<(), Box<
                 v_max: {:.5} m/s\n\
                 fps: {:.3} frame/s\n\
                 eye: {}\
-                ", pause_on_speed_explosion, display_high_speed_only, idx, fluid_simulation.get_time_step(), total_time, fluid_simulation.len(), fluid_simulation.get_v_max(), 1. / timer.elapsed().as_secs_f32(), renderer.camera.eye()));
+                ", idx, fluid_simulation.get_time_step(), total_time, fluid_simulation.len(), fluid_simulation.get_v_max(), 1. / timer.elapsed().as_secs_f32(), renderer.camera.eye()));
         }
 
         renderer.update();

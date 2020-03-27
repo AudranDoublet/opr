@@ -21,7 +21,7 @@ pub struct Scene {
 impl Scene {
     pub fn new(particle_radius: f32) -> Scene {
         let mut scene = Scene {
-            window: Window::new("OPR - Fluid simulation"),
+            window: Window::new("OPR - Fluid Simulation"),
             camera: FirstPerson::new(Point3::origin(), Point3::origin()),
             particles: vec![],
             particle_radius,
