@@ -172,6 +172,9 @@ impl BoundingSphereHierarchy
                 let rdist = self.minimal_distance_right(depth, p).powi(2);
                 let ldist = self.minimal_distance_left(depth, p).powi(2);
 
+                result = l_child.minimal_signed_distance_rec(depth + 1, p, result);
+                result = r_child.minimal_signed_distance_rec(depth + 1, p, result);
+                /*
                 if ldist <= rdist && ldist <= result.distance {
                     result = l_child.minimal_signed_distance_rec(depth + 1, p, result);
 
@@ -185,6 +188,7 @@ impl BoundingSphereHierarchy
                         result = l_child.minimal_signed_distance_rec(depth + 1, p, result);
                     }
                 }
+                */
 
                 result
             }
