@@ -50,6 +50,8 @@ pub struct DFSPH
     time_step: f32,
 
     v_max: f32,
+    debug_v_max_sq: f32,
+    debug_v_mean_sq: f32,
 
     particles: Vec<Particle>,
     solids: Vec<RigidObject>,
@@ -117,6 +119,8 @@ impl DFSPH
             time_step: 0.0001,
 
             v_max: 0.0,
+            debug_v_max_sq: 0.0,
+            debug_v_mean_sq: 0.0,
 
             solids,
             particles: Vec::new(),
@@ -137,6 +141,14 @@ impl DFSPH
 
     pub fn solid(&self, i: usize) -> &RigidObject {
         &self.solids[i]
+    }
+
+    pub fn debug_get_v_mean_sq  (&self) -> f32 {
+        self.debug_v_mean_sq
+    }
+
+    pub fn debug_get_v_max_sq  (&self) -> f32 {
+        self.debug_v_max_sq
     }
 
     pub fn get_v_max(&self) -> f32 {
@@ -275,11 +287,16 @@ impl DFSPH
     fn adapt_cfl(&mut self) {
         // Compute max velocity
         let mut v_max: f32 = 0.0;
+        let mut debug_v_mean_sq: f64 = 0.;
 
         for i in 0..self.len() {
-            v_max = v_max.max(self.velocity(i).norm_squared());
+            let n = self.velocity(i).norm_squared();
+            debug_v_mean_sq += n as f64;
+            v_max = v_max.max(n);
         }
 
+        self.debug_v_mean_sq = (debug_v_mean_sq / self.len() as f64) as f32;
+        self.debug_v_max_sq = v_max;
         self.v_max = v_max.sqrt();
 
         self.time_step = ((self.cfl_factor * self.particle_radius) / self.v_max)

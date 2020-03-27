@@ -8,7 +8,7 @@ use kiss3d::window::Window;
 
 use crate::particle::Particle;
 
-use self::na::{Point2, Point3, Translation3};
+use self::na::{Point2, Point3, Translation3, partial_ge};
 
 pub struct Scene {
     pub window: Window,
@@ -21,7 +21,7 @@ pub struct Scene {
 impl Scene {
     pub fn new(particle_radius: f32) -> Scene {
         let mut scene = Scene {
-            window: Window::new("OPR - Fluid simulation"),
+            window: Window::new("Audran is stupid"),
             camera: FirstPerson::new(Point3::origin(), Point3::origin()),
             particles: vec![],
             particle_radius,
