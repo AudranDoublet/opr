@@ -196,11 +196,11 @@ impl DFSPH
         self.particles[i].density_prediction
     }
 
-    fn velocity(&self, i: usize) -> Vector3<f32> {
+    pub fn velocity(&self, i: usize) -> Vector3<f32> {
         self.particles[i].velocity
     }
 
-    fn acceleration(&self, i: usize) -> Vector3<f32> {
+    pub fn acceleration(&self, i: usize) -> Vector3<f32> {
         self.particles[i].acceleration
     }
 

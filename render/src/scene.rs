@@ -8,7 +8,7 @@ use kiss3d::window::Window;
 
 use crate::particle::Particle;
 
-use self::na::{Point2, Point3, Translation3};
+use self::na::{Point2, Point3, Translation3, partial_ge};
 
 pub struct Scene {
     pub window: Window,
@@ -62,6 +62,7 @@ impl Scene {
 
         node.set_local_translation(Translation3::new(x, y, z));
         node.set_color(r, g, b);
+        node.set_visible(particle.visible);
     }
 
     pub fn update(&mut self) {
