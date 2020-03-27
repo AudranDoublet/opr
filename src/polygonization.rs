@@ -6,10 +6,12 @@ use std::time::Instant;
 use clap::ArgMatches;
 use indicatif::{ProgressBar, ProgressStyle};
 use kiss3d::camera::camera::Camera;
-use nalgebra::{Point3};
+use nalgebra::Point3;
 use sph_common::DFSPH;
 use sph_common::mesher::interpolation::InterpolationAlgorithms;
 use sph_common::mesher::Mesher;
+
+use rayon::prelude::*;
 
 use crate::simulation::add_particles;
 
@@ -140,13 +142,13 @@ pub fn main_polygonization(args: &ArgMatches) -> Result<(), Box<dyn std::error::
     };
 
     // FIXME: the ISO-VALUE and CUBE-SIZE should be asked in CLI instead of being hardcoded
-    let mesher = Mesher::new(2., 0.5, interpolation_algorithm);
+    let mesher = Mesher::new(0.01, 0.1, interpolation_algorithm);
     // FIXME-END
 
     fs::create_dir_all(output_directory)?;
 
-    let simulations : Vec<DFSPH> = get_simulation_dumps_paths(dump_directory)?
-        .iter()
+    let simulations: Vec<DFSPH> = get_simulation_dumps_paths(dump_directory)?
+        .par_iter()
         .map(|path| DFSPH::load(path.to_str().unwrap()).unwrap())
         .collect();
 

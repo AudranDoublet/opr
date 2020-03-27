@@ -939,6 +939,7 @@ dependencies = [
  "kiss3d",
  "nalgebra",
  "rand 0.7.3",
+ "rayon",
  "render",
  "sph_common",
  "sph_scene",

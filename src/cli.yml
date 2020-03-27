@@ -45,6 +45,7 @@ subcommands:
                         required: true
                         index: 1
                 -   output_directory:
+                        short: o
                         help: folder where the generated mesh should be saved
                         value_name: FILE
                         takes_value: true
