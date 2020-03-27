@@ -110,13 +110,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             sph_scene.tick();
         }
 
-        let v_max = sph_scene.get_v_max();
+        let d_v_mean_sq = sph_scene.debug_get_v_mean_sq();
+        let d_v_max_sq_deviation = sph_scene.debug_get_v_max_sq() / d_v_mean_sq;
 
         // particles position sync in 3d rendering
         for i in 0..sph_scene.len() {
             let mut particle = scene.get_particle(i);
-            let particle_speed_ratio = if v_max > 0.00001 {
-                sph_scene.velocity(i).norm() / v_max
+            let particle_speed_ratio = if !d_v_max_sq_deviation.is_nan() {
+                sph_scene.velocity(i).norm_squared() / d_v_max_sq_deviation
             } else {
                 0.
             };
