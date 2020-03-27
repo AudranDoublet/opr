@@ -83,8 +83,16 @@ impl FluidSnapshot for DFSPH {
         v
     }
 
-    fn density_at(&self, _position: Vector3<f32>) -> f32 {
-        0.
+    fn density_at(&self, position: Vector3<f32>) -> f32 {
+        let mut density = 0.;
+        for i in 0..self.particles.len() {
+            let sq_dist = (self.position(i) - &position).norm_squared();
+
+            if sq_dist >= 0.001 && sq_dist <= self.kernel.radius_sq() {
+                density += self.volume(i) * self.kernel.apply_on_norm(sq_dist.sqrt());
+            }
+        }
+        density
     }
 }
 
