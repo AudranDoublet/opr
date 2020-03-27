@@ -11,6 +11,9 @@ render = { path = "render" }
 
 image = "0.23.2"
 
+# Multithreding
+rayon = "1.3.0"
+
 # Maths
 nalgebra = "0.20.0"
 rand = "0.7.3"
@@ -20,3 +23,4 @@ kiss3d = "0.23.0"
 
 # CLI
 clap = {version = "~2.33.0", features = ["yaml"]}
+indicatif = "0.14.0"
