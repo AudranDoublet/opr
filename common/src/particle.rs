@@ -94,22 +94,17 @@ macro_rules! timeit {
 
 impl FluidSnapshot for DFSPH {
     fn particles(&self) -> Vec<Vector3<f32>> {
-        let mut v = vec![Vector3::zeros(); self.particles.len()];
-        for i in 0..self.particles.len() {
-            v[i] = self.particles[i].position;
-        }
-        v
+        self.particles.iter().map(|p| p.position).collect()
     }
 
     fn density_at(&self, position: Vector3<f32>) -> f32 {
+        let neighbours = self.neighbours_struct.find_neighbours(self.len(), &self, position);
         let mut density = 0.;
-        for i in 0..self.particles.len() {
-            let sq_dist = (self.position(i) - &position).norm_squared();
 
-            if sq_dist >= 0.001 && sq_dist <= self.kernel.radius_sq() {
-                density += self.volume(i) * self.kernel.apply_on_norm(sq_dist.sqrt());
-            }
+        for i in neighbours {
+            density += self.volume(i) * self.kernel_apply_solid(i, position);
         }
+
         density
     }
 }
@@ -525,7 +520,7 @@ impl DFSPH
     pub fn load(path: &str) -> Result<DFSPH, std::io::Error> {
         let buffer = BufReader::new(File::open(path)?);
         let decoder = ZlibDecoder::new(buffer);
-        let r = serde_json::from_reader(decoder)?;
+        let mut r : DFSPH = serde_json::from_reader(decoder)?;
 
         r.sync();
 

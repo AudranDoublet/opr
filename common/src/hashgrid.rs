@@ -90,7 +90,7 @@ impl HashGrid
                 for dx in -1..=1 {
                     if let Some(vec) = self.map.get(&key.relative(dx, dy, dz)) {
                         for &j in vec.iter() {
-                            if i != j && dfsph.distance_sq(i, j) < self.cell_size_sq {
+                            if i != j && (position - dfsph.position(j)).norm_squared() < self.cell_size_sq {
                                 result.push(j);
                             }
                         }
