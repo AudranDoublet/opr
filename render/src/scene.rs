@@ -8,7 +8,7 @@ use kiss3d::window::Window;
 
 use crate::particle::Particle;
 
-use self::na::{Point2, Point3, Translation3, partial_ge};
+use self::na::{Point2, Point3, Translation3};
 
 pub struct Scene {
     pub window: Window,

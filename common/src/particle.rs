@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::kernel::{Kernel, kernels::CubicSpine};
 use crate::mesher::types::FluidSnapshot;
-use crate::RigidObject;
+use crate::{RigidObject, HashGrid};
 use std::path::Path;
 
 const EPSILON: f32 = 1e-5;
@@ -60,6 +60,8 @@ pub struct DFSPH
     density: Vec<f32>,
     stiffness: Vec<f32>,
     neighbours: Vec<Vec<usize>>,
+
+    neighbours_struct: HashGrid,
 }
 
 impl Particle
@@ -75,6 +77,20 @@ impl Particle
     }
 }
 
+/*
+use std::time::Instant;
+
+macro_rules! timeit {
+    ($name:expr, $code:expr) => ({
+        let now = Instant::now();
+        let result = $code;
+
+        println!("{} : {}ms", $name, now.elapsed().as_micros() as f32 / 1000.);
+
+        result
+    })
+}
+*/
 
 impl FluidSnapshot for DFSPH {
     fn particles(&self) -> Vec<Vector3<f32>> {
@@ -128,6 +144,8 @@ impl DFSPH
             neighbours: Vec::new(),
             density: Vec::new(),
             stiffness: Vec::new(),
+
+            neighbours_struct: HashGrid::new(kernel_radius),
         }
     }
 
@@ -189,11 +207,11 @@ impl DFSPH
         self.kernel.apply_on_norm((self.position(i) - j).norm())
     }
 
-    fn distance_sq(&self, i: usize, j: usize) -> f32 {
+    pub fn distance_sq(&self, i: usize, j: usize) -> f32 {
         (self.position(i) - self.position(j)).norm_squared()
     }
 
-    fn position(&self, i: usize) -> &Vector3<f32> {
+    pub fn position(&self, i: usize) -> &Vector3<f32> {
         &self.particles[i].position
     }
 
@@ -269,22 +287,7 @@ impl DFSPH
         self.solids_reduce(i, 0.0, f)
     }
 
-    fn compute_neighbours(&self, i: usize) -> Vec<usize> {
-        let mut neighbours = Vec::new();
-
-        for j in 0..self.len() {
-            // we can ignore particles at that distance since they are discarded by the kernel
-            if j == i || self.distance_sq(i, j) >= self.kernel.radius_sq() {
-                continue;
-            }
-
-            neighbours.push(j);
-        }
-
-        neighbours
-    }
-
-    fn adapt_cfl(&mut self) {
+    fn adapt_cfl(&mut self) -> f32 {
         // Compute max velocity
         let mut v_max: f32 = 0.0;
         let mut debug_v_mean_sq: f64 = 0.;
@@ -302,6 +305,8 @@ impl DFSPH
         self.time_step = ((self.cfl_factor * self.particle_radius) / self.v_max)
             .max(self.cfl_min_time_step)
             .min(self.cfl_max_time_step);
+
+        self.time_step
     }
 
     fn compute_density(&self, i: usize) -> f32 {
@@ -366,13 +371,14 @@ impl DFSPH
 
         let mut iter_count = 0;
         let mut chk = false;
+        let step = 1. / self.time_step.powi(2);
 
         while (!chk || iter_count <= 1) && iter_count < 1000 {
             for i in 0..self.len() {
-                let ki = (self.density_adv(i) - 1.) * self.stiffness(i) / self.time_step.powi(2);
+                let ki = (self.density_adv(i) - 1.) * self.stiffness(i) * step;
 
                 let diff = self.neighbours_reduce_v(i, &|r, i, j| {
-                    let sum = ki + (self.density_adv(j) - 1.) * self.stiffness(j) / self.time_step.powi(2);
+                    let sum = ki + (self.density_adv(j) - 1.) * self.stiffness(j) * step;
 
                     if sum.abs() <= EPSILON {
                         return r;
@@ -417,13 +423,14 @@ impl DFSPH
 
         let mut iter_count = 0;
         let mut chk = false;
+        let step = 1. / self.time_step;
 
         while (!chk || iter_count <= 1) && iter_count < 100 {
             for i in 0..self.len() {
-                let ki = self.density_adv(i) * self.stiffness(i) / self.time_step;
+                let ki = self.density_adv(i) * self.stiffness(i) * step;
 
                 let diff = self.neighbours_reduce_v(i, &|r, i, j| {
-                    let sum = ki + self.density_adv(j) * self.stiffness(j) / self.time_step;
+                    let sum = ki + self.density_adv(j) * self.stiffness(j) * step;
 
                     if sum.abs() <= EPSILON {
                         return r;
@@ -464,18 +471,8 @@ impl DFSPH
         self.particles[i].acceleration += Vector3::new(0.0, -9.81, 0.0);
     }
 
-    fn predict_velocity(&mut self, i: usize) {
-        let acc = self.acceleration(i);
-        self.particles[i].velocity += acc * self.time_step;
-    }
-
-    fn update_position(&mut self, i: usize) {
-        let vel = self.velocity(i);
-        self.particles[i].position += self.time_step * vel;
-    }
-
     fn init(&mut self) {
-        self.neighbours = (0..self.len()).into_par_iter().map(|i| self.compute_neighbours(i)).collect();
+        self.neighbours = self.neighbours_struct.find_all_neighbours(&self, &self.particles);
 
         self.init_boundaries();
 
@@ -496,6 +493,11 @@ impl DFSPH
         }
     }
 
+    pub fn sync(&mut self) {
+        self.neighbours_struct = HashGrid::new(self.kernel.radius());
+        self.neighbours_struct.insert(&self.particles);
+    }
+
     pub fn tick(&mut self) {
         self.init();
 
@@ -505,17 +507,11 @@ impl DFSPH
             self.compute_non_pressure_forces(i);
         }
 
-        self.adapt_cfl();
+        let dt = self.adapt_cfl();
 
-        for i in 0..self.len() {
-            self.predict_velocity(i);
-        }
-
+        self.particles.par_iter_mut().for_each(|p| p.velocity += p.acceleration * dt);
         self.correct_density_error();
-
-        for i in 0..self.len() {
-            self.update_position(i);
-        }
+        self.neighbours_struct.update_particles(self.time_step, &mut self.particles);
     }
 
     pub fn dump(&self, path: &Path) -> Result<(), std::io::Error> {
@@ -530,6 +526,8 @@ impl DFSPH
         let buffer = BufReader::new(File::open(path)?);
         let decoder = ZlibDecoder::new(buffer);
         let r = serde_json::from_reader(decoder)?;
+
+        r.sync();
 
         Ok(r)
     }

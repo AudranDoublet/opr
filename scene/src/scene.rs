@@ -95,6 +95,8 @@ impl Scene
         for liquid in &self.liquids_blocks {
             liquid.create_particles(scene);
         }
+
+        scene.sync();
     }
 
     pub fn add_blocks(&self, scene: &mut DFSPH) -> std::ops::Range<usize> {
@@ -103,6 +105,8 @@ impl Scene
         for liquid in &self.liquids_add_blocks {
             liquid.create_particles(scene);
         }
+
+        scene.sync();
 
         prev_size..scene.len()
     }

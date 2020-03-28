@@ -54,6 +54,7 @@ fn simulate(scene: Scene, dump_all: bool, dump_folder: &Path) -> Result<(), Box<
     add_meshes(&scene, &mut renderer);
 
     let mut show_info: bool = true;
+    let mut show_velocity: bool = false;
     let mut pause: bool = true;
     let mut idx: usize = 0;
 
@@ -77,6 +78,9 @@ fn simulate(scene: Scene, dump_all: bool, dump_folder: &Path) -> Result<(), Box<
                             if !dump_all {
                                 dump_simulation(&fluid_simulation, dump_folder, idx)?;
                             }
+                        }
+                        render::event::Key::C => {
+                            show_velocity = !show_velocity;
                         }
                         render::event::Key::H => {
                             display_high_speed_only = !display_high_speed_only;
@@ -122,7 +126,11 @@ fn simulate(scene: Scene, dump_all: bool, dump_folder: &Path) -> Result<(), Box<
                 }
 
                 particle.visible = !display_high_speed_only || particle_speed_ratio > 0.5;
-                particle.color = (particle_speed_ratio.min(1.), 0., (1. - particle_speed_ratio).max(0.));
+                if show_velocity {
+                    particle.color = (particle_speed_ratio.min(1.), 0., (1. - particle_speed_ratio).max(0.));
+                } else {
+                    particle.color = (0., 0., 1.);
+                }
                 particle.position = fluid_simulation.particle(i);
             }
 
