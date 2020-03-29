@@ -27,7 +27,7 @@ fn get_simulation_dumps_paths(folder: &Path) -> Result<Vec<PathBuf>, Box<dyn std
     Ok(files)
 }
 
-fn polygonize(mesher: &Mesher, simulation: &DFSPH, folder: &Path, idx: usize) -> Result<(), Box<dyn std::error::Error>> {
+fn polygonize(mesher: &mut Mesher, simulation: &DFSPH, folder: &Path, idx: usize) -> Result<(), Box<dyn std::error::Error>> {
     let path = folder.join(format!("{:08}.obj", idx));
     let buffer = &mut File::create(path)?;
 
@@ -36,14 +36,14 @@ fn polygonize(mesher: &Mesher, simulation: &DFSPH, folder: &Path, idx: usize) ->
     Ok(())
 }
 
-fn polygonize_with_gui(mesher: Mesher, simulations: Vec<DFSPH>, output_folder: &Path) -> Result<(), Box<dyn std::error::Error>> {
+fn polygonize_with_gui(mut mesher: Mesher, simulations: Vec<PathBuf>, output_folder: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let mut simulations = simulations.iter();
 
     let simulation = simulations.next();
     if simulation.is_none() {
         return Ok(());
     }
-    let mut simulation = simulation.unwrap();
+    let mut simulation = DFSPH::load(&simulation.unwrap()).unwrap();
 
     let mut renderer = render::scene::Scene::new(simulation.particle_radius());
     renderer.camera.look_at(Point3::new(0.0, 1., -2.), Point3::new(0., 0., 5.)); //FIXME make camera configurable
@@ -58,7 +58,7 @@ fn polygonize_with_gui(mesher: Mesher, simulations: Vec<DFSPH>, output_folder: &
     while renderer.render() {
         let timer = Instant::now();
 
-        polygonize(&mesher, &simulation, output_folder, idx)?;
+        polygonize(&mut mesher, &simulation, output_folder, idx)?;
 
         for event in renderer.window.events().iter() {
             match event.value {
@@ -79,7 +79,7 @@ fn polygonize_with_gui(mesher: Mesher, simulations: Vec<DFSPH>, output_folder: &
 
         if !pause {
             match simulations.next() {
-                Some(s) => { simulation = s; }
+                Some(s) => { simulation = DFSPH::load(&s).unwrap(); }
                 None => break
             };
 
@@ -110,15 +110,15 @@ fn polygonize_with_gui(mesher: Mesher, simulations: Vec<DFSPH>, output_folder: &
 }
 
 
-fn polygonize_cli(mesher: Mesher, simulations: Vec<DFSPH>, output_folder: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let simulations = simulations.iter();
-
+fn polygonize_cli(mesher: Mesher, simulations: Vec<PathBuf>, output_folder: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let pb = ProgressBar::new(simulations.len() as u64);
     pb.set_style(ProgressStyle::default_bar()
         .template("[{elapsed}] [{per_sec}] [{eta}] {bar:40.cyan/blue} {pos:>7}/{len:7}"));
 
-    simulations.for_each(|simulation| {
-        polygonize(&mesher, &simulation, output_folder, pb.position() as usize).unwrap();
+    simulations.par_iter().enumerate().for_each(|(i, path)| {
+        let dfsph = DFSPH::load(&path).unwrap();
+
+        polygonize(&mut mesher.clone(), &dfsph, output_folder, i).unwrap();
         pb.inc(1);
     });
 
@@ -142,15 +142,12 @@ pub fn main_polygonization(args: &ArgMatches) -> Result<(), Box<dyn std::error::
     };
 
     // FIXME: the ISO-VALUE and CUBE-SIZE should be asked in CLI instead of being hardcoded
-    let mesher = Mesher::new(0.01, 0.1, interpolation_algorithm);
+    let mesher = Mesher::new(0.01, 0.01, interpolation_algorithm);
     // FIXME-END
 
     fs::create_dir_all(output_directory)?;
 
-    let simulations: Vec<DFSPH> = get_simulation_dumps_paths(dump_directory)?
-        .par_iter()
-        .map(|path| DFSPH::load(path.to_str().unwrap()).unwrap())
-        .collect();
+    let simulations: Vec<PathBuf> = get_simulation_dumps_paths(dump_directory)?;
 
     if render {
         polygonize_with_gui(mesher, simulations, output_directory)?;
