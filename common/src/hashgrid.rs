@@ -38,7 +38,7 @@ impl HashGridKey
     }
 }
 
-#[derive(Serialize, Deserialize, Derivative)]
+#[derive(Serialize, Deserialize, Derivative, Clone)]
 #[derivative(Debug)]
 pub struct HashGrid
 {

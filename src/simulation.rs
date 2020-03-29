@@ -5,12 +5,11 @@ use clap::ArgMatches;
 use kiss3d::camera::camera::Camera;
 use nalgebra::{Point3, Translation3};
 use sph_common::DFSPH;
-use sph_common::mesher::types::FluidSnapshot;
 use sph_scene::Scene;
 use std::fs;
 
 pub fn add_particles(range: std::ops::Range<usize>, dfsph: &DFSPH, scene: &mut render::scene::Scene) {
-    let particles = dfsph.particles();
+    let particles = &dfsph.positions.read().unwrap();
 
     for i in range {
         let pos = particles[i];

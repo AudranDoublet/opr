@@ -76,19 +76,27 @@ macro_rules! timeit {
 }
 */
 
-impl FluidSnapshot for DFSPH {
+pub struct DFSPHFluidSnapshot
+{
+    particles: Vec<Vector3<f32>>,
+    neighbours_struct: HashGrid,
+    kernel: CubicSpine,
+    volume: f32,
+}
+
+impl FluidSnapshot for DFSPHFluidSnapshot {
     fn particles(&self) -> Vec<Vector3<f32>> {
-        self.positions.read().unwrap().clone()
+        self.particles.clone()
     }
 
     fn density_at(&self, position: Vector3<f32>) -> f32 {
-        let positions = self.positions.read().unwrap();
+        let positions = &self.particles;
 
-        let neighbours = self.neighbours_struct.find_neighbours(self.len(), &*positions, position);
+        let neighbours = self.neighbours_struct.find_neighbours(positions.len(), positions, position);
         let mut density = 0.;
 
         for i in neighbours {
-            density += self.volume(i) * self.kernel_apply(positions[i], position);
+            density += self.volume * self.kernel.apply_on_norm((positions[i] - position).norm());
         }
 
         density
@@ -132,6 +140,15 @@ impl DFSPH
             accelerations: RwLock::new(Vec::new()),
             velocities: RwLock::new(Vec::new()),
             positions: RwLock::new(Vec::new()),
+        }
+    }
+
+    pub fn snapshot(&self) -> DFSPHFluidSnapshot {
+        DFSPHFluidSnapshot {
+            particles: self.positions.read().unwrap().clone(),
+            neighbours_struct: self.neighbours_struct.clone(),
+            kernel: CubicSpine::new(self.kernel.radius()),
+            volume: self.volume(0),
         }
     }
 

@@ -31,7 +31,7 @@ fn polygonize(mesher: &mut Mesher, simulation: &DFSPH, folder: &Path, idx: usize
     let path = folder.join(format!("{:08}.obj", idx));
     let buffer = &mut File::create(path)?;
 
-    mesher.to_obj(simulation, buffer);
+    mesher.to_obj(&simulation.snapshot(), buffer);
 
     Ok(())
 }
