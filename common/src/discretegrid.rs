@@ -37,6 +37,19 @@ pub struct DiscreteGrid {
     functions: Vec<DiscreteGridFunction>,
 }
 
+impl Default for DiscreteGrid {
+    fn default() -> Self {
+        DiscreteGrid{
+            domain_min: Vector3::zeros(),
+            domain_max: Vector3::zeros(),
+            resolution: Vector3::zeros(),
+            cell_size: Vector3::zeros(),
+            cell_count: 0,
+            functions: vec![]
+        }
+    }
+}
+
 impl DiscreteGrid {
     pub fn load(path: &File) -> Result<DiscreteGrid, Box<dyn std::error::Error>> {
         let result: DiscreteGrid = serde_cbor::from_reader(path)?;

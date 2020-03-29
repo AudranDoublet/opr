@@ -24,7 +24,6 @@ fn view_meshes(meshes_folder: &Path, back_face_culling: bool) -> Result<(), Box<
     renderer.camera.look_at(Point3::new(0.0, 1., -2.), Point3::new(0., 0., 5.)); //FIXME make camera configurable
 
     let meshes = get_meshes_paths(meshes_folder)?;
-    println!("paths: {:?}", meshes);
     if meshes.len() == 0 {
         println!("No mesh found");
         return Ok(());

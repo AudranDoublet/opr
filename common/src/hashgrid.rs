@@ -38,15 +38,13 @@ impl HashGridKey
     }
 }
 
-#[derive(Serialize, Deserialize)]
-#[derive(Derivative)]
+#[derive(Serialize, Deserialize, Derivative)]
 #[derivative(Debug)]
 pub struct HashGrid
 {
     cell_size: f32,
     cell_size_sq: f32,
-    #[serde(skip_serializing)]
-    #[serde(skip_deserializing)]
+    #[serde(skip_serializing, skip_deserializing)]
     #[derivative(Debug="ignore")]
     map: CHashMap<HashGridKey, Vec<usize>>,
 }
