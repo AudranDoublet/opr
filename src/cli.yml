@@ -32,6 +32,14 @@ subcommands:
                         value_name: FILE
                         help: folder where the dump files should be stored (default="./")
                         takes_value: true
+                -   max_time:
+                        long: max-time
+                        value_name: time
+                        help: max simulation (real) time
+                        takes_value: true
+                -   no_gui:
+                        long: no-gui
+                        help: use CLI interface for simulation
     -   polygonize:
             about: polygonize a fluid simulation into 3d objs
             args:

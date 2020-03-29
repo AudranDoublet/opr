@@ -8,6 +8,8 @@ use sph_common::DFSPH;
 use sph_scene::Scene;
 use std::fs;
 
+use indicatif::{ProgressBar, ProgressStyle};
+
 pub fn add_particles(range: std::ops::Range<usize>, dfsph: &DFSPH, scene: &mut render::scene::Scene) {
     let particles = &dfsph.positions.read().unwrap();
 
@@ -36,12 +38,16 @@ fn add_meshes(config: &sph_scene::Scene, scene: &mut render::scene::Scene) {
     }
 }
 
-fn dump_simulation(simulation: &DFSPH, dump_folder: &Path, idx: usize) -> Result<(), Box<dyn std::error::Error>> {
+fn dump_simulation(simulation: &DFSPH, dump_folder: &Path, idx: usize, verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
     let path = dump_folder.join(format!("{:08}.sim.bin", idx));
-    println!("Dumping scene as `{:?}`", &path);
+    if verbose {
+        println!("Dumping scene as `{:?}`", &path);
+    }
     let now = Instant::now();
     simulation.dump(&path)?;
-    println!("> `Simulation::dump()` elapsed time: {} s", now.elapsed().as_secs_f32());
+    if verbose {
+        println!("> `Simulation::dump()` elapsed time: {} s", now.elapsed().as_secs_f32());
+    }
     Ok(())
 }
 
@@ -80,7 +86,7 @@ fn simulate(scene: Scene, dump_all: bool, dump_folder: &Path) -> Result<(), Box<
                         }
                         render::event::Key::D => {
                             if !dump_all {
-                                dump_simulation(&fluid_simulation, dump_folder, idx)?;
+                                dump_simulation(&fluid_simulation, dump_folder, idx, true)?;
                             }
                         }
                         render::event::Key::C => {
@@ -107,7 +113,7 @@ fn simulate(scene: Scene, dump_all: bool, dump_folder: &Path) -> Result<(), Box<
 
         if !pause {
             if dump_all {
-                dump_simulation(&fluid_simulation, dump_folder, idx)?;
+                dump_simulation(&fluid_simulation, dump_folder, idx, true)?;
             }
 
             fluid_simulation.tick();
@@ -166,6 +172,40 @@ fn simulate(scene: Scene, dump_all: bool, dump_folder: &Path) -> Result<(), Box<
     Ok(())
 }
 
+fn simulate_cli(scene: Scene, max_time: f32, dump_folder: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let mut fluid_simulation = scene.load()?;
+    let mut total_time = 0.0;
+
+    total_time += fluid_simulation.get_time_step();
+
+    let mut idx = 0;
+
+    let pb = ProgressBar::new(100);
+
+    pb.set_style(ProgressStyle::default_bar()
+        .template("[{elapsed}] [{per_sec}] [{eta}] {bar:40.cyan/blue} {pos:>7}/{len:7}"));
+
+    let perc = |x| ((x / max_time) * 100.) as u64;
+
+    while total_time < max_time {
+        dump_simulation(&fluid_simulation, dump_folder, idx, false)?;
+
+        idx += 1;
+
+        fluid_simulation.tick();
+
+        let old = perc(total_time);
+        total_time += fluid_simulation.get_time_step();
+
+        let percent = perc(total_time);
+        pb.inc(percent - old);
+    }
+
+    pb.finish_with_message("polygonization done");
+
+    Ok(())
+}
+
 pub fn main_simulation(args: &ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
     let scene_file = args.value_of("scene").unwrap();
     let mut scene_c = sph_scene::load_scene(scene_file)?;
@@ -193,6 +233,14 @@ pub fn main_simulation(args: &ArgMatches) -> Result<(), Box<dyn std::error::Erro
 
     fs::create_dir_all(dump_folder)?;
 
-    simulate(scene_c, dump_all, dump_folder)
-}
+    let mut max_time = 4.0;
+    if let Some(mt) = args.value_of("max_time") {
+        max_time = mt.parse()?;
+    }
 
+    if args.is_present("no_gui") {
+        simulate_cli(scene_c, max_time, dump_folder)
+    } else {
+        simulate(scene_c, dump_all, dump_folder)
+    }
+}
