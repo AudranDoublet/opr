@@ -106,8 +106,8 @@ impl DFSPH
 
             rest_density: 1000.0,
 
-            correct_density_max_error: 0.001,
-            correct_divergence_max_error: 0.01,
+            correct_density_max_error: 0.01,
+            correct_divergence_max_error: 0.1,
 
             // time step
             cfl_min_time_step: 0.0001,
