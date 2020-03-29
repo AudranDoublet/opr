@@ -1,7 +1,7 @@
 use nalgebra::Vector3;
 use serde::{Deserialize, Serialize};
 
-use crate::{DiscreteGrid, Particle};
+use crate::{DiscreteGrid};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RigidObject
@@ -56,9 +56,9 @@ impl RigidObject
         self.boundary_x = boundary_x;
     }
 
-    pub fn compute_volume_and_boundary_x(&self, particle: &mut Particle, particle_radius: f32, kernel_radius: f32, dt: f32) -> (f32, Vector3<f32>)
+    pub fn compute_volume_and_boundary_x(&self, position: &mut Vector3<f32>, velocity: &mut Vector3<f32>, particle_radius: f32, kernel_radius: f32, dt: f32) -> (f32, Vector3<f32>)
     {
-        let x = self.position_in_mesh_space(particle.position);
+        let x = self.position_in_mesh_space(*position);
 
         let mut volume = 0.0;
         let mut boundary_x = Vector3::zeros();
@@ -73,7 +73,7 @@ impl RigidObject
                     //FIXME unrotate normal
 
                     if normal.norm() > 1e-5 { // != 0
-                        boundary_x =particle.position - dist * normal.normalize();
+                        boundary_x = *position - dist * normal.normalize();
                     }
                 }
             }
@@ -86,8 +86,8 @@ impl RigidObject
                 let normal = normal.normalize();
 
                 let d = (-dist).min(50. * particle_radius * dt);
-                particle.position += d * normal;
-                particle.velocity += (0.05 - particle.velocity.dot(&normal)) * normal;
+                *position += d * normal;
+                *velocity += (0.05 - velocity.dot(&normal)) * normal;
             }
         }
 

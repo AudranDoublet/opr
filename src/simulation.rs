@@ -5,14 +5,19 @@ use clap::ArgMatches;
 use kiss3d::camera::camera::Camera;
 use nalgebra::{Point3, Translation3};
 use sph_common::DFSPH;
+use sph_common::mesher::types::FluidSnapshot;
 use sph_scene::Scene;
 use std::fs;
 
 pub fn add_particles(range: std::ops::Range<usize>, dfsph: &DFSPH, scene: &mut render::scene::Scene) {
+    let particles = dfsph.particles();
+
     for i in range {
+        let pos = particles[i];
+
         scene.push_particle(render::particle::Particle {
             visible: true,
-            position: dfsph.particle(i),
+            position: (pos.x, pos.y, pos.z),
             color: (0., 0., 1.),
         })
     }
@@ -112,11 +117,14 @@ fn simulate(scene: Scene, dump_all: bool, dump_folder: &Path) -> Result<(), Box<
             let d_v_max_sq_deviation = fluid_simulation.debug_get_v_max_sq() / d_v_mean_sq;
 
             // particles position sync in 3d rendering
+            let velocities = fluid_simulation.velocities.read().unwrap();
+            let positions = fluid_simulation.positions.read().unwrap();
+
             for i in 0..fluid_simulation.len() {
                 let mut particle = renderer.get_particle(i);
 
-                let particle_speed_ratio = if !d_v_max_sq_deviation.is_nan() {
-                    fluid_simulation.velocity(i).norm_squared() / d_v_max_sq_deviation
+                let particle_speed_ratio: f32 = if !d_v_max_sq_deviation.is_nan() {
+                    velocities[i].norm_squared() / d_v_max_sq_deviation
                 } else {
                     0.
                 };
@@ -131,7 +139,9 @@ fn simulate(scene: Scene, dump_all: bool, dump_folder: &Path) -> Result<(), Box<
                 } else {
                     particle.color = (0., 0., 1.);
                 }
-                particle.position = fluid_simulation.particle(i);
+
+                let pos = positions[i];
+                particle.position = (pos.x, pos.y, pos.z);
             }
 
             total_time += fluid_simulation.get_time_step();
