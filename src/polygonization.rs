@@ -93,7 +93,7 @@ fn polygonize_with_gui(mut mesher: Mesher, simulations: Vec<PathBuf>, output_fol
 
         if show_info {
             renderer.debug_text(&format!("\
-                iteration: {}/{}\n
+                iteration: {}/{}\n\
                 dt: {:.6} s\n\
                 total: {:.6} s\n\
                 nb_particle: {}\n\

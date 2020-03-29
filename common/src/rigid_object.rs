@@ -8,6 +8,7 @@ pub struct RigidObject
 {
     position: Vector3<f32>,
     scale: Vector3<f32>,
+    #[serde(skip_serializing, skip_deserializing)]
     grid: DiscreteGrid,
     volume: Vec<f32>,
     #[serde(skip_serializing)]
