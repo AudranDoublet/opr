@@ -10,6 +10,8 @@ pub struct RigidObject
     scale: Vector3<f32>,
     grid: DiscreteGrid,
     volume: Vec<f32>,
+    #[serde(skip_serializing)]
+    #[serde(skip_deserializing)]
     boundary_x: Vec<Vector3<f32>>,
 }
 

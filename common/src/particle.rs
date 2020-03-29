@@ -517,7 +517,7 @@ impl DFSPH
         Ok(())
     }
 
-    pub fn load(path: &str) -> Result<DFSPH, std::io::Error> {
+    pub fn load(path: &Path) -> Result<DFSPH, std::io::Error> {
         let buffer = BufReader::new(File::open(path)?);
         let decoder = ZlibDecoder::new(buffer);
         let mut r : DFSPH = serde_json::from_reader(decoder)?;

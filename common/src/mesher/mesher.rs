@@ -6,10 +6,14 @@ use crate::mesher::interpolation::{interpolate, InterpolationAlgorithms};
 use crate::mesher::mesh::Mesh;
 use crate::mesher::types::*;
 
+use std::collections::HashMap;
+
+#[derive(Clone)]
 pub struct Mesher {
     iso_value: f32,
     cube_size: f32,
     interpolation_algorithm: InterpolationAlgorithms,
+    cache: HashMap<(i32, i32, i32), f32>,
 }
 
 impl Mesher {
@@ -18,10 +22,15 @@ impl Mesher {
             iso_value,
             cube_size,
             interpolation_algorithm,
+            cache: HashMap::new(),
         }
     }
 
-    fn generate_cube_vertices(&self, snapshot: &impl FluidSnapshot, origin: VertexWorld, from_local: VertexLocal) -> CubeVertices {
+    fn density_at(&mut self, local: &VertexLocal, vertex: &VertexWorld, snapshot: &impl FluidSnapshot) -> f32 {
+        *self.cache.entry((local.x, local.y, local.z)).or_insert_with(|| snapshot.density_at(*vertex))
+    }
+
+    fn generate_cube_vertices(&mut self, snapshot: &impl FluidSnapshot, origin: VertexWorld, from_local: VertexLocal) -> CubeVertices {
         let vertices_local = [
             &from_local + Vector3::new(-1, 0, 0),   // 0
             &from_local + Vector3::new(0, 0, 0),    // 1
@@ -38,9 +47,7 @@ impl Mesher {
 
         for i in 0..8 {
             vertices_world[i] = self.to_world(&origin, vertices_local[i]);
-            densities[i] = snapshot.density_at(
-                vertices_world[i]
-            );
+            densities[i] = self.density_at(&vertices_local[i], &vertices_world[i], snapshot);
         }
 
         CubeVertices { vertices_local, vertices_world, densities }
@@ -63,7 +70,7 @@ impl Mesher {
         index
     }
 
-    fn to_mesh_cube(&self, snapshot: &impl FluidSnapshot, min: VertexWorld, max: VertexWorld) -> Mesh {
+    fn to_mesh_cube(&mut self, snapshot: &impl FluidSnapshot, min: VertexWorld, max: VertexWorld) -> Mesh {
         let iso_value = self.iso_value;
         let interpolation_algorithm = self.interpolation_algorithm;
         let interpolator: Box<dyn Fn(&CubeVertices, &EdgeIndices) -> VertexWorld> = Box::new(move |cube_vertices, edge_indices| interpolate(interpolation_algorithm, iso_value, cube_vertices, edge_indices));
@@ -102,8 +109,8 @@ impl Mesher {
         mesh
     }
 
-    fn to_mesh_fluid(&self, scene: &impl FluidSnapshot) -> (Vec<VertexWorld>, Vec<Normal>, Vec<TriangleCoordinates>) {
-        let bounding_boxes = scene.aabb(self.cube_size);
+    fn to_mesh_fluid(&mut self, scene: &impl FluidSnapshot) -> (Vec<VertexWorld>, Vec<Normal>, Vec<TriangleCoordinates>) {
+        let bounding_boxes = scene.aabb(self.cube_size * 5.);
 
         let mut r_vertices = Vec::new();
         let mut r_normals = Vec::new();
@@ -123,7 +130,7 @@ impl Mesher {
         (r_vertices, r_normals, r_triangles)
     }
 
-    pub fn to_obj(&self, scene: &impl FluidSnapshot, writer: &mut impl std::io::Write) {
+    pub fn to_obj(&mut self, scene: &impl FluidSnapshot, writer: &mut impl std::io::Write) {
         let (vertices, normals, triangles) = self.to_mesh_fluid(scene);
         let error_msg_on_write = "unable to write mesh info";
 
