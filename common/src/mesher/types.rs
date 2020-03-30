@@ -1,6 +1,7 @@
-use nalgebra::Vector3;
-
 use std::f32;
+
+use nalgebra::Vector3;
+use crate::Kernel;
 
 pub type VertexWorld = Vector3<f32>;
 pub type VertexLocal = Vector3<i32>;
@@ -33,12 +34,29 @@ impl CubeVertices {
 
 pub trait FluidSnapshot {
     /// Returns an iterator over all particles of the fluid
-    fn particles(&self) -> std::vec::Vec<Vector3<f32>>; //dyn std::iter::Iterator<Item=Vector3<f32>>;
+    fn particles(&self) -> Vec<VertexWorld>; //dyn std::iter::Iterator<Item=Vector3<f32>>;
 
-    /// Returns the density of the fluid at the given position
-    /// # Arguments
-    /// * `position` - World-Coordinates of the space location where the density must be returned
-    fn density_at(&self, position: Vector3<f32>) -> f32;
+    /// Returns the number of particles present in the snapshot
+    fn len(&self) -> usize;
+
+    /// Returns the position of the particle
+    /// * `i` - index of the particle
+    fn position(&self, i: usize) -> VertexWorld;
+
+    /// Returns an iterator over all neighbours of the given particle
+    /// * `i` - index of the particle
+    fn neighbours(&self, i: usize) -> Vec<usize>; //dyn std::iter::Iterator<Item=Vector3<f32>>;
+
+    /// Returns an iterator over all neighbours of the given particle
+    /// * `x` - center of the sphere of research
+    fn find_neighbours(&self, x: &VertexWorld) -> Vec<usize>;
+
+    /// Returns the volume of the given particle
+    /// * `i` - index of the particle
+    fn volume(&self, i: usize) -> f32;
+
+    /// Returns a reference to the kernel used by the simulation
+    fn get_kernel(&self) -> &dyn Kernel;
 
     /// Returns an Axis-Aligned bounding box partition of the space where the liquid is located
     ///
@@ -71,3 +89,10 @@ pub trait FluidSnapshot {
         vec![(a - Vector3::new(min_dist, min_dist, min_dist), b + Vector3::new(min_dist, min_dist, min_dist))]
     }
 }
+
+
+pub trait FluidSnapshotProvider {
+    fn radius(&self) -> f32;
+    fn snapshot(&self, radius: f32) -> Box<dyn FluidSnapshot>;
+}
+
