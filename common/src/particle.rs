@@ -157,6 +157,10 @@ impl DFSPH
         self.velocities.write().unwrap().clear();
         self.positions.write().unwrap().clear();
         self.density_prediction.write().unwrap().clear();
+        self.stiffness.write().unwrap().clear();
+        self.density.write().unwrap().clear();
+
+        self.len = 0;
     }
 
     pub fn solid_count(&self) -> usize {
