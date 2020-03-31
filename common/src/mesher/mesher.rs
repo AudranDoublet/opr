@@ -34,11 +34,11 @@ impl Mesher {
 
         let f_approx_density = |j: usize| {
             if let Some(anisotropicator) = &self.anisotropicator {
-                        let g = anisotropicator.compute_anisotropy(snapshot, j);
-                        let r = x - anisotropicator.smoothed_position(j);
-                        let p = g * r;
+                let g = anisotropicator.compute_anisotropy(snapshot, j);
+                let r = x - anisotropicator.smoothed_position(j);
+                let p = g * r;
 
-                        kernel.unormalized_apply_on_norm(p.norm(), g.norm())
+                kernel.unormalized_apply_on_norm(p.norm(), g.determinant())
             } else {
                 kernel.apply_on_norm((x - snapshot.position(j)).norm())
             }
@@ -166,7 +166,7 @@ impl Mesher {
         (r_vertices, r_normals, r_triangles)
     }
 
-    fn find_radius(&self, snapshot_provider: &impl FluidSnapshotProvider) -> f32{
+    fn find_radius(&self, snapshot_provider: &impl FluidSnapshotProvider) -> f32 {
         if self.anisotropicator.is_some() {
             Anisotropicator::compute_radius(snapshot_provider.radius())
         } else {

@@ -32,7 +32,7 @@ fn get_simulation_dumps_paths(folder: &Path) -> Result<Vec<PathBuf>, Box<dyn std
 fn polygonize(mesher: &mut Mesher, simulation: &impl FluidSnapshotProvider, folder: &Path, idx: usize) -> Result<(), Box<dyn std::error::Error>> {
     let path = folder.join(format!("{:08}.obj", idx));
     let buffer = &mut File::create(path)?;
-    
+
     mesher.to_obj(simulation, buffer);
 
     Ok(())
@@ -116,6 +116,7 @@ fn polygonize_cli(mesher: Mesher, simulations: Vec<PathBuf>, output_folder: &Pat
     let pb = ProgressBar::new(simulations.len() as u64);
     pb.set_style(ProgressStyle::default_bar()
         .template("[{elapsed_precise}] [{per_sec}] [{eta_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7}"));
+    pb.tick();
 
     simulations.par_iter().enumerate().for_each(|(i, path)| {
         let dfsph = DFSPH::load(&path).unwrap();
@@ -146,12 +147,12 @@ pub fn main_polygonization(args: &ArgMatches) -> Result<(), Box<dyn std::error::
 
     let anisotropicator = if !disable_anisotropication {
         Some(
-            Anisotropicator::new(0.9, 10, 4., 1000., 0.5)
+            Anisotropicator::new(0.8, 10, 8., 10400., 0.5)
         )
     } else { None };
 
     // FIXME: the ISO-VALUE and CUBE-SIZE should be asked in CLI instead of being hardcoded
-    let mesher = Mesher::new(0.01, 0.01, interpolation_algorithm, anisotropicator);
+    let mesher = Mesher::new(0.00001, 0.10, interpolation_algorithm, anisotropicator);
     // FIXME-END
 
     fs::create_dir_all(output_directory)?;

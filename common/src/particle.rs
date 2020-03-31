@@ -79,6 +79,7 @@ pub struct DFSPHFluidSnapshot
 {
     particles: Vec<Vector3<f32>>,
     neighbours_struct: HashGrid,
+    neighbours: Vec<Vec<usize>>,
     kernel: CubicSpine,
     volume: f32,
 }
@@ -96,8 +97,8 @@ impl FluidSnapshot for DFSPHFluidSnapshot {
         self.particles[i]
     }
 
-    fn neighbours(&self, i: usize) -> Vec<usize> {
-        self.neighbours_struct.find_neighbours(i, &self.particles, self.position(i))
+    fn neighbours(&self, i: usize) -> &Vec<usize> {
+        &self.neighbours[i]
     }
 
     fn find_neighbours(&self, x: &VertexWorld) -> Vec<usize> {
@@ -122,10 +123,12 @@ impl FluidSnapshotProvider for DFSPH {
         let particles = self.positions.read().unwrap().clone();
         let mut neighbours_struct = HashGrid::new(radius);
         neighbours_struct.insert(&particles);
+        let neighbours = neighbours_struct.find_all_neighbours(&particles);
 
         Box::new(DFSPHFluidSnapshot {
             particles,
             neighbours_struct,
+            neighbours,
             kernel: CubicSpine::new(self.kernel.radius()),
             volume: self.volume(0),
         })

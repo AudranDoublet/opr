@@ -87,7 +87,7 @@ impl Anisotropicator {
             let mut a = Vector3::zeros(); // sum of the weighted position of the neighborhood
 
             for j in snapshot.neighbours(i) {
-                let x_j = &snapshot.position(j);
+                let x_j = snapshot.position(*j);
                 let x_ji = x_j - x_i;
                 let w_ij = self.w(x_ji.norm_squared());
 
@@ -110,7 +110,7 @@ impl Anisotropicator {
         let mut sum_w_ij = 0.;
 
         for j in snapshot.neighbours(i) {
-            let x_j = &snapshot.position(j);
+            let x_j = &snapshot.position(*j);
             let x_ji = x_j - x_i;
             let w_ij = self.w(x_ji.norm_squared());
 
@@ -135,19 +135,11 @@ impl Anisotropicator {
             let sig_min = sig_1 / self.cst_normalization_factor;
 
             svd.singular_values = Vector3::new(
-                sig_1,
-                sig_2.max(sig_min),
-                sig_3.max(sig_min),
+                self.cst_scaling_factor * sig_1,
+                self.cst_scaling_factor * sig_2.max(sig_min),
+                self.cst_scaling_factor * sig_3.max(sig_min),
             );
         }
-    }
-
-    pub fn radius_sq(&self) -> f32 {
-        self.radius_sq
-    }
-
-    pub fn radius(&self) -> f32 {
-        self.radius
     }
 
     pub fn smoothed_position(&self, i: usize) -> VertexWorld {
@@ -164,6 +156,6 @@ impl Anisotropicator {
 
         self.normalize_eigen_values(c_svd, snapshot.neighbours(i).len());
 
-        self.kernel_radius_inv * c_svd.pseudo_inverse(CST_EPSILON).unwrap()
+        self.kernel_radius_inv * c_svd.u.unwrap() * Matrix3::from_diagonal(&c_svd.singular_values).pseudo_inverse(CST_EPSILON).unwrap() * c_svd.v_t.unwrap()
     }
 }

@@ -45,7 +45,7 @@ pub trait FluidSnapshot {
 
     /// Returns an iterator over all neighbours of the given particle
     /// * `i` - index of the particle
-    fn neighbours(&self, i: usize) -> Vec<usize>; //dyn std::iter::Iterator<Item=Vector3<f32>>;
+    fn neighbours(&self, i: usize) -> &Vec<usize>; //dyn std::iter::Iterator<Item=Vector3<f32>>;
 
     /// Returns an iterator over all neighbours of the given particle
     /// * `x` - center of the sphere of research
