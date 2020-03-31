@@ -31,7 +31,7 @@ pub struct Anisotropicator {
     cst_scaling_factor: f32,
 
     // k_n such that, on too low neighborhood, Σ~ = k_n * I. Should be similar to the kernel radius
-    cst_pc_on_low_neighborhood: f32,
+    cst_g_on_low_neighborhood: Matrix3<f32>,
 }
 
 impl Anisotropicator {
@@ -50,7 +50,8 @@ impl Anisotropicator {
             cst_min_nb_neighbours,
             cst_normalization_factor,
             cst_scaling_factor,
-            cst_pc_on_low_neighborhood,
+
+            cst_g_on_low_neighborhood: Matrix3::identity() * 1. /cst_pc_on_low_neighborhood,
         }
     }
 
@@ -123,23 +124,19 @@ impl Anisotropicator {
         c / sum_w_ij
     }
 
-    fn normalize_eigen_values(&self, svd: &mut SVD<f32, U3, U3>, nb_neighbours: usize) {
-        if nb_neighbours < self.cst_min_nb_neighbours {
-            svd.singular_values = Vector3::identity() * self.cst_pc_on_low_neighborhood;
-        } else {
-            let (sig_1, sig_2, sig_3) = (
-                svd.singular_values[0],
-                svd.singular_values[1],
-                svd.singular_values[2]
-            );
-            let sig_min = sig_1 / self.cst_normalization_factor;
+    fn normalize_eigen_values(&self, svd: &mut SVD<f32, U3, U3>) {
+        let (sig_1, sig_2, sig_3) = (
+            svd.singular_values[0],
+            svd.singular_values[1],
+            svd.singular_values[2]
+        );
+        let sig_min = sig_1 / self.cst_normalization_factor;
 
-            svd.singular_values = Vector3::new(
-                self.cst_scaling_factor * sig_1,
-                self.cst_scaling_factor * sig_2.max(sig_min),
-                self.cst_scaling_factor * sig_3.max(sig_min),
-            );
-        }
+        svd.singular_values = Vector3::new(
+            self.cst_scaling_factor * sig_1,
+            self.cst_scaling_factor * sig_2.max(sig_min),
+            self.cst_scaling_factor * sig_3.max(sig_min),
+        );
     }
 
     pub fn smoothed_position(&self, i: usize) -> VertexWorld {
@@ -151,10 +148,14 @@ impl Anisotropicator {
     }
 
     pub fn compute_anisotropy(&self, snapshot: &Box<dyn FluidSnapshot>, i: usize) -> Matrix3<f32> {
+        if snapshot.neighbours(i).len() < self.cst_min_nb_neighbours {
+            return self.cst_g_on_low_neighborhood;
+        }
+
         let c = self.compute_covariance_matrix(snapshot, i);
         let c_svd = &mut c.svd(true, true);
 
-        self.normalize_eigen_values(c_svd, snapshot.neighbours(i).len());
+        self.normalize_eigen_values(c_svd);
 
         self.kernel_radius_inv * c_svd.u.unwrap() * Matrix3::from_diagonal(&c_svd.singular_values).pseudo_inverse(CST_EPSILON).unwrap() * c_svd.v_t.unwrap()
     }
