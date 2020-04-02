@@ -1,7 +1,8 @@
 use crate::search::{AABB, Bucket};
 use std::f32;
 
-use nalgebra::Vector3;
+use crate::mesh::Triangle;
+use nalgebra::{Matrix3, Vector3};
 
 const EPSILON: f32 = 1e-5;
 
@@ -13,10 +14,6 @@ pub struct BVHParameters {
 
 pub trait BVHShape {
     fn aabb(&self) -> AABB;
-}
-
-pub trait BVHShapeInside {
-    fn is_inside(&self, aabb: &AABB) -> bool;
 }
 
 #[derive(Debug)]
@@ -33,7 +30,7 @@ pub enum BVHNode<T: BVHShape + Clone> {
 }
 
 impl<T: BVHShape + Clone> BVHNode<T> {
-    fn build(params: &BVHParameters, depth: usize, points_indices: &Vec<usize>, points: &Vec<T>) -> BVHNode<T> {
+    fn build(params: &BVHParameters, depth: usize, points_indices: &Vec<usize>, points: &Vec<T>) -> (AABB, Box<BVHNode<T>>) {
         let mut convex_hull = (AABB::empty(), AABB::empty());
 
         for &idx in points_indices {
@@ -51,9 +48,12 @@ impl<T: BVHShape + Clone> BVHNode<T> {
             || points_indices.len() <= params.max_shapes_in_leaf
             || largest_axis_length < EPSILON
         {
-            BVHNode::Leaf {
-                shapes: points_indices.iter().map(|i| points[*i].clone()).collect()
-            }
+            (
+                convex_hull.0,
+                Box::new(BVHNode::Leaf {
+                    shapes: points_indices.iter().map(|i| points[*i].clone()).collect()
+                })
+            )
         } else {
             let mut buckets = vec![Bucket::new(); params.bucket_count];
             let mut buckets_assignements = vec![Vec::new(); params.bucket_count];
@@ -94,43 +94,78 @@ impl<T: BVHShape + Clone> BVHNode<T> {
             let l = l.concat();
             let r = r.concat();
 
-
-            BVHNode::Node {
-                left_node: Box::new(BVHNode::build(params, depth + 1, &l, points)),
-                right_node: Box::new(BVHNode::build(params, depth + 1, &r, points)),
-                left_box: l_aabb,
-                right_box: r_aabb,
-            }
+            (
+                convex_hull.0,
+                Box::new(BVHNode::Node {
+                    left_node: BVHNode::build(params, depth + 1, &l, points).1,
+                    right_node: BVHNode::build(params, depth + 1, &r, points).1,
+                    left_box: l_aabb,
+                    right_box: r_aabb,
+                })
+            )
         }
     }
-}
 
-impl<T: BVHShape + BVHShapeInside + Clone> BVHNode<T> {
-    pub fn search_shapes(&self, aabb: &AABB, f: &mut dyn Fn(&T)) {
+    pub fn is_leaf(&self) -> bool {
         match self {
-            BVHNode::Leaf { shapes } => {
-                for s in shapes {
-                    if s.is_inside(aabb) {
-                        f(s);
-                    }
-                }
-            },
-            BVHNode::Node { left_node, right_node, left_box, right_box } => {
-                if left_box.intersects(aabb) {
-                    left_node.search_shapes(aabb, f);
-                }
+            BVHNode::Leaf {..} => true,
+            _ => false,
+        }
+    }
 
-                if right_box.intersects(aabb) {
-                    right_node.search_shapes(aabb, f);
+    fn dump_nodes(&self, id: usize, f: &mut dyn Fn(usize, &T)) {
+        match self {
+            BVHNode::Leaf{shapes} => {
+                for v in shapes {
+                    f(id, v);
                 }
             },
+            _ => ()
+        }
+    }
+
+    fn intersect_iter(&self,
+            f: &mut dyn Fn(usize, &T),
+            rotation: &Matrix3<f32>,
+            translation: &Vector3<f32>,
+            self_aabb: &AABB,
+            other_aabb: &AABB, other: &BVHNode<T>) {
+
+        if !self_aabb.intersects(other_aabb) {
+            return;
+        }
+
+        let modify = |b: &AABB| b.transform(rotation, translation);
+
+        if self.is_leaf() {
+            if other.is_leaf() {
+                other.dump_nodes(1, f);
+                self.dump_nodes(0, f);
+            } else if let BVHNode::Node { left_box, right_box, left_node, right_node } = other {
+                self.intersect_iter(f, rotation, translation, self_aabb, &modify(left_box), left_node);
+                self.intersect_iter(f, rotation, translation, self_aabb, &modify(right_box), right_node);
+            }
+        } else if let BVHNode::Node { left_box: lb, right_box: rb, left_node: ln, right_node: rn } = self {
+            if other.is_leaf() {
+                ln.intersect_iter(f, rotation, translation, lb, other_aabb, other);
+                rn.intersect_iter(f, rotation, translation, rb, other_aabb, other);
+            } else if let BVHNode::Node { left_box, right_box, left_node, right_node } = other {
+                let left_box = modify(left_box);
+                let right_box = modify(right_box);
+
+                ln.intersect_iter(f, rotation, translation, lb, &left_box, left_node);
+                ln.intersect_iter(f, rotation, translation, lb, &right_box, right_node);
+                rn.intersect_iter(f, rotation, translation, rb, &left_box, left_node);
+                rn.intersect_iter(f, rotation, translation, rb, &right_box, right_node);
+            }
         }
     }
 }
 
 #[derive(Debug)]
 pub struct BVH<T: BVHShape + Clone> {
-    root: BVHNode<T>,
+    root: Box<BVHNode<T>>,
+    aabb: AABB,
 }
 
 impl<T: BVHShape + Clone> BVH<T> {
@@ -145,11 +180,22 @@ impl<T: BVHShape + Clone> BVH<T> {
     }
 
     pub fn build_params(params: &BVHParameters, points: &Vec<T>) -> BVH<T> {
-        let root = BVHNode::build(params, 0, &(0..points.len()).collect(), points);
+        let (aabb, root) = BVHNode::build(params, 0, &(0..points.len()).collect(), points);
 
         BVH {
             root: root,
+            aabb: aabb,
         }
+    }
+
+    pub fn intersects(&self,
+            other: &BVH<T>,
+            f: &mut dyn Fn(usize, &T),
+            rotation: &Matrix3<f32>,
+            translation: &Vector3<f32>) {
+        self.root.intersect_iter(f, rotation, translation,
+                                 &self.aabb,
+                                 &other.aabb.transform(rotation, translation), &other.root);
     }
 }
 
@@ -159,21 +205,9 @@ impl<T: BVHShape + Clone> Default for BVH<T> {
     }
 }
 
-impl<T: BVHShape + BVHShapeInside + Clone> BVH<T> {
-    pub fn foreach_inside(&self, aabb: &AABB, f: &mut dyn Fn(&T)) {
-        self.root.search_shapes(aabb, f);
-    }
-}
-
 /** Implement BVH types for Vector3 */
-impl BVHShape for Vector3<f32> {
+impl BVHShape for Triangle {
     fn aabb(&self) -> AABB {
-        AABB::new(*self, *self)
-    }
-}
-
-impl BVHShapeInside for Vector3<f32> {
-    fn is_inside(&self, aabb: &AABB) -> bool {
-        aabb.is_inside(*self)
+        AABB::new_from_pointset(&[self.v1, self.v2, self.v3])
     }
 }

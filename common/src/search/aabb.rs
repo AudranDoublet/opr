@@ -1,4 +1,4 @@
-use nalgebra::Vector3;
+use nalgebra::{Vector3, Matrix3};
 use std::f32;
 
 #[derive(Clone, Copy, Debug)]
@@ -22,7 +22,24 @@ impl AABB {
         }
     }
 
-    pub fn new_from_pointset(mins: &[Vector3<f32>], maxs: &[Vector3<f32>]) -> AABB {
+    pub fn new_from_pointset(points: &[Vector3<f32>]) -> AABB {
+        let mut min = Vector3::new(f32::INFINITY, f32::INFINITY, f32::INFINITY);
+        let mut max = Vector3::new(f32::NEG_INFINITY, f32::NEG_INFINITY, f32::NEG_INFINITY);
+
+        for p in points {
+            for i in 0..3 {
+                min[i] = min[i].min(p[i]);
+                max[i] = max[i].max(p[i]);
+            }
+        }
+
+        AABB {
+            min: min,
+            max: max,
+        }
+    }
+
+    pub fn new_from_pointset_mm(mins: &[Vector3<f32>], maxs: &[Vector3<f32>]) -> AABB {
         let mut min = Vector3::new(f32::INFINITY, f32::INFINITY, f32::INFINITY);
         let mut max = Vector3::new(f32::NEG_INFINITY, f32::NEG_INFINITY, f32::NEG_INFINITY);
 
@@ -53,11 +70,11 @@ impl AABB {
     }
 
     pub fn join(&self, other: &AABB) -> AABB {
-        AABB::new_from_pointset(&[self.min, other.min], &[self.max, other.max])
+        AABB::new_from_pointset_mm(&[self.min, other.min], &[self.max, other.max])
     }
 
     pub fn grow(&self, p: Vector3<f32>) -> AABB {
-        AABB::new_from_pointset(&[self.min, p], &[self.max, p])
+        AABB::new_from_pointset_mm(&[self.min, p], &[self.max, p])
     }
 
     pub fn center(&self) -> Vector3<f32> {
@@ -85,5 +102,35 @@ impl AABB {
         }
 
         result
+    }
+
+    pub fn coord(&self, i: f32, j: f32, k: f32) -> Vector3<f32> {
+        self.min + (self.max - self.min).component_mul(&Vector3::new(i, j, k))
+    }
+
+    pub fn transform(&self, rotation: &Matrix3<f32>, translation: &Vector3<f32>) -> AABB {
+        let origin = rotation*self.min + translation;
+
+        let dx = rotation*self.coord(1.0, 0.0, 0.0) + translation - origin;
+        let dy = rotation*self.coord(0.0, 1.0, 0.0) + translation - origin;
+        let dz = rotation*self.coord(0.0, 0.0, 1.0) + translation - origin;
+
+        let mut min = Vector3::new(f32::INFINITY, f32::INFINITY, f32::INFINITY);
+        let mut max = Vector3::new(f32::NEG_INFINITY, f32::NEG_INFINITY, f32::NEG_INFINITY);
+
+        for x in 0..=1 {
+            for y in 0..=1 {
+                for z in 0..=1 {
+                    let pos = origin + dx*x as f32 + dy*y as f32 + dz*z as f32;
+
+                    for i in 0..3 {
+                        min[i] = min[i].min(pos[i]);
+                        max[i] = max[i].max(pos[i]);
+                    }
+                }
+            }
+        }
+
+        AABB::new(min, max)
     }
 }
