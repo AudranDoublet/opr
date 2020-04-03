@@ -51,9 +51,10 @@ fn dump_simulation(simulation: &DFSPH, dump_folder: &Path, idx: usize, verbose: 
     Ok(())
 }
 
-fn simulate(scene: Scene, dump_all: bool, dump_folder: &Path) -> Result<(), Box<dyn std::error::Error>> {
+fn simulate(scene: Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Result<(), Box<dyn std::error::Error>> {
     let mut fluid_simulation = scene.load()?;
     let mut total_time = 0.0;
+    let mut time_simulated_since_last_frame = fps;
     let mut display_high_speed_only = false;
     let mut pause_on_speed_explosion= false;
 
@@ -66,7 +67,7 @@ fn simulate(scene: Scene, dump_all: bool, dump_folder: &Path) -> Result<(), Box<
     let mut show_info: bool = true;
     let mut show_velocity: bool = false;
     let mut pause: bool = true;
-    let mut idx: usize = 0;
+    let mut frame_idx: usize = 0;
 
     while renderer.render() {
         let timer = Instant::now();
@@ -86,7 +87,7 @@ fn simulate(scene: Scene, dump_all: bool, dump_folder: &Path) -> Result<(), Box<
                         }
                         render::event::Key::D => {
                             if !dump_all {
-                                dump_simulation(&fluid_simulation, dump_folder, idx, true)?;
+                                dump_simulation(&fluid_simulation, dump_folder, frame_idx, true)?;
                             }
                         }
                         render::event::Key::C => {
@@ -112,11 +113,16 @@ fn simulate(scene: Scene, dump_all: bool, dump_folder: &Path) -> Result<(), Box<
         }
 
         if !pause {
-            if dump_all {
-                dump_simulation(&fluid_simulation, dump_folder, idx, true)?;
+            if time_simulated_since_last_frame >= fps {
+                if dump_all {
+                    dump_simulation(&fluid_simulation, dump_folder, frame_idx, true)?;
+                }
+
+                time_simulated_since_last_frame = 0.;
+                frame_idx += 1;
             }
 
-            fluid_simulation.tick();
+            time_simulated_since_last_frame += fluid_simulation.tick();
 
             let d_v_mean_sq = fluid_simulation.debug_get_v_mean_sq();
             let d_v_max_sq_deviation = fluid_simulation.debug_get_v_max_sq() / d_v_mean_sq;
@@ -151,19 +157,18 @@ fn simulate(scene: Scene, dump_all: bool, dump_folder: &Path) -> Result<(), Box<
 
             total_time += fluid_simulation.get_time_step();
 
-            idx += 1;
         }
 
         if show_info {
             renderer.debug_text(&format!("\
-                iteration: {}\n\
+                frame: {}\n\
                 dt: {:.6} s\n\
                 total: {:.6} s\n\
                 nb_particle: {}\n\
                 v_max: {:.5} m/s\n\
                 fps: {:.3} frame/s\n\
                 eye: {}\
-                ", idx, fluid_simulation.get_time_step(), total_time, fluid_simulation.len(), fluid_simulation.get_v_max(), 1. / timer.elapsed().as_secs_f32(), renderer.camera.eye()));
+                ", frame_idx, fluid_simulation.get_time_step(), total_time, fluid_simulation.len(), fluid_simulation.get_v_max(), 1. / timer.elapsed().as_secs_f32(), renderer.camera.eye()));
         }
 
         renderer.update();
@@ -172,9 +177,10 @@ fn simulate(scene: Scene, dump_all: bool, dump_folder: &Path) -> Result<(), Box<
     Ok(())
 }
 
-fn simulate_cli(scene: Scene, max_time: f32, dump_folder: &Path) -> Result<(), Box<dyn std::error::Error>> {
+fn simulate_cli(scene: Scene, max_time: f32, dump_folder: &Path, fps: f32) -> Result<(), Box<dyn std::error::Error>> {
     let mut fluid_simulation = scene.load()?;
     let mut total_time = 0.0;
+    let mut time_simulated_since_last_frame = fps;
 
     total_time += fluid_simulation.get_time_step();
 
@@ -188,11 +194,13 @@ fn simulate_cli(scene: Scene, max_time: f32, dump_folder: &Path) -> Result<(), B
     let perc = |x| ((x / max_time) * 100.) as u64;
 
     while total_time < max_time {
-        dump_simulation(&fluid_simulation, dump_folder, idx, false)?;
+        if time_simulated_since_last_frame >= fps {
+            dump_simulation(&fluid_simulation, dump_folder, idx, false)?;
+            time_simulated_since_last_frame = 0.;
+            idx += 1;
+        }
 
-        idx += 1;
-
-        fluid_simulation.tick();
+        time_simulated_since_last_frame += fluid_simulation.tick();
 
         let old = perc(total_time);
         total_time += fluid_simulation.get_time_step();
@@ -233,14 +241,16 @@ pub fn main_simulation(args: &ArgMatches) -> Result<(), Box<dyn std::error::Erro
 
     fs::create_dir_all(dump_folder)?;
 
+    let fps = 1. / args.value_of("fps").unwrap_or("-1.").parse::<f32>()?;
+
     let mut max_time = 4.0;
     if let Some(mt) = args.value_of("max_time") {
         max_time = mt.parse()?;
     }
 
     if args.is_present("no_gui") {
-        simulate_cli(scene_c, max_time, dump_folder)
+        simulate_cli(scene_c, max_time, dump_folder, fps)
     } else {
-        simulate(scene_c, dump_all, dump_folder)
+        simulate(scene_c, dump_all, dump_folder, fps)
     }
 }

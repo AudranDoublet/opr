@@ -3,6 +3,8 @@ extern crate serde;
 
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
+use std::path::Path;
+use std::sync::RwLock;
 
 use flate2::Compression;
 use flate2::read::ZlibDecoder;
@@ -11,12 +13,9 @@ use nalgebra::Vector3;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
+use crate::{HashGrid, RigidObject};
 use crate::kernel::{Kernel, kernels::CubicSpine};
-use crate::mesher::types::FluidSnapshot;
-use crate::{RigidObject, HashGrid};
-use std::path::Path;
-
-use std::sync::RwLock;
+use crate::mesher::types::{FluidSnapshot, FluidSnapshotProvider, VertexWorld};
 
 const EPSILON: f32 = 1e-5;
 
@@ -80,6 +79,7 @@ pub struct DFSPHFluidSnapshot
 {
     particles: Vec<Vector3<f32>>,
     neighbours_struct: HashGrid,
+    neighbours: Vec<Vec<usize>>,
     kernel: CubicSpine,
     volume: f32,
 }
@@ -89,17 +89,49 @@ impl FluidSnapshot for DFSPHFluidSnapshot {
         self.particles.clone()
     }
 
-    fn density_at(&self, position: Vector3<f32>) -> f32 {
-        let positions = &self.particles;
+    fn len(&self) -> usize {
+        self.particles.len()
+    }
 
-        let neighbours = self.neighbours_struct.find_neighbours(positions.len(), positions, position);
-        let mut density = 0.;
+    fn position(&self, i: usize) -> VertexWorld {
+        self.particles[i]
+    }
 
-        for i in neighbours {
-            density += self.volume * self.kernel.apply_on_norm((positions[i] - position).norm());
-        }
+    fn neighbours(&self, i: usize) -> &Vec<usize> {
+        &self.neighbours[i]
+    }
 
-        density
+    fn find_neighbours(&self, x: &VertexWorld) -> Vec<usize> {
+        self.neighbours_struct.find_neighbours(self.len(), &self.particles, *x)
+    }
+
+    fn volume(&self, _i: usize) -> f32 {
+        self.volume
+    }
+
+    fn get_kernel(&self) -> &dyn Kernel {
+        &self.kernel
+    }
+}
+
+impl FluidSnapshotProvider for DFSPH {
+    fn radius(&self) -> f32 {
+        self.kernel.radius()
+    }
+
+    fn snapshot(&self, radius: f32) -> Box<dyn FluidSnapshot> {
+        let particles = self.positions.read().unwrap().clone();
+        let mut neighbours_struct = HashGrid::new(radius);
+        neighbours_struct.insert(&particles);
+        let neighbours = neighbours_struct.find_all_neighbours(&particles);
+
+        Box::new(DFSPHFluidSnapshot {
+            particles,
+            neighbours_struct,
+            neighbours,
+            kernel: CubicSpine::new(self.kernel.radius()),
+            volume: self.volume(0),
+        })
     }
 }
 
@@ -143,14 +175,7 @@ impl DFSPH
         }
     }
 
-    pub fn snapshot(&self) -> DFSPHFluidSnapshot {
-        DFSPHFluidSnapshot {
-            particles: self.positions.read().unwrap().clone(),
-            neighbours_struct: self.neighbours_struct.clone(),
-            kernel: CubicSpine::new(self.kernel.radius()),
-            volume: self.volume(0),
-        }
-    }
+    pub fn len(&self) -> usize { self.len }
 
     pub fn clear(&mut self) {
         self.accelerations.write().unwrap().clear();
@@ -171,11 +196,11 @@ impl DFSPH
         &self.solids[i]
     }
 
-    pub fn debug_get_v_mean_sq  (&self) -> f32 {
+    pub fn debug_get_v_mean_sq(&self) -> f32 {
         self.debug_v_mean_sq
     }
 
-    pub fn debug_get_v_max_sq  (&self) -> f32 {
+    pub fn debug_get_v_max_sq(&self) -> f32 {
         self.debug_v_max_sq
     }
 
@@ -185,10 +210,6 @@ impl DFSPH
 
     pub fn get_time_step(&self) -> f32 {
         self.time_step
-    }
-
-    pub fn len(&self) -> usize {
-        self.len
     }
 
     pub fn add_particle(&mut self, x: f32, y: f32, z: f32)
@@ -403,8 +424,8 @@ impl DFSPH
             self.compute_density_advection();
 
             let density_avg: f32 = self.density_prediction.read().unwrap().par_iter()
-                                    .map(|v| v * self.rest_density - self.rest_density)
-                                    .sum::<f32>() / self.len() as f32;
+                .map(|v| v * self.rest_density - self.rest_density)
+                .sum::<f32>() / self.len() as f32;
 
             let eta = self.correct_density_max_error * 0.01 * self.rest_density;
 
@@ -453,8 +474,8 @@ impl DFSPH
             self.compute_density_variation();
 
             let density_div_avg: f32 = self.density_prediction.read().unwrap().par_iter()
-                                    .map(|v| v * self.rest_density - self.rest_density)
-                                    .sum::<f32>() / self.len() as f32;
+                .map(|v| v * self.rest_density - self.rest_density)
+                .sum::<f32>() / self.len() as f32;
 
             let eta = 1. / self.time_step * self.correct_divergence_max_error * 0.01 * self.rest_density;
 
@@ -475,7 +496,7 @@ impl DFSPH
         let positions = &*self.positions.read().unwrap();
 
         self.density.write().unwrap().par_iter_mut().enumerate().for_each(|(i, v)| *v = self.compute_density(i, positions));
-         self.stiffness.write().unwrap().par_iter_mut().enumerate().for_each(|(i, v)| *v = self.compute_stiffness(i, positions));
+        self.stiffness.write().unwrap().par_iter_mut().enumerate().for_each(|(i, v)| *v = self.compute_stiffness(i, positions));
     }
 
     fn init_boundaries(&mut self) {
@@ -486,8 +507,8 @@ impl DFSPH
         for solid in &mut self.solids {
             let (volume, boundary_x): (Vec<f32>, Vec<Vector3<f32>>) =
                 self.velocities.write().unwrap().par_iter_mut()
-                        .zip(self.positions.write().unwrap().par_iter_mut())
-                        .map(|(v, p)| solid.compute_volume_and_boundary_x(p, v, pr, kr, dt)).unzip();
+                    .zip(self.positions.write().unwrap().par_iter_mut())
+                    .map(|(v, p)| solid.compute_volume_and_boundary_x(p, v, pr, kr, dt)).unzip();
 
             solid.set_volume_and_boundary_x(volume, boundary_x);
         }
@@ -498,7 +519,7 @@ impl DFSPH
         self.neighbours_struct.insert(&self.positions.read().unwrap());
     }
 
-    pub fn tick(&mut self) {
+    pub fn tick(&mut self) -> f32 {
         self.init();
 
         self.correct_divergence_error();
@@ -514,6 +535,8 @@ impl DFSPH
 
         self.correct_density_error();
         self.neighbours_struct.update_particles(self.time_step, &mut self.positions.write().unwrap(), &self.velocities.read().unwrap());
+
+        self.time_step
     }
 
     pub fn dump(&self, path: &Path) -> Result<(), std::io::Error> {
@@ -527,7 +550,7 @@ impl DFSPH
     pub fn load(path: &Path) -> Result<DFSPH, std::io::Error> {
         let buffer = BufReader::new(File::open(path)?);
         let decoder = ZlibDecoder::new(buffer);
-        let mut r : DFSPH = serde_json::from_reader(decoder)?;
+        let mut r: DFSPH = serde_json::from_reader(decoder)?;
 
         r.sync();
 
