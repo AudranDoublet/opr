@@ -60,6 +60,9 @@ subcommands:
                 -   disable_interpolation:
                         long: disable-interpolation
                         help: disable triangles vertices interpolation
+                -   disable_anisotropication:
+                        long: disable-anisotropication
+                        help: disable the anisotropication of the kernel used to approximate densities over fluid space (fluid will appear blobby, don't do that :p)
     -   view:
             about: view list of meshes as "video"
             args:

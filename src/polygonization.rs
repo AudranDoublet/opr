@@ -14,6 +14,8 @@ use sph_common::mesher::Mesher;
 use rayon::prelude::*;
 
 use crate::simulation::add_particles;
+use sph_common::mesher::anisotropication::Anisotropicator;
+use sph_common::mesher::types::FluidSnapshotProvider;
 
 fn get_simulation_dumps_paths(folder: &Path) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
     let mut files: Vec<PathBuf> = fs::read_dir(folder)?
@@ -27,11 +29,11 @@ fn get_simulation_dumps_paths(folder: &Path) -> Result<Vec<PathBuf>, Box<dyn std
     Ok(files)
 }
 
-fn polygonize(mesher: &mut Mesher, simulation: &DFSPH, folder: &Path, idx: usize) -> Result<(), Box<dyn std::error::Error>> {
+fn polygonize(mesher: &mut Mesher, simulation: &impl FluidSnapshotProvider, folder: &Path, idx: usize) -> Result<(), Box<dyn std::error::Error>> {
     let path = folder.join(format!("{:08}.obj", idx));
     let buffer = &mut File::create(path)?;
 
-    mesher.to_obj(&simulation.snapshot(), buffer);
+    mesher.to_obj(simulation, buffer);
 
     Ok(())
 }
@@ -113,7 +115,8 @@ fn polygonize_with_gui(mut mesher: Mesher, simulations: Vec<PathBuf>, output_fol
 fn polygonize_cli(mesher: Mesher, simulations: Vec<PathBuf>, output_folder: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let pb = ProgressBar::new(simulations.len() as u64);
     pb.set_style(ProgressStyle::default_bar()
-        .template("[{elapsed}] [{per_sec}] [{eta}] {bar:40.cyan/blue} {pos:>7}/{len:7}"));
+        .template("[{elapsed_precise}] [{per_sec}] [{eta_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7}"));
+    pb.tick();
 
     simulations.par_iter().enumerate().for_each(|(i, path)| {
         let dfsph = DFSPH::load(&path).unwrap();
@@ -134,6 +137,7 @@ pub fn main_polygonization(args: &ArgMatches) -> Result<(), Box<dyn std::error::
     };
     let dump_directory = Path::new(args.value_of("dump_directory").unwrap());
     let disable_interpolation = args.is_present("disable_interpolation");
+    let disable_anisotropication = args.is_present("disable_anisotropication");
     let render = args.is_present("render");
 
     let interpolation_algorithm = match disable_interpolation {
@@ -141,8 +145,14 @@ pub fn main_polygonization(args: &ArgMatches) -> Result<(), Box<dyn std::error::
         false => InterpolationAlgorithms::Linear,
     };
 
+    let anisotropicator = if !disable_anisotropication {
+        Some(
+            Anisotropicator::new(0.8, 10, 8., 10400., 0.5)
+        )
+    } else { None };
+
     // FIXME: the ISO-VALUE and CUBE-SIZE should be asked in CLI instead of being hardcoded
-    let mesher = Mesher::new(0.01, 0.01, interpolation_algorithm);
+    let mesher = Mesher::new(0.00001, 0.10, interpolation_algorithm, anisotropicator);
     // FIXME-END
 
     fs::create_dir_all(output_directory)?;
