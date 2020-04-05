@@ -197,6 +197,10 @@ impl<T: BVHShape + Clone> BVH<T> {
                                  &self.aabb,
                                  &other.aabb.transform(rotation, translation), &other.root);
     }
+
+    pub fn root(&self) -> &Box<BVHNode<T>> {
+        &self.root
+    }
 }
 
 impl<T: BVHShape + Clone> Default for BVH<T> {

@@ -33,7 +33,7 @@ fn polygonize(mesher: &mut Mesher, simulation: &impl FluidSnapshotProvider, fold
     let path = folder.join(format!("{:08}.obj", idx));
     let buffer = &mut File::create(path)?;
 
-    mesher.to_obj(simulation, buffer);
+    mesher.convert_into_obj(simulation, buffer);
 
     Ok(())
 }
@@ -152,7 +152,7 @@ pub fn main_polygonization(args: &ArgMatches) -> Result<(), Box<dyn std::error::
     } else { None };
 
     // FIXME: the ISO-VALUE and CUBE-SIZE should be asked in CLI instead of being hardcoded
-    let mesher = Mesher::new(0.00001, 0.10, interpolation_algorithm, anisotropicator);
+    let mesher = Mesher::new(0.00001, 0.05, interpolation_algorithm, anisotropicator);
     // FIXME-END
 
     fs::create_dir_all(output_directory)?;

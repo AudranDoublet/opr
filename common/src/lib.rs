@@ -1,5 +1,6 @@
 #![feature(clamp)]
 
+mod search;
 mod particle;
 mod discretegrid;
 mod rigid_object;

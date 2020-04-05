@@ -69,7 +69,7 @@ pub trait FluidSnapshot {
     ///
     /// # Optimization
     /// To decrease the cpu/memory consummation, it's better to split the fluid into multiple AABB
-    fn aabb(&self, min_dist: f32) -> std::vec::Vec<(Vector3<f32>, Vector3<f32>)> {
+    fn aabb(&self) -> std::vec::Vec<(Vector3<f32>, Vector3<f32>)> {
         // FIXME: the default implementation is too naive, it'd be better to split the fluid into multiple AABB
         let mut a = Vector3::new(f32::MAX, f32::MAX, f32::MAX); // bottom left front
         let mut b = Vector3::new(f32::MIN, f32::MIN, f32::MIN); // top right back
@@ -86,7 +86,7 @@ pub trait FluidSnapshot {
                 b.z = b.z.max(p.z);
             });
 
-        vec![(a - Vector3::new(min_dist, min_dist, min_dist), b + Vector3::new(min_dist, min_dist, min_dist))]
+        vec![(a, b)]
     }
 }
 

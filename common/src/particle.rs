@@ -1,6 +1,7 @@
 extern crate nalgebra;
 extern crate serde;
 
+use std::collections::VecDeque;
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
 use std::path::Path;
@@ -16,6 +17,7 @@ use serde::{Deserialize, Serialize};
 use crate::{HashGrid, RigidObject};
 use crate::kernel::{Kernel, kernels::CubicSpine};
 use crate::mesher::types::{FluidSnapshot, FluidSnapshotProvider, VertexWorld};
+use crate::search::{AABB, BVH, BVHNode, BVHParameters, BVHShape};
 
 const EPSILON: f32 = 1e-5;
 
@@ -75,6 +77,12 @@ macro_rules! timeit {
 }
 */
 
+impl BVHShape for Vector3<f32> {
+    fn aabb(&self) -> AABB {
+        AABB::new(self.clone_owned(), self.clone_owned())
+    }
+}
+
 pub struct DFSPHFluidSnapshot
 {
     particles: Vec<Vector3<f32>>,
@@ -111,6 +119,34 @@ impl FluidSnapshot for DFSPHFluidSnapshot {
 
     fn get_kernel(&self) -> &dyn Kernel {
         &self.kernel
+    }
+
+    fn aabb(&self) -> std::vec::Vec<(Vector3<f32>, Vector3<f32>)> {
+        let params = BVHParameters { max_depth: 20, max_shapes_in_leaf: 100, bucket_count: 6 };
+        let bvh = BVH::build_params(&params, &self.particles);
+
+        let mut v = vec![];
+
+        let mut q = VecDeque::new();
+        q.push_back(bvh.root());
+
+        while !q.is_empty() {
+            let node = q.pop_front().unwrap().as_ref();
+            match node {
+                BVHNode::Node { left_node, right_node, left_box: _, right_box: _ } => {
+                    q.push_back(&left_node);
+                    q.push_back(&right_node);
+                }
+                BVHNode::Leaf { shapes } => {
+                    // FIXME: isn't it better to get the AABB box from the BVH Node directly instead of computing the perfect fit?
+                    let aabb = AABB::new_from_pointset(&shapes);
+                    // FIXME-END
+                    v.push((aabb.min, aabb.max));
+                }
+            }
+        }
+
+        v
     }
 }
 
