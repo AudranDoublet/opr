@@ -225,8 +225,8 @@ impl HashGrid
                 }
             });
 
-        result.extend(
-            grid.into_iter()
+        result.par_extend(
+            grid.into_par_iter()
                 .filter(|(_, s)| *s != LakeState::INTERNAL)
                 .map(|(k, _)| self.convert_into_world_vertex(&k))
         );
