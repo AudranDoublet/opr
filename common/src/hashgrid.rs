@@ -1,12 +1,15 @@
-use serde_derive::*;
+use std::iter::FromIterator;
+
 use derivative::*;
-
-use rayon::prelude::*;
+use itertools::Itertools;
 use nalgebra::Vector3;
+use rayon::prelude::*;
+use serde_derive::*;
 
-use chashmap::CHashMap;
+use crate::mesher::types::VertexWorld;
+use std::collections::{HashMap, HashSet};
 
-#[derive(Hash, Copy, Clone, PartialEq, Eq)]
+#[derive(Hash, Debug, Copy, Clone, PartialEq, Eq)]
 pub struct HashGridKey
 {
     x: isize,
@@ -45,8 +48,8 @@ pub struct HashGrid
     cell_size: f32,
     cell_size_sq: f32,
     #[serde(skip_serializing, skip_deserializing)]
-    #[derivative(Debug="ignore")]
-    map: CHashMap<HashGridKey, Vec<usize>>,
+    #[derivative(Debug = "ignore")]
+    map: HashMap<HashGridKey, Vec<usize>>,
 }
 
 impl HashGrid
@@ -55,22 +58,26 @@ impl HashGrid
         HashGrid {
             cell_size: cell_size,
             cell_size_sq: cell_size.powi(2),
-            map: CHashMap::new(),
+            map: HashMap::new(),
         }
     }
 
     pub fn insert(&mut self, particles: &Vec<Vector3<f32>>) {
-        particles.par_iter().enumerate().for_each(|(i, &p)| {
-            let position = self.key(p);
+        let cell_size = self.cell_size;
+        let to_update: HashMap<HashGridKey, Vec<usize>> = particles.par_iter().enumerate()
+            .map(|(i, p)| (HashGridKey::new(cell_size, *p), i))
+            .collect::<Vec<(HashGridKey, usize)>>()
+            .into_iter()
+            .into_group_map()
+            .into_par_iter()
+            .map(|(k, v)| {
+                let s_i: HashSet<usize> = HashSet::from_iter(v.into_iter());
+                (k, s_i.into_iter().collect())
+            }).collect();
 
-            if !self.map.contains_key(&position) {
-                self.map.insert_new(position, Vec::new());
-            }
-
-            if let Some(mut pos) = self.map.get_mut(&position) {
-                pos.push(i)
-            }
-        });
+        self.map.par_extend(
+            to_update.into_par_iter()
+        );
     }
 
     pub fn key(&self, position: Vector3<f32>) -> HashGridKey {
@@ -104,27 +111,50 @@ impl HashGrid
         }).collect()
     }
 
-    pub fn update_particles(&self, dt: f32, particles: &mut Vec<Vector3<f32>>, velocity: &Vec<Vector3<f32>>) {
-        particles.par_iter_mut().zip(velocity.par_iter()).enumerate().for_each(|(i, (p, v))| {
-            let old_key = self.key(*p);
+    pub fn update_particles(&mut self, old_positions: &Vec<VertexWorld>, new_positions: &Vec<VertexWorld>) {
+        let cell_size = self.cell_size;
+        let to_update: Vec<(usize, HashGridKey, HashGridKey)> = old_positions.par_iter().zip(new_positions.par_iter()).enumerate()
+            .filter(|(_, (old, new))| *old != *new)
+            .map(|(i, (old, new))| {
+                (i, HashGridKey::new(cell_size, *old), HashGridKey::new(cell_size, *new))
+            }).collect();
 
-            *p += dt * v;
+        let to_remove: HashMap<HashGridKey, HashSet<usize>> = to_update.par_iter()
+            .map(|(i, old, _new)| (*old, *i))
+            .collect::<Vec<(HashGridKey, usize)>>()
+            .into_iter()
+            .into_group_map()
+            .into_par_iter()
+            .map(|(k, v)| (k, HashSet::from_iter(v.into_iter())))
+            .collect();
 
-            let new_key = self.key(*p);
+        let to_add: HashMap<HashGridKey, HashSet<usize>> = to_update.par_iter()
+            .map(|(i, _old, new)| (*new, *i))
+            .collect::<Vec<(HashGridKey, usize)>>()
+            .into_iter()
+            .into_group_map()
+            .into_par_iter()
+            .map(|(k, v)| (k, HashSet::from_iter(v.into_iter())))
+            .collect();
 
-            if old_key != new_key {
-                if let Some(mut vec) = self.map.get_mut(&old_key) {
-                    vec.retain(|&x| x != i); // FIXME remove vector if empty ?
-                }
+        let keys : HashSet<HashGridKey> = HashSet::from_par_iter(to_remove.par_iter().chain(to_add.par_iter()).into_par_iter().map(|(&k, _)| k));
 
-                if !self.map.contains_key(&new_key) {
-                    self.map.insert_new(new_key, Vec::new());
-                }
+        let new_values : Vec<(HashGridKey, Vec<usize>)> = keys.into_par_iter().map(|k| {
+            let mut entry = self.map.get(&k).unwrap_or(&vec![]).clone();
 
-                if let Some(mut vec) = self.map.get_mut(&new_key) {
-                    vec.push(i);
-                }
+            if let Some(v_to_del) = to_remove.get(&k) {
+                entry.retain(|v| v_to_del.contains(v));
             }
-        });
+
+            if let Some(v_to_add) = to_add.get(&k) {
+                entry.extend(v_to_add.iter());
+            }
+
+            let entry: HashSet<usize> = HashSet::from_iter(entry.into_iter());
+
+            (k, entry.into_iter().collect_vec())
+        }).collect();
+
+        self.map.par_extend(new_values.into_par_iter());
     }
 }

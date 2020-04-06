@@ -570,7 +570,9 @@ impl DFSPH
         }
 
         self.correct_density_error();
-        self.neighbours_struct.update_particles(self.time_step, &mut self.positions.write().unwrap(), &self.velocities.read().unwrap());
+        let old = self.positions.read().unwrap().clone();
+        self.positions.write().unwrap().par_iter_mut().zip(self.velocities.read().unwrap().par_iter()).for_each(|(p, v)| *p += dt * v);
+        self.neighbours_struct.update_particles(&old, &self.positions.read().unwrap());
     }
 
     pub fn dump(&self, path: &Path) -> Result<(), std::io::Error> {
