@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 
 use nalgebra::Vector3;
 
@@ -42,7 +41,7 @@ impl Mesher {
             }
         };
 
-        let neighbours = snapshot.find_neighbours(x);
+        let neighbours = snapshot.neighbours_kernel(x);
 
         let mut density = 0.;
 
@@ -53,20 +52,16 @@ impl Mesher {
         density
     }
 
-    fn density_at(&mut self, local: &VertexLocal, x: &VertexWorld, snapshot: &Box<dyn FluidSnapshot>, cache: &mut HashMap<VertexLocal, f32>) -> f32 {
-        *cache.entry(*local).or_insert_with(|| self.compute_density_at(snapshot, x))
-    }
-
-    fn generate_cube_vertices(&mut self, snapshot: &Box<dyn FluidSnapshot>, origin: VertexLocal, cache: &mut HashMap<VertexLocal, f32>) -> CubeVertices {
+    fn generate_cube_vertices(&mut self, snapshot: &Box<dyn FluidSnapshot>, origin: &VertexLocal) -> CubeVertices {
         let vertices_local = [
-            &origin + Vector3::new(-1, 0, 0),   // 0
-            &origin + Vector3::new(0, 0, 0),    // 1
-            &origin + Vector3::new(0, 0, -1),   // 2
-            &origin + Vector3::new(-1, 0, -1),  // 3
-            &origin + Vector3::new(-1, -1, 0),  // 4
-            &origin + Vector3::new(0, -1, 0),   // 5
-            &origin + Vector3::new(0, -1, -1),  // 6
-            &origin + Vector3::new(-1, -1, -1), // 7
+            origin + Vector3::new(-1, 0, 0),   // 0
+            origin + Vector3::new(0, 0, 0),    // 1
+            origin + Vector3::new(0, 0, -1),   // 2
+            origin + Vector3::new(-1, 0, -1),  // 3
+            origin + Vector3::new(-1, -1, 0),  // 4
+            origin + Vector3::new(0, -1, 0),   // 5
+            origin + Vector3::new(0, -1, -1),  // 6
+            origin + Vector3::new(-1, -1, -1), // 7
         ];
 
         let mut vertices_world: [VertexWorld; 8] = [Vector3::zeros(); 8];
@@ -74,10 +69,18 @@ impl Mesher {
 
         for i in 0..8 {
             vertices_world[i] = self.to_world(vertices_local[i]);
-            densities[i] = self.density_at(&vertices_local[i], &vertices_world[i], snapshot, cache);
+            densities[i] = self.compute_density_at(snapshot, &vertices_world[i])
         }
 
         CubeVertices { vertices_local, vertices_world, densities }
+    }
+
+    fn to_local(&self, v: &VertexWorld) -> VertexLocal {
+        VertexLocal::new(
+            (v.x / self.cube_size) as i32,
+            (v.y / self.cube_size) as i32,
+            (v.z / self.cube_size) as i32,
+        )
     }
 
     fn to_world(&self, point: VertexLocal) -> VertexWorld {
@@ -98,7 +101,7 @@ impl Mesher {
     }
 
     fn compute_mesh(&mut self, snapshot: &Box<dyn FluidSnapshot>) -> Mesh {
-        let bounding_boxes = self.discrete_aabb(snapshot);
+        let borders = snapshot.get_borders();
 
         let iso_value = self.iso_value;
         let interpolation_algorithm = self.interpolation_algorithm;
@@ -106,64 +109,27 @@ impl Mesher {
 
         let mut mesh = Mesh::new();
 
-        let mut cache_densities: HashMap<VertexLocal, f32> = HashMap::new();
-        let mut cache_cubes: HashMap<VertexLocal, CubeVertices> = HashMap::new();
+        borders.iter()
+            .for_each(|cube_origin| {
+            let cube_vertices = self.generate_cube_vertices(snapshot, &self.to_local(cube_origin));
+            let config_id = self.search_configuration(&cube_vertices);
 
-        for (min, max) in &bounding_boxes {
-            for z in min.z..=max.z {
-                for y in min.y..=max.y {
-                    for x in min.x..=max.x {
-                        let cube_origin = VertexLocal::new(x, y, z);
-
-                        let cube_vertices = cache_cubes
-                            .entry(cube_origin)
-                            .or_insert_with(|| self.generate_cube_vertices(snapshot, cube_origin, &mut cache_densities));
-
-                        let config_id = self.search_configuration(&cube_vertices);
-
-                        for triangle in &constants::MC_CONFIGS_TRIANGLES[config_id] {
-                            if triangle[0] == -1 {
-                                break;
-                            }
-
-                            mesh.add_triangle(
-                                &cube_vertices,
-                                &MC_CONFIGS_EDGES[triangle[0] as usize],
-                                &MC_CONFIGS_EDGES[triangle[1] as usize],
-                                &MC_CONFIGS_EDGES[triangle[2] as usize],
-                                &interpolator,
-                            );
-                        }
-                    }
+            for triangle in &constants::MC_CONFIGS_TRIANGLES[config_id] {
+                if triangle[0] == -1 {
+                    break;
                 }
+
+                mesh.add_triangle(
+                    &cube_vertices,
+                    &MC_CONFIGS_EDGES[triangle[0] as usize],
+                    &MC_CONFIGS_EDGES[triangle[1] as usize],
+                    &MC_CONFIGS_EDGES[triangle[2] as usize],
+                    &interpolator,
+                );
             }
-        }
+        });
 
         mesh
-    }
-
-    fn discrete_aabb(&self, snapshot: &Box<dyn FluidSnapshot>) -> Vec<(VertexLocal, VertexLocal)> {
-        let bounding_boxes = snapshot.aabb();
-        let kernel_radius = snapshot.get_kernel().radius();
-
-        let align_max = |v: &VertexWorld| -> VertexLocal {
-            let x = ((v.x + kernel_radius) / self.cube_size).ceil() as i32;
-            let y = ((v.y + kernel_radius) / self.cube_size).ceil() as i32;
-            let z = ((v.z + kernel_radius) / self.cube_size).ceil() as i32;
-
-            VertexLocal::new(x, y, z)
-        };
-
-        let align_min = |v: &VertexWorld| -> VertexLocal {
-            let x = ((v.x - kernel_radius) / self.cube_size).floor() as i32;
-            let y = ((v.y - kernel_radius) / self.cube_size).floor() as i32;
-            let z = ((v.z - kernel_radius) / self.cube_size).floor() as i32;
-
-            VertexLocal::new(x, y, z)
-        };
-
-
-        bounding_boxes.iter().map(|(min, max)| (align_min(min), align_max(max))).collect()
     }
 
     fn convert_mesh_into_obj(&mut self, mesh: Mesh) -> (Vec<VertexWorld>, Vec<Normal>, Vec<TriangleCoordinates>) {
@@ -174,11 +140,11 @@ impl Mesher {
         )
     }
 
-    fn find_radius(&self, snapshot_provider: &impl FluidSnapshotProvider) -> f32 {
+    fn get_anisotropic_kernel_radius(&self, snapshot_provider: &impl FluidSnapshotProvider) -> Option<f32> {
         if self.anisotropicator.is_some() {
-            Anisotropicator::compute_radius(snapshot_provider.radius())
+            Some(Anisotropicator::compute_radius(snapshot_provider.radius()))
         } else {
-            snapshot_provider.radius()
+            None
         }
     }
 
@@ -189,8 +155,8 @@ impl Mesher {
     }
 
     pub fn convert_into_obj(&mut self, snapshot_provider: &impl FluidSnapshotProvider, writer: &mut impl std::io::Write) {
-        let radius = self.find_radius(snapshot_provider);
-        let snapshot = &snapshot_provider.snapshot(radius);
+        let an_radius = self.get_anisotropic_kernel_radius(snapshot_provider);
+        let snapshot = &snapshot_provider.snapshot(snapshot_provider.radius(), an_radius);
         self.update_anisotropicator(snapshot);
 
         let mesh = self.compute_mesh(snapshot);

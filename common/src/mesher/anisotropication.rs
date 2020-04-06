@@ -87,7 +87,7 @@ impl Anisotropicator {
             let mut sum_w_ij = 0.;
             let mut a = Vector3::zeros(); // sum of the weighted position of the neighborhood
 
-            for j in snapshot.neighbours(i) {
+            for j in snapshot.neighbours_anisotropic_kernel(i) {
                 let x_j = snapshot.position(*j);
                 let x_ji = x_j - x_i;
                 let w_ij = self.w(x_ji.norm_squared());
@@ -110,7 +110,7 @@ impl Anisotropicator {
 
         let mut sum_w_ij = 0.;
 
-        for j in snapshot.neighbours(i) {
+        for j in snapshot.neighbours_anisotropic_kernel(i) {
             let x_j = &snapshot.position(*j);
             let x_ji = x_j - x_i;
             let w_ij = self.w(x_ji.norm_squared());
@@ -148,7 +148,7 @@ impl Anisotropicator {
     }
 
     pub fn compute_anisotropy(&self, snapshot: &Box<dyn FluidSnapshot>, i: usize) -> Matrix3<f32> {
-        if snapshot.neighbours(i).len() < self.cst_min_nb_neighbours {
+        if snapshot.neighbours_anisotropic_kernel(i).len() < self.cst_min_nb_neighbours {
             return self.cst_g_on_low_neighborhood;
         }
 
