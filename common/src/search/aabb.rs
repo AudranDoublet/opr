@@ -52,10 +52,12 @@ impl AABB {
         AABB::new(min, max)
     }
 
+    #[allow(dead_code)]
     pub fn is_inside(&self, p: Vector3<f32>) -> bool {
         self.min < p && p < self.max
     }
 
+    #[allow(dead_code)]
     pub fn intersects(&self, other: &AABB) -> bool {
         self.min <= other.max && self.max >= other.min
     }
@@ -95,10 +97,12 @@ impl AABB {
         result
     }
 
+    #[allow(dead_code)]
     pub fn coord(&self, i: f32, j: f32, k: f32) -> Vector3<f32> {
         self.min + (self.max - self.min).component_mul(&Vector3::new(i, j, k))
     }
 
+    #[allow(dead_code)]
     pub fn transform(&self, rotation: &Matrix3<f32>, translation: &Vector3<f32>) -> AABB {
         let origin = rotation*self.min + translation;
 
