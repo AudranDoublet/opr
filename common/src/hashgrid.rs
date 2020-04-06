@@ -1,3 +1,4 @@
+use std::collections::{HashMap, HashSet};
 use std::iter::FromIterator;
 
 use derivative::*;
@@ -7,7 +8,6 @@ use rayon::prelude::*;
 use serde_derive::*;
 
 use crate::mesher::types::VertexWorld;
-use std::collections::{HashMap, HashSet};
 
 #[derive(Hash, Debug, Copy, Clone, PartialEq, Eq)]
 pub struct HashGridKey
@@ -39,6 +39,13 @@ impl HashGridKey
             z: self.z + z,
         }
     }
+}
+
+#[derive(PartialEq, Debug, Eq, Clone, Copy)]
+enum LakeState {
+    EXTERNAL = -1,
+    JUNCTURE = 0,
+    INTERNAL = 1,
 }
 
 #[derive(Serialize, Deserialize, Derivative, Clone)]
@@ -137,9 +144,9 @@ impl HashGrid
             .map(|(k, v)| (k, HashSet::from_iter(v.into_iter())))
             .collect();
 
-        let keys : HashSet<HashGridKey> = HashSet::from_par_iter(to_remove.par_iter().chain(to_add.par_iter()).into_par_iter().map(|(&k, _)| k));
+        let keys: HashSet<HashGridKey> = HashSet::from_par_iter(to_remove.par_iter().chain(to_add.par_iter()).into_par_iter().map(|(&k, _)| k));
 
-        let new_values : Vec<(HashGridKey, Vec<usize>)> = keys.into_par_iter().map(|k| {
+        let new_values: Vec<(HashGridKey, Vec<usize>)> = keys.into_par_iter().map(|k| {
             let mut entry = self.map.get(&k).unwrap_or(&vec![]).clone();
 
             if let Some(v_to_del) = to_remove.get(&k) {
@@ -156,5 +163,74 @@ impl HashGrid
         }).collect();
 
         self.map.par_extend(new_values.into_par_iter());
+    }
+
+    fn _get_borders_rec(&self, cell: &HashGridKey, grid: &mut HashMap<HashGridKey, LakeState>) -> LakeState {
+        grid.insert(*cell, LakeState::INTERNAL);
+
+        let mut count_non_void_neighbours: u8 = 0;
+
+        for dz in -1..=1 {
+            for dy in -1..=1 {
+                for dx in -1..=1 {
+                    if dx == 0 && dy == 0 && dz == 0 {
+                        continue;
+                    }
+
+                    let neighbour = cell.relative(dx, dy, dz);
+
+                    let neighbour_state = match grid.get(&neighbour) {
+                        Some(&state) => state,
+                        None => {
+                            match self.map.get(&neighbour) {
+                                Some(particles) =>
+                                    if particles.is_empty() { LakeState::EXTERNAL } else { self._get_borders_rec(&neighbour, grid) }
+                                None =>
+                                    LakeState::EXTERNAL
+                            }
+                        }
+                    };
+
+                    if neighbour_state == LakeState::EXTERNAL {
+                        grid.entry(neighbour).or_insert(LakeState::EXTERNAL);
+                    }
+
+                    count_non_void_neighbours += (neighbour_state != LakeState::EXTERNAL) as u8;
+                }
+            }
+        }
+
+        if count_non_void_neighbours == 26 {
+            LakeState::INTERNAL
+        } else {
+            grid.insert(*cell, LakeState::JUNCTURE);
+            LakeState::JUNCTURE
+        }
+    }
+
+    fn convert_into_world_vertex(&self, x: &HashGridKey) -> VertexWorld {
+        VertexWorld::new(x.x as f32, x.y as f32, x.z as f32) * self.cell_size
+    }
+
+    pub fn get_borders(&self) -> Vec<VertexWorld> {
+        let mut result = vec![];
+
+        let mut grid: HashMap<HashGridKey, LakeState> = HashMap::new();
+
+        self.map.iter()
+            .filter(|(_k, v)| !v.is_empty())
+            .for_each(|(k, _)| {
+                if !grid.contains_key(k) {
+                    self._get_borders_rec(k, &mut grid);
+                }
+            });
+
+        result.extend(
+            grid.into_iter()
+                .filter(|(_, s)| *s != LakeState::INTERNAL)
+                .map(|(k, _)| self.convert_into_world_vertex(&k))
+        );
+
+        result
     }
 }

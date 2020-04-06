@@ -202,6 +202,7 @@ impl<T: BVHShape + Clone> BVH<T> {
                                  &other.aabb.transform(rotation, translation), &other.root);
     }
 
+    #[allow(dead_code)]
     pub fn root(&self) -> &Box<BVHNode<T>> {
         &self.root
     }
