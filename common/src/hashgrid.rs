@@ -209,7 +209,7 @@ impl HashGrid
     }
 
     fn convert_into_world_vertex(&self, x: &HashGridKey) -> VertexWorld {
-        VertexWorld::new(x.x as f32, x.y as f32, x.z as f32) * self.cell_size
+        (VertexWorld::new(x.x as f32, x.y as f32, x.z as f32) + VertexWorld::identity() * 0.5) * self.cell_size
     }
 
     pub fn get_borders(&self) -> Vec<VertexWorld> {

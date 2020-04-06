@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 
 use nalgebra::Vector3;
 
@@ -52,16 +53,22 @@ impl Mesher {
         density
     }
 
-    fn generate_cube_vertices(&mut self, snapshot: &Box<dyn FluidSnapshot>, origin: &VertexLocal) -> CubeVertices {
+    fn get_cube_density(&self, snapshot: &Box<dyn FluidSnapshot>, cache_densities: &mut HashMap<VertexLocal, f32>, x_local: &VertexLocal, x_world: &VertexWorld) -> f32 {
+        *cache_densities.entry(*x_local)
+            .or_insert_with(|| self.compute_density_at(snapshot, x_world))
+    }
+
+    fn generate_cube_vertices(&mut self, snapshot: &Box<dyn FluidSnapshot>, origin: &VertexLocal,
+                              cache_densities: &mut HashMap<VertexLocal, f32>) -> CubeVertices {
         let vertices_local = [
-            origin + Vector3::new(-1, 0, 0),   // 0
-            origin + Vector3::new(0, 0, 0),    // 1
-            origin + Vector3::new(0, 0, -1),   // 2
-            origin + Vector3::new(-1, 0, -1),  // 3
-            origin + Vector3::new(-1, -1, 0),  // 4
-            origin + Vector3::new(0, -1, 0),   // 5
-            origin + Vector3::new(0, -1, -1),  // 6
-            origin + Vector3::new(-1, -1, -1), // 7
+            origin + VertexLocal::new(-1, 0, 0),   // 0
+            origin + VertexLocal::new(0, 0, 0),    // 1
+            origin + VertexLocal::new(0, 0, -1),   // 2
+            origin + VertexLocal::new(-1, 0, -1),  // 3
+            origin + VertexLocal::new(-1, -1, 0),  // 4
+            origin + VertexLocal::new(0, -1, 0),   // 5
+            origin + VertexLocal::new(0, -1, -1),  // 6
+            origin + VertexLocal::new(-1, -1, -1), // 7
         ];
 
         let mut vertices_world: [VertexWorld; 8] = [Vector3::zeros(); 8];
@@ -69,7 +76,7 @@ impl Mesher {
 
         for i in 0..8 {
             vertices_world[i] = self.to_world(vertices_local[i]);
-            densities[i] = self.compute_density_at(snapshot, &vertices_world[i])
+            densities[i] = self.get_cube_density(snapshot, cache_densities, &vertices_local[i], &vertices_world[i])
         }
 
         CubeVertices { vertices_local, vertices_world, densities }
@@ -105,29 +112,33 @@ impl Mesher {
 
         let iso_value = self.iso_value;
         let interpolation_algorithm = self.interpolation_algorithm;
-        let interpolator: Box<dyn Fn(&CubeVertices, &EdgeIndices) -> VertexWorld> = Box::new(move |cube_vertices, edge_indices| interpolate(interpolation_algorithm, iso_value, cube_vertices, edge_indices));
+        let interpolator: Box<dyn Fn(&CubeVertices, &EdgeIndices) -> VertexWorld>
+            = Box::new(move |cube_vertices, edge_indices|
+            interpolate(interpolation_algorithm, iso_value, cube_vertices, edge_indices));
 
         let mut mesh = Mesh::new();
 
+        let mut cache_vertices: HashMap<VertexLocal, f32> = HashMap::new();
+
         borders.iter()
             .for_each(|cube_origin| {
-            let cube_vertices = self.generate_cube_vertices(snapshot, &self.to_local(cube_origin));
-            let config_id = self.search_configuration(&cube_vertices);
+                let cube_vertices = self.generate_cube_vertices(snapshot, &self.to_local(cube_origin), &mut cache_vertices);
+                let config_id = self.search_configuration(&cube_vertices);
 
-            for triangle in &constants::MC_CONFIGS_TRIANGLES[config_id] {
-                if triangle[0] == -1 {
-                    break;
+                for triangle in &constants::MC_CONFIGS_TRIANGLES[config_id] {
+                    if triangle[0] == -1 {
+                        break;
+                    }
+
+                    mesh.add_triangle(
+                        &cube_vertices,
+                        &MC_CONFIGS_EDGES[triangle[0] as usize],
+                        &MC_CONFIGS_EDGES[triangle[1] as usize],
+                        &MC_CONFIGS_EDGES[triangle[2] as usize],
+                        &interpolator,
+                    );
                 }
-
-                mesh.add_triangle(
-                    &cube_vertices,
-                    &MC_CONFIGS_EDGES[triangle[0] as usize],
-                    &MC_CONFIGS_EDGES[triangle[1] as usize],
-                    &MC_CONFIGS_EDGES[triangle[2] as usize],
-                    &interpolator,
-                );
-            }
-        });
+            });
 
         mesh
     }
