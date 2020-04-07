@@ -10,6 +10,7 @@ nalgebra = { version = "0.20.0", features = ["serde-serialize"] }
 
 # Multithreading
 rayon = "1.3.0"
+dashmap = "3.10.0"
 
 # compression
 flate2 = { version = "*", features = ["cloudflare_zlib"], default-features = false }
