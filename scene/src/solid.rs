@@ -19,8 +19,12 @@ pub struct Solid {
     pub rotation_axis: [f32; 3],
     pub rotation_angle: f32,
 
+    pub density: f32,
+
     pub resolution: [u32; 3],
     pub display: bool,
+
+    pub dynamic: bool,
 }
 
 impl Solid {
@@ -72,6 +76,15 @@ impl Solid {
         let cache_file = self.cache_file(Path::new(&scene.global_config.cache_path), kradius);
         let mesh_file = self.file(Path::new(&scene.global_config.data_path));
 
+        let mut mesh = Mesh::load_obj(&mesh_file, self.scale())?;
+
+        if self.mesh_invert {
+            mesh.invert();
+        }
+
+        let properties = mesh.compute_mass_properties(self.density);
+        mesh.set_translate(properties.center_of_mass);
+
         let grid = if scene.global_config.use_cache && cache_file.as_path().exists() {
             println!("Use cache {:?} for {}", cache_file, self.mesh);
 
@@ -81,15 +94,10 @@ impl Solid {
             println!("Compute sdf and volume for {}", self.mesh);
             let extend = 2. * Vector3::new(kradius, kradius, kradius);
 
-            let mut mesh = Mesh::load_obj(&mesh_file, self.scale())?;
-
-            if self.mesh_invert {
-                mesh.invert();
-            }
-
+            let (min, max) = mesh.boundings();
             let mut grid = DiscreteGrid::new(
-                mesh.bounding_min - extend,
-                mesh.bounding_max + extend,
+                min - extend,
+                max + extend,
                 self.resolution(),
             );
 
@@ -106,9 +114,8 @@ impl Solid {
         println!("{:?}", grid.interpolate(1, Vector3::new(0.5, 0.5, 0.5), true));
         println!("{} loaded!", self.mesh);
 
-        let mut object = RigidObject::new(grid);
+        let mut object = RigidObject::new(grid, mesh.compute_bvh(), self.dynamic, properties);
 
-        object.set_scale(self.scale());
         object.set_position(self.position());
 
         Ok(object)

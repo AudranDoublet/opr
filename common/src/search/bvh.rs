@@ -113,11 +113,11 @@ impl<T: BVHShape + Clone> BVHNode<T> {
         }
     }
 
-    fn dump_nodes(&self, id: usize, f: &mut dyn Fn(usize, &T)) {
+    fn dump_nodes(&self, id: usize, f: &mut Vec<(usize, T)>) {
         match self {
             BVHNode::Leaf{shapes} => {
                 for v in shapes {
-                    f(id, v);
+                    f.push((id, v.clone()));
                 }
             },
             _ => ()
@@ -125,7 +125,7 @@ impl<T: BVHShape + Clone> BVHNode<T> {
     }
 
     fn intersect_iter(&self,
-            f: &mut dyn Fn(usize, &T),
+            vec: &mut Vec<(usize, T)>,
             rotation: &Matrix3<f32>,
             translation: &Vector3<f32>,
             self_aabb: &AABB,
@@ -139,24 +139,24 @@ impl<T: BVHShape + Clone> BVHNode<T> {
 
         if self.is_leaf() {
             if other.is_leaf() {
-                other.dump_nodes(1, f);
-                self.dump_nodes(0, f);
+                other.dump_nodes(1, vec);
+                self.dump_nodes(0, vec);
             } else if let BVHNode::Node { left_box, right_box, left_node, right_node } = other {
-                self.intersect_iter(f, rotation, translation, self_aabb, &modify(left_box), left_node);
-                self.intersect_iter(f, rotation, translation, self_aabb, &modify(right_box), right_node);
+                self.intersect_iter(vec, rotation, translation, self_aabb, &modify(left_box), left_node);
+                self.intersect_iter(vec, rotation, translation, self_aabb, &modify(right_box), right_node);
             }
         } else if let BVHNode::Node { left_box: lb, right_box: rb, left_node: ln, right_node: rn } = self {
             if other.is_leaf() {
-                ln.intersect_iter(f, rotation, translation, lb, other_aabb, other);
-                rn.intersect_iter(f, rotation, translation, rb, other_aabb, other);
+                ln.intersect_iter(vec, rotation, translation, lb, other_aabb, other);
+                rn.intersect_iter(vec, rotation, translation, rb, other_aabb, other);
             } else if let BVHNode::Node { left_box, right_box, left_node, right_node } = other {
                 let left_box = modify(left_box);
                 let right_box = modify(right_box);
 
-                ln.intersect_iter(f, rotation, translation, lb, &left_box, left_node);
-                ln.intersect_iter(f, rotation, translation, lb, &right_box, right_node);
-                rn.intersect_iter(f, rotation, translation, rb, &left_box, left_node);
-                rn.intersect_iter(f, rotation, translation, rb, &right_box, right_node);
+                ln.intersect_iter(vec, rotation, translation, lb, &left_box, left_node);
+                ln.intersect_iter(vec, rotation, translation, lb, &right_box, right_node);
+                rn.intersect_iter(vec, rotation, translation, rb, &left_box, left_node);
+                rn.intersect_iter(vec, rotation, translation, rb, &right_box, right_node);
             }
         }
     }
@@ -165,7 +165,7 @@ impl<T: BVHShape + Clone> BVHNode<T> {
 #[derive(Debug)]
 pub struct BVH<T: BVHShape + Clone> {
     root: Box<BVHNode<T>>,
-    aabb: AABB,
+    pub aabb: AABB,
 }
 
 impl<T: BVHShape + Clone> BVH<T> {
@@ -190,12 +190,15 @@ impl<T: BVHShape + Clone> BVH<T> {
 
     pub fn intersects(&self,
             other: &BVH<T>,
-            f: &mut dyn Fn(usize, &T),
             rotation: &Matrix3<f32>,
-            translation: &Vector3<f32>) {
-        self.root.intersect_iter(f, rotation, translation,
+            translation: &Vector3<f32>) -> Vec<(usize, T)> {
+        let mut result = Vec::new();
+
+        self.root.intersect_iter(&mut result, rotation, translation,
                                  &self.aabb,
                                  &other.aabb.transform(rotation, translation), &other.root);
+
+        result
     }
 }
 

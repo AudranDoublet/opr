@@ -1,3 +1,5 @@
+# This file uses centimeters as units for non-parametric coordinates.
+
 v -0.500000 -0.500000 0.500000
 v 0.500000 -0.500000 0.500000
 v -0.500000 0.500000 0.500000

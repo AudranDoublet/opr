@@ -2,7 +2,7 @@ use std::path::Path;
 use std::time::Instant;
 
 use clap::ArgMatches;
-use kiss3d::camera::camera::Camera;
+use kiss3d::{camera::camera::Camera, scene::SceneNode};
 use nalgebra::{Point3, Translation3};
 use sph_common::DFSPH;
 use sph_scene::Scene;
@@ -24,18 +24,32 @@ pub fn add_particles(range: std::ops::Range<usize>, dfsph: &DFSPH, scene: &mut r
     }
 }
 
-fn add_meshes(config: &sph_scene::Scene, scene: &mut render::scene::Scene) {
+fn add_meshes(dfsph: &mut DFSPH, config: &sph_scene::Scene, scene: &mut render::scene::Scene) -> Vec<Option<SceneNode>> {
+    let mut result = Vec::new();
+
     for i in 0..config.solids.len() {
         let solid = &config.solids[i];
+        let center = dfsph.solid(i).center_of_mass.component_div(&solid.scale());
+        let position = dfsph.solid(i).position();
 
         if !solid.display {
-            continue;
-        }
+            result.push(None);
+        } else {
+            let data = Path::new(&config.global_config.data_path);
+            let path = solid.file(data);
+            let mut obj = scene.window.add_obj(&path, &path.parent().unwrap(), solid.scale());
 
-        let data = Path::new(&config.global_config.data_path);
-        let mut obj = scene.window.add_obj(&solid.file(data), data, solid.scale());
-        obj.set_local_translation(Translation3::new(solid.position[0], solid.position[1], solid.position[2]));
+            obj.modify_vertices(&mut |v| {
+                v.iter_mut().for_each(|t| *t -= center);
+            });
+
+            obj.set_local_translation(Translation3::new(position[0], position[1], position[2]));
+
+            result.push(Some(obj));
+        }
     }
+
+    result
 }
 
 fn dump_simulation(simulation: &DFSPH, dump_folder: &Path, idx: usize, verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
@@ -61,7 +75,7 @@ fn simulate(scene: Scene, dump_all: bool, dump_folder: &Path) -> Result<(), Box<
     renderer.camera.look_at(Point3::new(0.0, 1., -2.), Point3::new(0., 0., 5.)); //FIXME make camera configurable
 
     add_particles(0..fluid_simulation.len(), &fluid_simulation, &mut renderer);
-    add_meshes(&scene, &mut renderer);
+    let mut meshes = add_meshes(&mut fluid_simulation, &scene, &mut renderer);
 
     let mut show_info: bool = true;
     let mut show_velocity: bool = false;
@@ -147,6 +161,15 @@ fn simulate(scene: Scene, dump_all: bool, dump_folder: &Path) -> Result<(), Box<
 
                 let pos = positions[i];
                 particle.position = (pos.x, pos.y, pos.z);
+            }
+
+            for i in 0..fluid_simulation.solid_count() {
+                let solid = fluid_simulation.solid(i);
+
+                if let Some(mesh) = &mut meshes[i] {
+                    mesh.set_local_rotation(solid.rotation());
+                    mesh.set_local_translation(Translation3::from(solid.center_position()));
+                }
             }
 
             total_time += fluid_simulation.get_time_step();
