@@ -12,16 +12,14 @@ use crate::mesher::types::*;
 #[derive(Clone)]
 pub struct Mesher {
     iso_value: f32,
-    cube_size: f32,
     interpolation_algorithm: InterpolationAlgorithms,
     anisotropicator: Option<Anisotropicator>,
 }
 
 impl Mesher {
-    pub fn new(iso_value: f32, cube_size: f32, interpolation_algorithm: InterpolationAlgorithms, anisotropicator: Option<Anisotropicator>) -> Mesher {
+    pub fn new(iso_value: f32, interpolation_algorithm: InterpolationAlgorithms, anisotropicator: Option<Anisotropicator>) -> Mesher {
         Mesher {
             iso_value,
-            cube_size,
             interpolation_algorithm,
             anisotropicator,
         }
@@ -74,24 +72,14 @@ impl Mesher {
         let mut vertices_world: [VertexWorld; 8] = [Vector3::zeros(); 8];
         let mut densities: [f32; 8] = [0.; 8];
 
+        let grid = snapshot.get_grid();
+
         for i in 0..8 {
-            vertices_world[i] = self.to_world(vertices_local[i]);
+            vertices_world[i] = grid.coord_to_world(&vertices_local[i]);
             densities[i] = self.get_cube_density(snapshot, cache_densities, &vertices_local[i], &vertices_world[i])
         }
 
         CubeVertices { vertices_local, vertices_world, densities }
-    }
-
-    fn to_local(&self, v: &VertexWorld) -> VertexLocal {
-        VertexLocal::new(
-            (v.x / self.cube_size) as i32,
-            (v.y / self.cube_size) as i32,
-            (v.z / self.cube_size) as i32,
-        )
-    }
-
-    fn to_world(&self, point: VertexLocal) -> VertexWorld {
-        nalgebra::convert::<VertexLocal, VertexWorld>(point) * self.cube_size
     }
 
     fn search_configuration(&self, cube_vertices: &CubeVertices) -> usize {
@@ -108,7 +96,7 @@ impl Mesher {
     }
 
     fn compute_mesh(&mut self, snapshot: &Box<dyn FluidSnapshot>) -> Mesh {
-        let borders = snapshot.get_borders();
+        let borders = snapshot.get_grid().get_borders();
 
         let iso_value = self.iso_value;
         let interpolation_algorithm = self.interpolation_algorithm;
@@ -122,7 +110,7 @@ impl Mesher {
 
         borders.iter()
             .for_each(|cube_origin| {
-                let cube_vertices = self.generate_cube_vertices(snapshot, &self.to_local(cube_origin), &mut cache_vertices);
+                let cube_vertices = self.generate_cube_vertices(snapshot, &cube_origin, &mut cache_vertices);
                 let config_id = self.search_configuration(&cube_vertices);
 
                 for triangle in &constants::MC_CONFIGS_TRIANGLES[config_id] {

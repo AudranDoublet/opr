@@ -7,7 +7,7 @@ use nalgebra::Vector3;
 use rayon::prelude::*;
 use serde_derive::*;
 
-use crate::mesher::types::VertexWorld;
+use crate::mesher::types::{VertexLocal, VertexWorld};
 
 #[derive(Hash, Debug, Copy, Clone, PartialEq, Eq)]
 pub struct HashGridKey
@@ -20,10 +20,7 @@ pub struct HashGridKey
 impl HashGridKey
 {
     pub fn new(cell_size: f32, position: Vector3<f32>) -> HashGridKey {
-        let coord = |v| match v {
-            v if v > 0.0 => 0,
-            _ => -1,
-        } + (v / cell_size) as isize;
+        let coord = |v: f32| (v / cell_size).ceil() as isize;
 
         HashGridKey {
             x: coord(position.x),
@@ -208,11 +205,11 @@ impl HashGrid
         }
     }
 
-    fn convert_into_world_vertex(&self, x: &HashGridKey) -> VertexWorld {
-        (VertexWorld::new(x.x as f32, x.y as f32, x.z as f32) + VertexWorld::identity() * 0.5) * self.cell_size
+    pub fn coord_to_world(&self, v: &VertexLocal) -> VertexWorld {
+        (VertexWorld::new(v.x as f32, v.y as f32, v.z as f32)) * self.cell_size //+ 0.5 * VertexWorld::identity()) * self.cell_size
     }
 
-    pub fn get_borders(&self) -> Vec<VertexWorld> {
+    pub fn get_borders(&self) -> Vec<VertexLocal> {
         let mut result = vec![];
 
         let mut grid: HashMap<HashGridKey, LakeState> = HashMap::new();
@@ -228,7 +225,7 @@ impl HashGrid
         result.par_extend(
             grid.into_par_iter()
                 .filter(|(_, s)| *s != LakeState::INTERNAL)
-                .map(|(k, _)| self.convert_into_world_vertex(&k))
+                .map(|(k, _)| VertexLocal::new(k.x as i32, k.y as i32, k.z as i32))
         );
 
         result

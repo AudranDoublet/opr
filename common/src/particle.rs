@@ -113,8 +113,8 @@ impl FluidSnapshot for DFSPHFluidSnapshot {
         &self.kernel
     }
 
-    fn get_borders(&self) -> Vec<VertexWorld> {
-        self.neighbours_struct.get_borders()
+    fn get_grid(&self) -> &HashGrid {
+        &self.neighbours_struct
     }
 }
 

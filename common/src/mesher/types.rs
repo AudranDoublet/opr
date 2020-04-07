@@ -1,7 +1,7 @@
 use std::f32;
 
 use nalgebra::Vector3;
-use crate::Kernel;
+use crate::{Kernel, HashGrid};
 
 pub type VertexWorld = Vector3<f32>;
 pub type VertexLocal = Vector3<i32>;
@@ -58,7 +58,7 @@ pub trait FluidSnapshot {
     /// Returns a reference to the kernel used by the simulation
     fn get_kernel(&self) -> &dyn Kernel;
 
-    fn get_borders(&self) -> Vec<VertexWorld>;
+    fn get_grid(&self) -> &HashGrid;
 }
 
 
