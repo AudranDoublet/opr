@@ -528,7 +528,7 @@ impl DFSPH
         self.neighbours_struct.insert(&self.positions.read().unwrap());
     }
 
-    pub fn tick(&mut self) {
+    pub fn tick(&mut self) -> f32 {
         self.init();
 
         self.correct_divergence_error();
@@ -546,6 +546,8 @@ impl DFSPH
         let old = self.positions.read().unwrap().clone();
         self.positions.write().unwrap().par_iter_mut().zip(self.velocities.read().unwrap().par_iter()).for_each(|(p, v)| *p += dt * v);
         self.neighbours_struct.update_particles(&old, &self.positions.read().unwrap());
+
+        self.time_step
     }
 
     pub fn dump(&self, path: &Path) -> Result<(), std::io::Error> {
