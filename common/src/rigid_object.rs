@@ -1,15 +1,17 @@
 extern crate rayon;
 
-use nalgebra::{Vector3, Quaternion, UnitQuaternion, Matrix3};
+use std::sync::Mutex;
+
+use nalgebra::{Matrix3, Quaternion, UnitQuaternion, Vector3};
 use serde::{Deserialize, Serialize};
 
-use crate::{DiscreteGrid, mesh::MassProperties, search::BVH, mesh::Triangle};
-use std::sync::Mutex;
+use crate::{DiscreteGrid, mesh::MassProperties, mesh::Triangle, search::BVH};
+use crate::mesher::types::{VertexWorld};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RigidObject
 {
-    dynamic: bool,
+    pub dynamic: bool,
 
     /** State variables */
     position: Vector3<f32>,
@@ -80,6 +82,28 @@ impl RigidObject
         }
     }
 
+    pub fn to_particles(&self, radius: f32) -> Vec<VertexWorld> {
+        let (min, max) = self.grid.get_domain_definition();
+        let step = (min - max) / radius;
+
+        let mut res = vec![];
+        for z in 0..step.z as u32 {
+            for y in 0..step.y as u32 {
+                for x in 0..step.x as u32 {
+                    let pos = min + VertexWorld::new(x as f32, y as f32, z as f32) * radius;
+                    let v = self.grid.interpolate(0,  pos, false);
+                    if let Some((d, _)) = v {
+                        if d <= 0.01 {
+                            res.push(pos);
+                        }
+                    }
+                }
+            }
+        }
+
+        res
+    }
+
     pub fn reset_force_and_torque(&mut self)
     {
         self.forces.clear();
@@ -122,9 +146,9 @@ impl RigidObject
         let vz = self.rotation.k;
 
         Matrix3::new(
-            1. - 2.*vy*vy - 2.*vz*vz, 2.*vx*vy - 2.*s*vz        , 2.*vx*vz + 2.*s*vy,
-            2.*vx*vy + 2.*s*vz      , 1. - 2.*vx*vx - 2.*vz*vz  , 2.*vy*vz - 2.*s*vx,
-            2.*vx*vz - 2.*s*vy      , 2.*vy*vz + 2.*s*vx        , 1. - 2.*vx*vx - 2.*vy*vy,
+            1. - 2. * vy * vy - 2. * vz * vz, 2. * vx * vy - 2. * s * vz, 2. * vx * vz + 2. * s * vy,
+            2. * vx * vy + 2. * s * vz, 1. - 2. * vx * vx - 2. * vz * vz, 2. * vy * vz - 2. * s * vx,
+            2. * vx * vz - 2. * s * vy, 2. * vy * vz + 2. * s * vx, 1. - 2. * vx * vx - 2. * vy * vy,
         )
     }
 
@@ -139,8 +163,7 @@ impl RigidObject
     pub fn compute_k_matrix(&self, contact_point: Vector3<f32>) -> Matrix3<f32> {
         if !self.dynamic {
             Matrix3::zeros()
-        }
-        else {
+        } else {
             let contact_point = self.position_in_mesh_space(contact_point);
             let r = contact_point.cross_matrix();
 
@@ -258,10 +281,9 @@ impl RigidObject
     }
 
     fn prepare_constraint(&self, other: &RigidObject,
-                                  depth: f32,
-                                  cp0: Vector3<f32>, cp1: Vector3<f32>,
-                                  normal: Vector3<f32>) -> Constraint {
-
+                          depth: f32,
+                          cp0: Vector3<f32>, cp1: Vector3<f32>,
+                          normal: Vector3<f32>) -> Constraint {
         let restitution = 0.1; //FIXME
 
         let v0 = self.pred_point_velocity(cp0);
@@ -271,7 +293,7 @@ impl RigidObject
         let u_rel_n = normal.dot(&u_rel);
 
         let k = self.compute_k_matrix(cp0) + other.compute_k_matrix(cp1);
-        let mut tangent = u_rel - u_rel_n*normal;
+        let mut tangent = u_rel - u_rel_n * normal;
 
         if tangent.norm_squared() > 1e-6 {
             tangent.normalize_mut();
@@ -283,8 +305,8 @@ impl RigidObject
             normal: normal,
             tangent: tangent,
             depth: depth,
-            nkn_inv: 1.0 / normal.dot(&(k*normal)),
-            p_max: 1.0 / tangent.dot(&(k*tangent)) * u_rel.dot(&tangent),
+            nkn_inv: 1.0 / normal.dot(&(k * normal)),
+            p_max: 1.0 / tangent.dot(&(k * tangent)) * u_rel.dot(&tangent),
             goal_u_rel_n: match u_rel_n {
                 v if v < 0.0 => -restitution * v,
                 _ => 0.0,
@@ -319,9 +341,9 @@ impl RigidObject
 
         // friction
         force += match correction_magnitude.abs() * friction {
-            v if v > constraint.p_max   => -constraint.p_max * constraint.tangent,
-            v if v < -constraint.p_max  => constraint.p_max * constraint.tangent,
-            v                           => -v * constraint.tangent,
+            v if v > constraint.p_max => -constraint.p_max * constraint.tangent,
+            v if v < -constraint.p_max => constraint.p_max * constraint.tangent,
+            v => -v * constraint.tangent,
         };
 
         self.add_force(constraint.cp0, force);
@@ -366,7 +388,7 @@ impl RigidObject
                 } else {
                     None
                 }
-        }).collect();
+            }).collect();
 
         for _ in 0..10 {
             for (i, c) in &mut result {
@@ -378,7 +400,7 @@ impl RigidObject
             }
         }
 
-       result
+        result
     }
 
     pub fn compute_volume_and_boundary_x(&self, position: &mut Vector3<f32>, velocity: &mut Vector3<f32>, particle_radius: f32, kernel_radius: f32, dt: f32) -> (f32, Vector3<f32>)
