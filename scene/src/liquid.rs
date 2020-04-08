@@ -3,48 +3,86 @@ use nalgebra::Vector3;
 
 use sph_common::DFSPH;
 
+use crate::{Scene, Solid};
+
 #[derive(Debug, Deserialize)]
-pub struct LiquidZone
-{
-    pub from: [f32; 3],
-    pub to: [f32; 3],
+#[serde(tag = "type")]
+pub enum LiquidZone {
+    #[serde(rename = "block")]
+    Block {
+        from: Vector3<f32>,
+        to: Vector3<f32>,
+    },
+    #[serde(rename = "mesh")]
+    Mesh {
+        mesh: String,
+        scale: [f32; 3],
+
+        position: [f32; 3],
+        rotation_axis: [f32; 3],
+        rotation_angle: f32,
+
+        resolution: [u32; 3],
+    },
 }
 
 impl LiquidZone
 {
-    pub fn from(&self) -> Vector3<f32>
+    pub fn create_particles(&self, config: &Scene, scene: &mut DFSPH) -> Result<(), Box<dyn std::error::Error>>
     {
-        Vector3::new(self.from[0], self.from[1], self.from[2])
-    }
+        let count = match self {
+            LiquidZone::Block { from, to } => {
+                let radius = scene.particle_radius() * 2.;
+                let step_count = (to - from) / radius;
 
-    pub fn to(&self) -> Vector3<f32>
-    {
-        Vector3::new(self.to[0], self.to[1], self.to[2])
-    }
+                let mut count = 0;
 
-    pub fn create_particles(&self, scene: &mut DFSPH)
-    {
-        let from = self.from();
-        let to = self.to();
+                for z in 0..step_count.z as usize {
+                    let z = z as f32 * radius;
+                    for y in 0..step_count.y as usize {
+                        let y = y as f32 * radius;
+                        for x in 0..step_count.x as usize {
+                            let x = x as f32 * radius;
+                            scene.add_particle(from.x + x, from.y + y, from.z + z);
 
-        let radius = scene.particle_radius() * 2.;
-        let step_count = (to - from) / radius;
+                            count += 1;
+                        }
+                    }
+                }
 
-        let mut count = 0;
+                count
+            },
+            LiquidZone::Mesh { mesh, scale, position, rotation_axis, rotation_angle, resolution } => {
+                let solid = Solid {
+                    mesh: mesh.to_string(),
+                    mesh_invert: false,
+                    scale: *scale,
+                    position: *position,
+                    rotation_axis: *rotation_axis,
+                    rotation_angle: *rotation_angle,
+                    density: 1000.,
+                    resolution: *resolution,
+                    display: true,
+                    dynamic: false,
+                };
 
-        for z in 0..step_count.z as usize {
-            let z = z as f32 * radius;
-            for y in 0..step_count.y as usize {
-                let y = y as f32 * radius;
-                for x in 0..step_count.x as usize {
-                    let x = x as f32 * radius;
-                    scene.add_particle(from.x + x, from.y + y, from.z + z);
+                let solid = solid.load(config)?;
+                let position = solid.position();
 
+                let mut count = 0;
+
+                for particle in &solid.to_particles(scene.particle_radius() * 2.) {
+                    let pos = particle + position;
+
+                    scene.add_particle(pos.x, pos.y, pos.z);
                     count += 1;
                 }
+
+                count
             }
-        }
+        };
 
         println!("{} particles added", count);
+        Ok(())
     }
 }

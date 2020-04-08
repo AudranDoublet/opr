@@ -1,0 +1,27 @@
+config:
+    kernel_radius: 0.04
+    particle_radius: 0.01
+solids:
+    - mesh: objects/box.obj
+      density: 1000
+      dynamic: false
+      mesh_invert: true
+      resolution: [11, 11, 11]
+      scale: [1.0, 2.0, 1.0]
+      position: [0.0, 0.0, 0.0]
+      rotation_axis: [0.0, 0.0, 0.0]
+      rotation_angle: 0.0
+      display: false
+liquids_blocks:
+    - type: mesh
+      mesh: objects/dragon.obj
+      dynamic: true
+      resolution: [31, 31, 31]
+      scale: [0.7, 0.7, 0.7]
+      position: [0.0, -0.4, 0.0]
+      rotation_axis: [0.0, 0.0, 0.0]
+      rotation_angle: 0.0
+liquids_add_blocks:
+    - type: block
+      from:  [-0.100, 0.200, -0.100]
+      to:  [0.100, 0.400, 0.100]

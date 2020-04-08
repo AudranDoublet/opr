@@ -23,6 +23,4 @@ solids:
       rotation_angle: 0.0
       display: true
 liquids_blocks: []
-liquids_add_blocks:
-    - from:  [-0.100, 0.200, -0.100]
-      to:  [0.100, 0.400, 0.100]
+liquids_add_blocks: []

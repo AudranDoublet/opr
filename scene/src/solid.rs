@@ -20,11 +20,30 @@ pub struct Solid {
     pub rotation_angle: f32,
 
     pub density: f32,
-
     pub resolution: [u32; 3],
+
+    #[serde(default)]
     pub display: bool,
 
+    #[serde(default)]
     pub dynamic: bool,
+}
+
+impl Default for Solid {
+    fn default() -> Self {
+        Solid {
+            mesh: "".to_string(),
+            mesh_invert:  false,
+            scale: [0., 0., 0.],
+            position: [0., 0., 0.],
+            rotation_axis: [0., 0., 0.],
+            rotation_angle: 0.0,
+            density: 1000.,
+            resolution: [10, 10, 10],
+            display: true,
+            dynamic: false,
+        }
+    }
 }
 
 impl Solid {

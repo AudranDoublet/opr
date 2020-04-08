@@ -94,12 +94,12 @@ fn simulate(scene: Scene, dump_all: bool, dump_folder: &Path) -> Result<(), Box<
                 render::event::WindowEvent::Key(key, render::event::Action::Release, _) => match key {
                     render::event::Key::R => {
                         total_time = 0.0;
-                        scene.recreate(&mut fluid_simulation);
+                        scene.recreate(&mut fluid_simulation)?;
                         renderer.clear();
                         add_particles(0..fluid_simulation.len(), &fluid_simulation, &mut renderer);
                     }
                     render::event::Key::A => {
-                        add_particles(scene.add_blocks(&mut fluid_simulation), &fluid_simulation, &mut renderer);
+                        add_particles(scene.add_blocks(&mut fluid_simulation)?, &fluid_simulation, &mut renderer);
                     }
                     render::event::Key::D => {
                         if !dump_all {

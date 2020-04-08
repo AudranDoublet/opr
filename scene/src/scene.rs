@@ -84,31 +84,33 @@ impl Scene
         let solids = self.load_solids()?;
         let mut result = DFSPH::new(self.config.kernel_radius, self.config.particle_radius, solids);
 
-        self.recreate(&mut result);
+        self.recreate(&mut result)?;
 
         Ok(result)
     }
 
-    pub fn recreate(&self, scene: &mut DFSPH) {
+    pub fn recreate(&self, scene: &mut DFSPH) -> Result<(), Box<dyn std::error::Error>> {
         scene.clear();
 
         for liquid in &self.liquids_blocks {
-            liquid.create_particles(scene);
+            liquid.create_particles(self, scene)?;
         }
 
         scene.sync();
+
+        Ok(())
     }
 
-    pub fn add_blocks(&self, scene: &mut DFSPH) -> std::ops::Range<usize> {
+    pub fn add_blocks(&self, scene: &mut DFSPH) -> Result<std::ops::Range<usize>, Box<dyn std::error::Error>> {
         let prev_size = scene.len();
 
         for liquid in &self.liquids_add_blocks {
-            liquid.create_particles(scene);
+            liquid.create_particles(self, scene)?;
         }
 
         scene.sync();
 
-        prev_size..scene.len()
+        Ok(prev_size..scene.len())
     }
 }
 

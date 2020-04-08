@@ -84,7 +84,7 @@ impl RigidObject
 
     pub fn to_particles(&self, radius: f32) -> Vec<VertexWorld> {
         let (min, max) = self.grid.get_domain_definition();
-        let step = (min - max) / radius;
+        let step = (max - min) / radius;
 
         let mut res = vec![];
         for z in 0..step.z as u32 {
