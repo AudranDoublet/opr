@@ -147,7 +147,7 @@ pub fn main_polygonization(args: &ArgMatches) -> Result<(), Box<dyn std::error::
 
     let anisotropicator = if !disable_anisotropication {
         Some(
-            Anisotropicator::new(0.8, 10, 8., 1040., 0.5)
+            Anisotropicator::new(0.9, 20, 8., 10400., 0.05)
         )
     } else { None };
 

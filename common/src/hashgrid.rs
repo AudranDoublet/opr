@@ -180,7 +180,7 @@ impl HashGrid
 
         result.par_extend(
             grid.into_par_iter()
-                .filter(|(_, s)| *s != LakeState::INTERNAL)
+                // .filter(|(_, s)| *s != LakeState::INTERNAL)
                 .map(|(k, _)| VertexLocal::new(k.x as i32, k.y as i32, k.z as i32))
         );
 
