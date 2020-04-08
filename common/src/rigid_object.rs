@@ -37,10 +37,11 @@ pub struct RigidObject
     torques: Vec<Mutex<Vector3<f32>>>,
 }
 
-struct Constraint
+#[derive(Debug)]
+pub struct Constraint
 {
-    cp0: Vector3<f32>,
-    cp1: Vector3<f32>,
+    pub cp0: Vector3<f32>,
+    pub cp1: Vector3<f32>,
     normal: Vector3<f32>,
     tangent: Vector3<f32>,
     nkn_inv: f32,
@@ -293,7 +294,7 @@ impl RigidObject
     }
 
     fn solve_constraint(&self, other: &RigidObject, constraint: &mut Constraint) {
-        let p = self.dynamic && other.dynamic;
+        // let p = self.dynamic && other.dynamic;
 
         let stiffness = 1.1;
         let friction = 0.5;
@@ -327,9 +328,9 @@ impl RigidObject
         other.add_force(constraint.cp1, -force);
     }
 
-    pub fn collide(&self, other: &RigidObject) {
+    pub fn collide(&self, other: &RigidObject) -> Vec<(usize, Constraint)> {
         if !self.dynamic && !other.dynamic {
-            return;
+            return vec![];
         }
 
         let r_inv = self.rotation_matrix().transpose();
@@ -337,9 +338,9 @@ impl RigidObject
         let rotation = r_inv * other.rotation_matrix();
         let translation = r_inv * (other.position() - self.position());
 
-        let result = self.bvh.intersects(&other.bvh, &rotation, &translation);
+        let collisions = self.bvh.intersects(&other.bvh, &rotation, &translation);
 
-        let mut result: Vec<(usize, Constraint)> = result.iter()
+        let mut result: Vec<(usize, Constraint)> = collisions.iter()
             .flat_map(|&(i, triangle)| vec![(i, triangle.v1), (i, triangle.v2), (i, triangle.v3)])
             .filter_map(|(i, vertex)| {
                 let pos = match i {
@@ -376,6 +377,8 @@ impl RigidObject
                 }
             }
         }
+
+       result
     }
 
     pub fn compute_volume_and_boundary_x(&self, position: &mut Vector3<f32>, velocity: &mut Vector3<f32>, particle_radius: f32, kernel_radius: f32, dt: f32) -> (f32, Vector3<f32>)

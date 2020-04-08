@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::kernel::{Kernel, kernels::CubicSpine};
 use crate::mesher::types::FluidSnapshot;
-use crate::{RigidObject, HashGrid};
+use crate::{RigidObject, HashGrid, Constraint};
 use std::path::Path;
 
 use std::sync::RwLock;
@@ -46,6 +46,8 @@ pub struct DFSPH
     debug_v_mean_sq: f32,
 
     solids: Vec<RigidObject>,
+    #[serde(skip_serializing, skip_deserializing)]
+    debug_solid_collisions: Vec<(usize, Constraint)>,
 
     // Particle data
     density: RwLock<Vec<f32>>,
@@ -128,6 +130,7 @@ impl DFSPH
             debug_v_mean_sq: 0.0,
 
             solids,
+            debug_solid_collisions: vec![],
 
             neighbours: Vec::new(),
             density: RwLock::new(Vec::new()),
@@ -169,6 +172,10 @@ impl DFSPH
 
     pub fn solid(&self, i: usize) -> &RigidObject {
         &self.solids[i]
+    }
+
+    pub fn debug_get_solid_collisions (&self) -> &Vec<(usize, Constraint)> {
+        self.debug_solid_collisions.as_ref()
     }
 
     pub fn debug_get_v_mean_sq  (&self) -> f32 {
@@ -528,13 +535,17 @@ impl DFSPH
         let gravity = Vector3::new(0.0, -9.81, 0.0);
         self.solids.iter_mut().for_each(|v| v.update(gravity, dt));
 
+        let mut collisions = vec![];
+
         for i in 0..self.solids.len() {
             for j in i+1..self.solids.len() {
-                self.solids[i].collide(&self.solids[j]);
+                collisions.par_extend(self.solids[i].collide(&self.solids[j]));
                 self.solids[i].update_vel(dt);
                 self.solids[j].update_vel(dt);
             }
         }
+
+        self.debug_solid_collisions = collisions;
     }
 
     pub fn dump(&self, path: &Path) -> Result<(), std::io::Error> {
