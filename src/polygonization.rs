@@ -147,12 +147,12 @@ pub fn main_polygonization(args: &ArgMatches) -> Result<(), Box<dyn std::error::
 
     let anisotropicator = if !disable_anisotropication {
         Some(
-            Anisotropicator::new(0.8, 10, 8., 10400., 0.5)
+            Anisotropicator::new(0.9, 15, 40., 20000., 50.)
         )
     } else { None };
 
     // FIXME: the ISO-VALUE and CUBE-SIZE should be asked in CLI instead of being hardcoded
-    let mesher = Mesher::new(0.00001, 0.10, interpolation_algorithm, anisotropicator);
+    let mesher = Mesher::new(0.00001, 0.05, interpolation_algorithm, anisotropicator);
     // FIXME-END
 
     fs::create_dir_all(output_directory)?;
