@@ -78,3 +78,7 @@ subcommands:
                         required: true
                         value_name: FILE
                         index: 1
+                -   fps:
+                        long: fps
+                        help: FPS of the generated video (default=-1 => as much we can generate)
+                        takes_value: true
