@@ -17,7 +17,7 @@ fn get_meshes_paths(folder: &Path) -> Result<Vec<PathBuf>, Box<dyn std::error::E
     Ok(files)
 }
 
-fn view_meshes(meshes_folder: &Path, back_face_culling: bool) -> Result<(), Box<dyn std::error::Error>> {
+fn view_meshes(meshes_folder: &Path, back_face_culling: bool, mut time_step: f32) -> Result<(), Box<dyn std::error::Error>> {
     let scale = Vector3::new(1., 1., 1.);
 
     let mut renderer = render::scene::Scene::new(1.);
@@ -37,8 +37,6 @@ fn view_meshes(meshes_folder: &Path, back_face_culling: bool) -> Result<(), Box<
     let mut show_info = true;
     let mut pause = true;
     let mut now = Instant::now();
-
-    let mut time_step = 0.;
 
     while renderer.render() {
         if !pause && now.elapsed().as_secs_f32() > time_step {
@@ -88,8 +86,9 @@ fn view_meshes(meshes_folder: &Path, back_face_culling: bool) -> Result<(), Box<
 pub fn main_viewer(args: &ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
     let meshes_folder = Path::new(args.value_of("meshes_folder").unwrap());
     let back_face_culling = args.is_present("back_face_culling");
+    let fps = 1. / args.value_of("fps").unwrap_or("-1.").parse::<f32>()?;
 
-    view_meshes(meshes_folder, back_face_culling)?;
+    view_meshes(meshes_folder, back_face_culling, fps)?;
 
     Ok(())
 }
