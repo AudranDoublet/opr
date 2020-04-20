@@ -28,7 +28,7 @@ pub struct DFSPH
     pub particle_radius: f32,
     volume: f32,
 
-    rest_density: f32,
+    pub rest_density: f32,
 
     correct_density_max_error: f32,
     correct_divergence_max_error: f32,
@@ -236,11 +236,11 @@ impl DFSPH
         self.len += 1;
     }
 
-    fn gradient(&self, i: Vector3<f32>, j: Vector3<f32>) -> Vector3<f32> {
+    pub fn gradient(&self, i: Vector3<f32>, j: Vector3<f32>) -> Vector3<f32> {
         self.kernel.gradient(&(i - j))
     }
 
-    fn kernel_apply(&self, i: Vector3<f32>, j: Vector3<f32>) -> f32 {
+    pub fn kernel_apply(&self, i: Vector3<f32>, j: Vector3<f32>) -> f32 {
         self.kernel.apply_on_norm((i - j).norm())
     }
 
@@ -248,19 +248,23 @@ impl DFSPH
         self.particle_radius
     }
 
-    fn volume(&self, _i: usize) -> f32 {
+    pub fn volume(&self, _i: usize) -> f32 {
         self.volume
     }
 
-    fn mass(&self, _i: usize) -> f32 {
+    pub fn mass(&self, _i: usize) -> f32 {
         self.volume * self.rest_density
+    }
+
+    pub fn density(&self, _i: usize) -> f32 {
+        self.rest_density
     }
 
     fn neighbours_count(&self, i: usize) -> usize {
         self.neighbours[i].len()
     }
 
-    fn neighbours_reduce<V>(&self, i: usize, value: V, f: &dyn Fn(V, usize, usize) -> V) -> V {
+    pub fn neighbours_reduce<V>(&self, i: usize, value: V, f: &dyn Fn(V, usize, usize) -> V) -> V {
         let mut result = value;
 
         for j in 0..self.neighbours_count(i) {
@@ -270,7 +274,7 @@ impl DFSPH
         result
     }
 
-    fn solids_reduce<V>(&self, i: usize, value: V, f: &dyn Fn(&RigidObject, V, f32, Vector3<f32>) -> V) -> V {
+    pub fn solids_reduce<V>(&self, i: usize, value: V, f: &dyn Fn(&RigidObject, V, f32, Vector3<f32>) -> V) -> V {
         let mut result = value;
 
         for s in &self.solids {
@@ -284,19 +288,19 @@ impl DFSPH
         result
     }
 
-    fn neighbours_reduce_v(&self, i: usize, f: &dyn Fn(Vector3<f32>, usize, usize) -> Vector3<f32>) -> Vector3<f32> {
+    pub fn neighbours_reduce_v(&self, i: usize, f: &dyn Fn(Vector3<f32>, usize, usize) -> Vector3<f32>) -> Vector3<f32> {
         self.neighbours_reduce(i, Vector3::zeros(), f)
     }
 
-    fn neighbours_reduce_f(&self, i: usize, f: &dyn Fn(f32, usize, usize) -> f32) -> f32 {
+    pub fn neighbours_reduce_f(&self, i: usize, f: &dyn Fn(f32, usize, usize) -> f32) -> f32 {
         self.neighbours_reduce(i, 0.0, f)
     }
 
-    fn solids_reduce_v(&self, i: usize, f: &dyn Fn(&RigidObject, Vector3<f32>, f32, Vector3<f32>) -> Vector3<f32>) -> Vector3<f32> {
+    pub fn solids_reduce_v(&self, i: usize, f: &dyn Fn(&RigidObject, Vector3<f32>, f32, Vector3<f32>) -> Vector3<f32>) -> Vector3<f32> {
         self.solids_reduce(i, Vector3::zeros(), f)
     }
 
-    fn solids_reduce_f(&self, i: usize, f: &dyn Fn(&RigidObject, f32, f32, Vector3<f32>) -> f32) -> f32 {
+    pub fn solids_reduce_f(&self, i: usize, f: &dyn Fn(&RigidObject, f32, f32, Vector3<f32>) -> f32) -> f32 {
         self.solids_reduce(i, 0.0, f)
     }
 
@@ -506,8 +510,11 @@ impl DFSPH
         }
     }
 
-    fn compute_non_pressure_forces(&self, i: usize, acceleration: &mut Vector3<f32>) {
-        *acceleration = self.external_forces.apply(self, i);
+    fn compute_non_pressure_forces(&self) {
+        let mut accelerations = self.accelerations.write().unwrap();
+
+        accelerations.par_iter_mut().for_each(|v| *v = Vector3::zeros());
+        self.external_forces.apply(self, &mut accelerations);
     }
 
     fn init(&mut self) {
@@ -546,8 +553,7 @@ impl DFSPH
         self.init();
 
         self.correct_divergence_error();
-
-        self.accelerations.write().unwrap().par_iter_mut().enumerate().for_each(|(i, a)| self.compute_non_pressure_forces(i, a));
+        self.compute_non_pressure_forces();
 
         let dt = self.adapt_cfl();
 

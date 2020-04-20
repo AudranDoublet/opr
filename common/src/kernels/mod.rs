@@ -11,5 +11,9 @@ pub trait Kernel {
 }
 
 mod cubicspine;
+mod cohesionkernel;
+mod adhesionkernel;
 
 pub use cubicspine::*;
+pub use cohesionkernel::*;
+pub use adhesionkernel::*;

@@ -1,4 +1,5 @@
 use nalgebra::Vector3;
+use rayon::prelude::*;
 
 use crate::{DFSPH, external_forces::ExternalForce};
 
@@ -11,7 +12,7 @@ impl GravityForce {
 }
 
 impl ExternalForce for GravityForce {
-    fn compute_acceleration(&self, _sim: &DFSPH, _i: usize) -> Vector3<f32> {
-        self.0
+    fn compute_acceleration(&self, _sim: &DFSPH, accelerations: &mut Vec<Vector3<f32>>) {
+        accelerations.par_iter_mut().for_each(|v| *v += self.0)
     }
 }

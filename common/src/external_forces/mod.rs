@@ -1,11 +1,12 @@
 mod gravity;
+mod surfacetension;
 
 use nalgebra::Vector3;
 use crate::DFSPH;
 
 pub trait ExternalForce
 {
-    fn compute_acceleration(&self, sim: &DFSPH, i: usize) -> Vector3<f32>;
+    fn compute_acceleration(&self, sim: &DFSPH, accelerations: &mut Vec<Vector3<f32>>);
 }
 
 pub struct ExternalForces
@@ -24,14 +25,19 @@ impl ExternalForces {
         self.add(gravity::GravityForce::new(intensity))
     }
 
+    pub fn surface_tension(&mut self, kernel_radius: f32, surface_tension: f32, surface_adhesion: f32) -> &mut ExternalForces {
+        self.add(surfacetension::SurfaceTensionForce::new(kernel_radius, surface_tension, surface_adhesion))
+    }
+
     pub fn add(&mut self, force: Box<dyn ExternalForce + Sync + Send>) -> &mut ExternalForces {
         self.forces.push(force);
         self
     }
 
-    pub fn apply(&self, sim: &DFSPH, i: usize) -> Vector3<f32> {
-        self.forces.iter()
-            .fold(Vector3::zeros(), |a, b| a + b.compute_acceleration(sim, i))
+    pub fn apply(&self, sim: &DFSPH, accelerations: &mut Vec<Vector3<f32>>) {
+        for v in &self.forces {
+            v.compute_acceleration(sim, accelerations);
+        }
     }
 }
 

@@ -10,24 +10,29 @@ use sph_common::{RigidObject, DFSPH, external_forces::ExternalForces};
 use serde_derive::*;
 use crate::{Solid, LiquidZone};
 
+fn default_gravity() -> [f32; 3] {
+    [0.0, -9.81, 0.0]
+}
+
+fn default_surface_tension() -> f32 {
+    0.05
+}
+
+fn default_surface_adhesion() -> f32 {
+    0.01
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Configuration
 {
-    #[serde(default)]
+    #[serde(default = "default_gravity")]
     pub gravity: [f32; 3],
     pub kernel_radius: f32, //FIXME mark as default ?
     pub particle_radius: f32,
-}
-
-impl Default for Configuration
-{
-    fn default() -> Self {
-        Configuration {
-            gravity: [0.0, -9.81, 0.0],
-            kernel_radius: 0.1,
-            particle_radius: 0.025,
-        }
-    }
+    #[serde(default = "default_surface_tension")]
+    pub surface_tension: f32,
+    #[serde(default = "default_surface_adhesion")]
+    pub surface_adhesion: f32,
 }
 
 #[derive(Debug)]
@@ -66,6 +71,12 @@ impl Scene
         Ok(())
     }
 
+    pub fn gravity(&self) -> Vector3<f32> {
+        let g = &self.config.gravity;
+        Vector3::new(g[0], g[1], g[2])
+    }
+
+
     pub fn load_solids(&self) -> Result<Vec<RigidObject>, Box<dyn std::error::Error>>
     {
         self.create_cache_dir()?;
@@ -86,7 +97,8 @@ impl Scene
         let solids = self.load_solids()?;
         let mut forces = ExternalForces::new();
 
-        forces.gravity(Vector3::new(0.0, -9.81, 0.0));
+        forces.gravity(self.gravity())
+              .surface_tension(self.config.kernel_radius, self.config.surface_tension, self.config.surface_adhesion);
 
         let mut result = DFSPH::new(self.config.kernel_radius, self.config.particle_radius, solids, forces);
 
