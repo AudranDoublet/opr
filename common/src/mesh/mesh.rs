@@ -2,7 +2,7 @@ use std::error::Error;
 use std::path::Path;
 
 use crate::mesh::{Triangle, BoundingSphereHierarchy, tobj};
-use crate::{utils, kernels, Kernel, DiscreteGrid};
+use crate::{utils, kernels, kernels::Kernel, DiscreteGrid};
 use nalgebra::{Vector3, Matrix3};
 
 use crate::search::BVH;

@@ -14,7 +14,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::{HashGrid, RigidObject};
-use crate::kernel::{Kernel, kernels::CubicSpine};
+use crate::kernels::{Kernel, CubicSpine};
 use crate::mesher::types::{FluidSnapshot, FluidSnapshotProvider, VertexWorld};
 use crate::external_forces::ExternalForces;
 

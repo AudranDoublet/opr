@@ -1,7 +1,7 @@
 use std::f32;
 
 use nalgebra::Vector3;
-use crate::Kernel;
+use crate::kernels::Kernel;
 
 pub type VertexWorld = Vector3<f32>;
 pub type VertexLocal = Vector3<i32>;
