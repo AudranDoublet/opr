@@ -5,7 +5,7 @@ use std::sync::Mutex;
 use nalgebra::{Matrix3, Quaternion, UnitQuaternion, Vector3};
 use serde::{Deserialize, Serialize};
 
-use crate::{DiscreteGrid, mesh::MassProperties, mesh::Triangle, search::BVH};
+use crate::{DiscreteGrid, mesh::MassProperties, search::BVH, search::Sphere};
 use crate::mesher::types::{VertexWorld};
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -28,7 +28,7 @@ pub struct RigidObject
     #[serde(skip_serializing, skip_deserializing)]
     grid: DiscreteGrid,
     #[serde(skip_serializing, skip_deserializing)]
-    bvh: BVH<Triangle>,
+    bvh: BVH<Sphere>,
     #[serde(skip_serializing, skip_deserializing)]
     volume: Vec<f32>,
     #[serde(skip_serializing, skip_deserializing)]
@@ -58,8 +58,8 @@ pub struct Constraint
  */
 impl RigidObject
 {
-    pub fn new(grid: DiscreteGrid, bvh: BVH<Triangle>, dynamic: bool, properties: MassProperties) -> RigidObject {
-        RigidObject {
+    pub fn new(grid: DiscreteGrid, dynamic: bool, properties: MassProperties) -> RigidObject {
+        let mut res = RigidObject {
             dynamic: dynamic,
 
             // state
@@ -69,7 +69,7 @@ impl RigidObject
             rotation: Quaternion::new(1.0, 0.0, 0.0, 0.0),
 
             grid,
-            bvh: bvh,
+            bvh: BVH::build(&vec![]),
             volume: Vec::new(),
             boundary_x: Vec::new(),
             forces: Vec::new(),
@@ -79,7 +79,10 @@ impl RigidObject
             body_inertia_tensor: properties.inertia,
             inv_body_inertia_tensor: properties.inertia.try_inverse().expect("can't inverse inertia tensor"),
             mass: properties.mass,
-        }
+        };
+
+        res.bvh = res.to_particle_tree(0.01);
+        res
     }
 
     pub fn to_particles(&self, radius: f32) -> Vec<VertexWorld> {
@@ -91,9 +94,10 @@ impl RigidObject
             for y in 0..step.y as u32 {
                 for x in 0..step.x as u32 {
                     let pos = min + VertexWorld::new(x as f32, y as f32, z as f32) * radius;
-                    let v = self.grid.interpolate(0,  pos, false);
+                    let v = self.grid.interpolate(0, pos, false);
+
                     if let Some((d, _)) = v {
-                        if d <= 0.01 {
+                        if d <= 0.00 {
                             res.push(pos);
                         }
                     }
@@ -102,6 +106,14 @@ impl RigidObject
         }
 
         res
+    }
+
+    pub fn to_particle_tree(&self, radius: f32) -> BVH<Sphere> {
+        BVH::build(
+            &self.to_particles(radius).iter()
+                .map(|p| Sphere::new(p, radius))
+                .collect()
+        )
     }
 
     pub fn reset_force_and_torque(&mut self)
@@ -200,8 +212,8 @@ impl RigidObject
 
         let (force, torque) = self.get_force_and_torque();
 
-        let vdiff = force / self.mass;
-        let avdiff = self.inv_inertia_tensor() * torque;
+        let vdiff = force / self.mass * dt;
+        let avdiff = self.inv_inertia_tensor() * torque * dt;
 
         self.velocity += vdiff;
         self.position += vdiff * dt;
@@ -280,6 +292,7 @@ impl RigidObject
         }
     }
 
+    /*
     fn prepare_constraint(&self, other: &RigidObject,
                           depth: f32,
                           cp0: Vector3<f32>, cp1: Vector3<f32>,
@@ -349,11 +362,22 @@ impl RigidObject
         self.add_force(constraint.cp0, force);
         other.add_force(constraint.cp1, -force);
     }
+    */
 
-    pub fn collide(&self, other: &RigidObject) -> Vec<(usize, Constraint)> {
+    /**
+     * Reference:
+     * A review of computer simulation of tumbling mills by the discrete element method: Part I—contact mechanics
+     */
+    pub fn collide(&self, other: &RigidObject) -> Vec<Vector3<f32>> {
         if !self.dynamic && !other.dynamic {
             return vec![];
         }
+
+        let d: f32 = 0.02;
+
+        let k = 1.7;
+        let damping_coeff = 0.5;
+        let t = 1.2;
 
         let r_inv = self.rotation_matrix().transpose();
 
@@ -362,45 +386,36 @@ impl RigidObject
 
         let collisions = self.bvh.intersects(&other.bvh, &rotation, &translation);
 
-        let mut result: Vec<(usize, Constraint)> = collisions.iter()
-            .flat_map(|&(i, triangle)| vec![(i, triangle.v1), (i, triangle.v2), (i, triangle.v3)])
-            .filter_map(|(i, vertex)| {
-                let pos = match i {
-                    0 => self.position_in_world_space(vertex),
-                    _ => other.position_in_world_space(vertex),
-                };
+        let v = collisions.iter()
+            .map(|(a, b)| {
+                let pa = self.position_in_world_space(a.position);
+                let pb = other.position_in_world_space(b.position);
 
-                let opt = if i == 0 {
-                    other.is_inside(pos, 0.0)
-                } else {
-                    self.is_inside(pos, 0.0)
-                };
+                let r_ij = pb - pa;
+                let v_ij = - self.point_velocity(pa) + other.point_velocity(pb);
 
-                if let Some((dist, normal)) = opt {
-                    let normal = normal.normalize();
-                    let pos2 = pos - dist * normal;
+                let r_ij_n = r_ij.norm();
 
-                    if i == 0 {
-                        Some((i, self.prepare_constraint(other, dist, pos, pos2, normal)))
-                    } else {
-                        Some((i, other.prepare_constraint(self, dist, pos, pos2, normal)))
-                    }
-                } else {
-                    None
+                if r_ij_n > d {
+                    return Vector3::zeros();
                 }
+
+                let r_ij = r_ij / r_ij_n;
+                let v_ij_t = v_ij.dot(&r_ij) * r_ij;
+                let v_ij = v_ij - v_ij_t; //(v_ij.dot(&r_ij) * r_ij);
+
+                let f_s = -k * (d - r_ij_n) * r_ij;
+                let f_d = damping_coeff * v_ij;
+                let f_t = t * v_ij_t;
+                let f = f_s + f_d + f_t;
+
+                self.add_force(pa, f);
+                other.add_force(pb, -f);
+
+                pa
             }).collect();
 
-        for _ in 0..10 {
-            for (i, c) in &mut result {
-                if *i == 0 {
-                    self.solve_constraint(other, c)
-                } else {
-                    other.solve_constraint(self, c)
-                }
-            }
-        }
-
-        result
+        v
     }
 
     pub fn compute_volume_and_boundary_x(&self, position: &mut Vector3<f32>, velocity: &mut Vector3<f32>, particle_radius: f32, kernel_radius: f32, dt: f32) -> (f32, Vector3<f32>)

@@ -113,11 +113,13 @@ impl<T: BVHShape + Clone> BVHNode<T> {
         }
     }
 
-    fn dump_nodes(&self, id: usize, f: &mut Vec<(usize, T)>) {
-        match self {
-            BVHNode::Leaf{shapes} => {
-                for v in shapes {
-                    f.push((id, v.clone()));
+    fn dump_nodes(&self, f: &mut Vec<(T, T)>, other: &BVHNode<T>) {
+        match (self, other) {
+            (BVHNode::Leaf{shapes: a}, BVHNode::Leaf{shapes: b}) => {
+                for v in a {
+                    for w in b {
+                        f.push((v.clone(), w.clone()));
+                    }
                 }
             },
             _ => ()
@@ -125,7 +127,7 @@ impl<T: BVHShape + Clone> BVHNode<T> {
     }
 
     fn intersect_iter(&self,
-            vec: &mut Vec<(usize, T)>,
+            vec: &mut Vec<(T, T)>,
             rotation: &Matrix3<f32>,
             translation: &Vector3<f32>,
             self_aabb: &AABB,
@@ -139,8 +141,7 @@ impl<T: BVHShape + Clone> BVHNode<T> {
 
         if self.is_leaf() {
             if other.is_leaf() {
-                other.dump_nodes(1, vec);
-                self.dump_nodes(0, vec);
+                self.dump_nodes(vec, other);
             } else if let BVHNode::Node { left_box, right_box, left_node, right_node } = other {
                 self.intersect_iter(vec, rotation, translation, self_aabb, &modify(left_box), left_node);
                 self.intersect_iter(vec, rotation, translation, self_aabb, &modify(right_box), right_node);
@@ -165,7 +166,7 @@ impl<T: BVHShape + Clone> BVHNode<T> {
 #[derive(Debug)]
 pub struct BVH<T: BVHShape + Clone> {
     root: Box<BVHNode<T>>,
-    pub aabb: AABB,
+    aabb: AABB,
 }
 
 impl<T: BVHShape + Clone> BVH<T> {
@@ -188,10 +189,14 @@ impl<T: BVHShape + Clone> BVH<T> {
         }
     }
 
+    pub fn aabb(&self) -> AABB {
+        self.aabb
+    }
+
     pub fn intersects(&self,
             other: &BVH<T>,
             rotation: &Matrix3<f32>,
-            translation: &Vector3<f32>) -> Vec<(usize, T)> {
+            translation: &Vector3<f32>) -> Vec<(T, T)> {
         let mut result = Vec::new();
 
         self.root.intersect_iter(&mut result, rotation, translation,
@@ -212,5 +217,28 @@ impl<T: BVHShape + Clone> Default for BVH<T> {
 impl BVHShape for Triangle {
     fn aabb(&self) -> AABB {
         AABB::new_from_pointset(&[self.v1, self.v2, self.v3])
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Sphere {
+    pub position: Vector3<f32>,
+    pub radius: f32,
+}
+
+impl Sphere {
+    pub fn new(position: &Vector3<f32>, radius: f32) -> Sphere {
+        Sphere {
+            position: *position,
+            radius: radius,
+        }
+    }
+}
+
+impl BVHShape for Sphere {
+    fn aabb(&self) -> AABB {
+        let radius = Vector3::new(self.radius, self.radius, self.radius);
+
+        AABB::new(self.position - radius, self.position + radius)
     }
 }
