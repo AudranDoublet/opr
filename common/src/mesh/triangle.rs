@@ -1,6 +1,6 @@
 use nalgebra::Vector3;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Triangle
 {
     pub v1: Vector3<f32>,
@@ -72,6 +72,10 @@ impl Triangle
         self.v1_normal * (1. - s - t)
             + self.v2_normal * s
             + self.v3_normal * t
+    }
+
+    pub fn surface_normal(&self) -> Vector3<f32> {
+        self.edge(0).cross(&self.edge(1))
     }
 
     pub fn vertex(&self, i: usize) -> Vector3<f32> {
@@ -186,5 +190,47 @@ impl Triangle
         };
 
         (distance, sign)
+    }
+
+    /**
+     * Part of Mesh mass-properties algorithm
+     * Source: https://www.geometrictools.com/Documentation/PolyhedralMassProperties.pdf
+     */
+    pub fn triangle_mass_properties(&self, intg: &mut [f32; 10]) {
+        let subexpression = |w0, w1, w2| {
+            let t0 = w0 + w1;
+            let t1 = w0 * w0;
+            let t2 = t1 + w1*t0;
+
+            let f1 = t0 + w2;
+            let f2 = t2 + w2*f1;
+            let f3 = w0*t1 + w1*t2 + w2*f2;
+
+            let g0 = f2 + w0*(f1 + w0);
+            let g1 = f2 + w1*(f1 + w1);
+            let g2 = f2 + w2*(f1 + w2);
+
+            (Vector3::new(f1, f2, f3), Vector3::new(g0, g1, g2))
+        };
+
+        let d = self.surface_normal();
+
+        let (fx, gx) = subexpression(self.v1.x, self.v2.x, self.v3.x);
+        let (fy, gy) = subexpression(self.v1.y, self.v2.y, self.v3.y);
+        let (fz, gz) = subexpression(self.v1.z, self.v2.z, self.v3.z);
+
+        intg[0] += d.x * fx.x;
+
+        intg[1] += d.x * fx.y;
+        intg[2] += d.y * fy.y;
+        intg[3] += d.z * fz.y;
+
+        intg[4] += d.x * fx.z;
+        intg[5] += d.y * fy.z;
+        intg[6] += d.z * fz.z;
+
+        intg[7] += d.x * (self.v1.y*gx.x + self.v2.y*gx.y + self.v3.y*gx.z);
+        intg[8] += d.y * (self.v1.z*gy.x + self.v2.z*gy.y + self.v3.z*gy.z);
+        intg[9] += d.z * (self.v1.x*gz.x + self.v2.x*gz.z + self.v3.x*gz.z);
     }
 }

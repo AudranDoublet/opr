@@ -45,6 +45,8 @@ pub struct DFSPH
     debug_v_mean_sq: f32,
 
     solids: Vec<RigidObject>,
+    #[serde(skip_serializing, skip_deserializing)]
+    debug_solid_collisions: Vec<Vector3<f32>>,
 
     // Particle data
     density: RwLock<Vec<f32>>,
@@ -160,6 +162,7 @@ impl DFSPH
             debug_v_mean_sq: 0.0,
 
             solids,
+            debug_solid_collisions: vec![],
 
             neighbours: Vec::new(),
             density: RwLock::new(Vec::new()),
@@ -194,6 +197,10 @@ impl DFSPH
 
     pub fn solid(&self, i: usize) -> &RigidObject {
         &self.solids[i]
+    }
+
+    pub fn debug_get_solid_collisions (&self) -> &Vec<Vector3<f32>> {
+        self.debug_solid_collisions.as_ref()
     }
 
     pub fn debug_get_v_mean_sq(&self) -> f32 {
@@ -239,6 +246,10 @@ impl DFSPH
         self.volume
     }
 
+    fn mass(&self, _i: usize) -> f32 {
+        self.volume * self.rest_density
+    }
+
     fn neighbours_count(&self, i: usize) -> usize {
         self.neighbours[i].len()
     }
@@ -253,14 +264,14 @@ impl DFSPH
         result
     }
 
-    fn solids_reduce<V>(&self, i: usize, value: V, f: &dyn Fn(V, f32, Vector3<f32>) -> V) -> V {
+    fn solids_reduce<V>(&self, i: usize, value: V, f: &dyn Fn(&RigidObject, V, f32, Vector3<f32>) -> V) -> V {
         let mut result = value;
 
         for s in &self.solids {
             let volume = s.particle_volume(i);
 
             if volume > 0.0 {
-                result = f(result, volume, s.particle_boundary_x(i));
+                result = f(s, result, volume, s.particle_boundary_x(i));
             }
         }
 
@@ -275,11 +286,11 @@ impl DFSPH
         self.neighbours_reduce(i, 0.0, f)
     }
 
-    fn solids_reduce_v(&self, i: usize, f: &dyn Fn(Vector3<f32>, f32, Vector3<f32>) -> Vector3<f32>) -> Vector3<f32> {
+    fn solids_reduce_v(&self, i: usize, f: &dyn Fn(&RigidObject, Vector3<f32>, f32, Vector3<f32>) -> Vector3<f32>) -> Vector3<f32> {
         self.solids_reduce(i, Vector3::zeros(), f)
     }
 
-    fn solids_reduce_f(&self, i: usize, f: &dyn Fn(f32, f32, Vector3<f32>) -> f32) -> f32 {
+    fn solids_reduce_f(&self, i: usize, f: &dyn Fn(&RigidObject, f32, f32, Vector3<f32>) -> f32) -> f32 {
         self.solids_reduce(i, 0.0, f)
     }
 
@@ -316,7 +327,7 @@ impl DFSPH
             density + self.volume(j) * self.kernel_apply(pos, positions[j])
         });
 
-        let solids_dens = self.solids_reduce_f(i, &|r, v, x| r + v * self.kernel_apply(pos, x));
+        let solids_dens = self.solids_reduce_f(i, &|_, r, v, x| r + v * self.kernel_apply(pos, x));
 
         (self_dens + neighbour_dens + solids_dens) * self.rest_density
     }
@@ -330,7 +341,7 @@ impl DFSPH
         });
 
         // boundaries
-        let sum_a = sum_a + self.solids_reduce_v(i, &|total, v, p| total + v * self.gradient(pos, p));
+        let sum_a = sum_a + self.solids_reduce_v(i, &|_, total, v, p| total + v * self.gradient(pos, p));
         let sum = sum_a.norm_squared() + sum_b;
 
         match sum {
@@ -350,8 +361,8 @@ impl DFSPH
                 0.0
             } else {
                 let mut delta = self.neighbours_reduce_f(i, &|r, i, j| r + self.volume(j) * (velocities[i] - velocities[j]).dot(&self.gradient(pos, positions[j])));
-                delta += self.solids_reduce_f(i, &|r, v, x| {
-                    let vj = Vector3::zeros(); //FIXME compute velocity for moving solids
+                delta += self.solids_reduce_f(i, &|volume, r, v, x| {
+                    let vj = volume.point_velocity(x);
                     r + v * (velocities[i] - vj).dot(&self.gradient(pos, x))
                 });
 
@@ -371,8 +382,8 @@ impl DFSPH
             let pos = positions[i];
 
             let mut delta = self.neighbours_reduce_f(i, &|r, i, j| r + self.volume(j) * (velocities[i] - velocities[j]).dot(&self.gradient(pos, positions[j])));
-            delta += self.solids_reduce_f(i, &|r, v, x| {
-                let vj = Vector3::zeros(); //FIXME compute velocity for moving solids
+            delta += self.solids_reduce_f(i, &|volume, r, v, x| {
+                let vj = volume.point_velocity(x);
                 r + v * (velocities[i] - vj).dot(&self.gradient(pos, x))
             });
 
@@ -409,10 +420,13 @@ impl DFSPH
                     });
 
                     let boundary_diff = match ki.abs() {
-                        v if v > EPSILON => self.solids_reduce_v(i, &|r, v, x| {
+                        v if v > EPSILON => self.solids_reduce_v(i, &|solid, r, v, x| {
                             let grad = -v * self.gradient(positions[i], x);
-                            //FIXME add force to solid
-                            r + (-self.time_step * 1.0 * ki * grad)
+                            let change = 1.0 * ki * grad;
+
+                            solid.add_force(x, change * self.mass(i));
+
+                            r + (-self.time_step * change)
                         }),
                         _ => Vector3::zeros(),
                     };
@@ -461,10 +475,12 @@ impl DFSPH
                         r - self.time_step * sum * grad
                     });
 
-                    let boundary_diff = self.solids_reduce_v(i, &|r, v, x| {
+                    let boundary_diff = self.solids_reduce_v(i, &|solid, r, v, x| {
                         let grad = -v * self.gradient(positions[i], x);
-                        //FIXME add force to solid
-                        r + (-self.time_step * 1.0 * ki * grad)
+                        let change = 1.0 * ki * grad;
+
+                        solid.add_force(x, change * self.mass(i));
+                        r + (-self.time_step * change)
                     });
 
                     *v += diff + boundary_diff;
@@ -489,6 +505,7 @@ impl DFSPH
     }
 
     fn init(&mut self) {
+        self.solids.iter_mut().for_each(|v| v.reset_force_and_torque());
         self.neighbours = self.neighbours_struct.find_all_neighbours(&self.positions.read().unwrap());
 
         self.init_boundaries();
@@ -536,6 +553,22 @@ impl DFSPH
         self.correct_density_error();
         self.neighbours_struct.update_particles(self.time_step, &mut self.positions.write().unwrap(), &self.velocities.read().unwrap());
 
+        let gravity = Vector3::new(0.0, -9.81, 0.0);
+        self.solids.iter_mut().for_each(|v| v.update(gravity, dt));
+
+        let mut collisions = vec![];
+
+        for i in 0..self.solids.len() {
+            for j in i+1..self.solids.len() {
+                collisions.par_extend(self.solids[i].collide(&self.solids[j]));
+            }
+        }
+
+        for i in 0..self.solids.len() {
+            self.solids[i].update_vel(dt);
+        }
+
+        self.debug_solid_collisions = collisions;
         self.time_step
     }
 

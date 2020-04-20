@@ -1,14 +1,13 @@
+use std::fs;
 use std::path::Path;
 use std::time::Instant;
 
 use clap::ArgMatches;
-use kiss3d::camera::camera::Camera;
+use indicatif::{ProgressBar, ProgressStyle};
+use kiss3d::{camera::camera::Camera, scene::SceneNode};
 use nalgebra::{Point3, Translation3};
 use sph_common::DFSPH;
 use sph_scene::Scene;
-use std::fs;
-
-use indicatif::{ProgressBar, ProgressStyle};
 
 pub fn add_particles(range: std::ops::Range<usize>, dfsph: &DFSPH, scene: &mut render::scene::Scene) {
     let particles = &dfsph.positions.read().unwrap();
@@ -24,18 +23,32 @@ pub fn add_particles(range: std::ops::Range<usize>, dfsph: &DFSPH, scene: &mut r
     }
 }
 
-fn add_meshes(config: &sph_scene::Scene, scene: &mut render::scene::Scene) {
+fn add_meshes(dfsph: &mut DFSPH, config: &sph_scene::Scene, scene: &mut render::scene::Scene) -> Vec<Option<SceneNode>> {
+    let mut result = Vec::new();
+
     for i in 0..config.solids.len() {
         let solid = &config.solids[i];
+        let center = dfsph.solid(i).center_of_mass.component_div(&solid.scale());
+        let position = dfsph.solid(i).position();
 
         if !solid.display {
-            continue;
-        }
+            result.push(None);
+        } else {
+            let data = Path::new(&config.global_config.data_path);
+            let path = solid.file(data);
+            let mut obj = scene.window.add_obj(&path, &path.parent().unwrap(), solid.scale());
 
-        let data = Path::new(&config.global_config.data_path);
-        let mut obj = scene.window.add_obj(&solid.file(data), data, solid.scale());
-        obj.set_local_translation(Translation3::new(solid.position[0], solid.position[1], solid.position[2]));
+            obj.modify_vertices(&mut |v| {
+                v.iter_mut().for_each(|t| *t -= center);
+            });
+
+            obj.set_local_translation(Translation3::new(position[0], position[1], position[2]));
+
+            result.push(Some(obj));
+        }
     }
+
+    result
 }
 
 fn dump_simulation(simulation: &DFSPH, dump_folder: &Path, idx: usize, verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
@@ -56,16 +69,21 @@ fn simulate(scene: Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Resul
     let mut total_time = 0.0;
     let mut time_simulated_since_last_frame = fps;
     let mut display_high_speed_only = false;
-    let mut pause_on_speed_explosion= false;
+    let mut pause_on_speed_explosion = false;
+
+    let mut collision_size = 5.;
 
     let mut renderer = render::scene::Scene::new(fluid_simulation.particle_radius());
     renderer.camera.look_at(Point3::new(0.0, 1., -2.), Point3::new(0., 0., 5.)); //FIXME make camera configurable
+    renderer.window.set_point_size(collision_size);
 
     add_particles(0..fluid_simulation.len(), &fluid_simulation, &mut renderer);
-    add_meshes(&scene, &mut renderer);
+    let mut meshes = add_meshes(&mut fluid_simulation, &scene, &mut renderer);
 
     let mut show_info: bool = true;
     let mut show_velocity: bool = false;
+    let mut show_collisions: bool = true;
+    let mut hide_solids = false;
     let mut pause: bool = true;
     let mut frame_idx: usize = 0;
 
@@ -74,39 +92,59 @@ fn simulate(scene: Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Resul
 
         for event in renderer.window.events().iter() {
             match event.value {
-                render::event::WindowEvent::Key(key, render::event::Action::Release, _) => {
-                    match key {
-                        render::event::Key::R => {
-                            total_time = 0.0;
-                            scene.recreate(&mut fluid_simulation);
-                            renderer.clear();
-                            add_particles(0..fluid_simulation.len(), &fluid_simulation, &mut renderer);
+                render::event::WindowEvent::Key(key, render::event::Action::Release, _) => match key {
+                    render::event::Key::R => {
+                        total_time = 0.0;
+                        scene.recreate(&mut fluid_simulation)?;
+                        renderer.clear();
+                        add_particles(0..fluid_simulation.len(), &fluid_simulation, &mut renderer);
+                    }
+                    render::event::Key::A => {
+                        add_particles(scene.add_blocks(&mut fluid_simulation)?, &fluid_simulation, &mut renderer);
+                    }
+                    render::event::Key::D => {
+                        if !dump_all {
+                            dump_simulation(&fluid_simulation, dump_folder, idx, true)?;
                         }
-                        render::event::Key::A => {
-                            add_particles(scene.add_blocks(&mut fluid_simulation), &fluid_simulation, &mut renderer);
-                        }
-                        render::event::Key::D => {
-                            if !dump_all {
-                                dump_simulation(&fluid_simulation, dump_folder, frame_idx, true)?;
+                    }
+                    render::event::Key::Y => {
+                        show_collisions = !show_collisions;
+                    }
+                    render::event::Key::H => {
+                        hide_solids = !hide_solids;
+                        for i in 0..fluid_simulation.solid_count() {
+                            if let Some(mesh) = &mut meshes[i] {
+                                mesh.set_visible(!hide_solids);
                             }
                         }
-                        render::event::Key::C => {
-                            show_velocity = !show_velocity;
-                        }
-                        render::event::Key::H => {
-                            display_high_speed_only = !display_high_speed_only;
-                        }
-                        render::event::Key::P => {
-                            pause_on_speed_explosion = !pause_on_speed_explosion;
-                        }
-                        render::event::Key::I => {
-                            show_info = !show_info;
-                        }
-                        render::event::Key::Space => {
-                            pause = !pause;
-                        }
-                        _ => {}
                     }
+                    render::event::Key::C => {
+                        show_velocity = !show_velocity;
+                    }
+                    render::event::Key::S => {
+                        display_high_speed_only = !display_high_speed_only;
+                    }
+                    render::event::Key::P => {
+                        pause_on_speed_explosion = !pause_on_speed_explosion;
+                    }
+                    render::event::Key::I => {
+                        show_info = !show_info;
+                    }
+                    render::event::Key::Space => {
+                        pause = !pause;
+                    }
+                    _ => {}
+                }
+                render::event::WindowEvent::Key(key, render::event::Action::Press, render::event::Modifiers::Shift) => match key {
+                    render::event::Key::PageDown => {
+                        collision_size = (collision_size - 0.25).max(1.);
+                        renderer.window.set_point_size(collision_size);
+                    }
+                    render::event::Key::PageUp => {
+                        collision_size = (collision_size + 0.25).min(10.);
+                        renderer.window.set_point_size(collision_size);
+                    }
+                    _ => {}
                 }
                 _ => {}
             }
@@ -155,8 +193,26 @@ fn simulate(scene: Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Resul
                 particle.position = (pos.x, pos.y, pos.z);
             }
 
+
+            if !hide_solids {
+                for i in 0..fluid_simulation.solid_count() {
+                    let solid = fluid_simulation.solid(i);
+
+                    if let Some(mesh) = &mut meshes[i] {
+                        mesh.set_local_rotation(solid.rotation());
+                        mesh.set_local_translation(Translation3::from(solid.center_position()));
+                    }
+                }
+            }
+
             total_time += fluid_simulation.get_time_step();
 
+        }
+
+        if show_collisions {
+            fluid_simulation.debug_get_solid_collisions().iter().for_each(|v| {
+                renderer.window.draw_point(&Point3::from(*v), &Point3::new(0., 0., 1.));
+            });
         }
 
         if show_info {
@@ -166,9 +222,19 @@ fn simulate(scene: Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Resul
                 total: {:.6} s\n\
                 nb_particle: {}\n\
                 v_max: {:.5} m/s\n\
+                show_solids: {:}\n\
+                show_collisions: {:}\n\
+                collision_size: {:.3}\n\
+                nb_solid_collisions: {}\n\
                 fps: {:.3} frame/s\n\
                 eye: {}\
-                ", frame_idx, fluid_simulation.get_time_step(), total_time, fluid_simulation.len(), fluid_simulation.get_v_max(), 1. / timer.elapsed().as_secs_f32(), renderer.camera.eye()));
+                ", idx, fluid_simulation.get_time_step(), total_time, fluid_simulation.len(), fluid_simulation.get_v_max(),
+                                         !hide_solids,
+                                         show_collisions,
+                                         collision_size,
+                                         fluid_simulation.debug_get_solid_collisions().len(),
+                                         1. / timer.elapsed().as_secs_f32(),
+                                         renderer.camera.eye()));
         }
 
         renderer.update();

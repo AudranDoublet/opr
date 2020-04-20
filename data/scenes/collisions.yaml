@@ -1,0 +1,46 @@
+config:
+    kernel_radius: 0.08
+    particle_radius: 0.02
+solids:
+    #    - mesh: objects/earth/earth.obj
+    #      dynamic: true
+    #      density: 1000
+    #      mesh_invert: false
+    #      resolution: [31, 31, 31]
+    #      scale: [0.0002, 0.0002, 0.0002]
+    #      position: [-1.0, -0.4, 0.0]
+    #      rotation_axis: [0.0, 0.0, 0.0]
+    #      rotation_angle: 0.0
+    #      display: true
+    - mesh: objects/earth/earth.obj
+      dynamic: true
+      density: 1000
+      mesh_invert: false
+      resolution: [31, 31, 31]
+      scale: [0.0002, 0.0002, 0.0002]
+      position: [0.4, 1.0, 0.0]
+      rotation_axis: [0.0, 0.0, 0.0]
+      rotation_angle: 0.0
+      display: true
+    - mesh: objects/inclined.obj
+      density: 1000
+      dynamic: false
+      mesh_invert: false
+      resolution: [11, 11, 11]
+      scale: [1.0, 1.0, 1.0]
+      position: [0.0, 0.0, 0.0]
+      rotation_axis: [0.0, 0.0, 0.0]
+      rotation_angle: 0.0
+      display: true
+    - mesh: objects/box.obj
+      density: 1000
+      dynamic: false
+      mesh_invert: false
+      resolution: [11, 11, 11]
+      scale: [1.0, 1.0, 1.0]
+      position: [-1.0, -1.0, 0.0]
+      rotation_axis: [0.0, 0.0, 0.0]
+      rotation_angle: 0.0
+      display: true
+liquids_blocks: []
+liquids_add_blocks: []
