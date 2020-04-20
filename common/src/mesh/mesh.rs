@@ -1,9 +1,7 @@
-extern crate tobj;
-
 use std::error::Error;
 use std::path::Path;
 
-use crate::mesh::{Triangle, BoundingSphereHierarchy};
+use crate::mesh::{Triangle, BoundingSphereHierarchy, tobj};
 use crate::{utils, kernels, Kernel, DiscreteGrid};
 use nalgebra::{Vector3, Matrix3};
 
@@ -55,29 +53,40 @@ impl Mesh
                                            mesh.normals[i + 2]));
             }
 
+            if vertices_normal.len() != vertices.len() {
+                println!("Drop vertices normals");
+
+                // compute new vertices normals by computing the mean of neighbouring triangles
+                // normals
+                vertices_normal = vec![Vector3::zeros(); vertices.len()];
+
+                for i in (0..mesh.indices.len()).step_by(3) {
+                    let va = &vertices[mesh.indices[i + 0] as usize];
+                    let vb = &vertices[mesh.indices[i + 1] as usize];
+                    let vc = &vertices[mesh.indices[i + 2] as usize];
+
+                    let normal = (vb - va).cross(&(vc - va));
+
+                    vertices_normal[mesh.indices[i + 0] as usize] += normal;
+                    vertices_normal[mesh.indices[i + 1] as usize] += normal;
+                    vertices_normal[mesh.indices[i + 2] as usize] += normal;
+                }
+            }
+
             for i in (0..mesh.indices.len()).step_by(3)
             {
                 let a = mesh.indices[i + 0] as usize;
                 let b = mesh.indices[i + 1] as usize;
                 let c = mesh.indices[i + 2] as usize;
 
-                if vertices_normal.len() == 0 {
-                    triangles.push(
-                        Triangle::new_no_normals(
-                            vertices[a],
-                            vertices[b],
-                            vertices[c],
-                    ));
-                } else {
-                    triangles.push(
-                        Triangle::new(vertices[a],
-                                      vertices[b],
-                                      vertices[c],
-                                      vertices_normal[a],
-                                      vertices_normal[b],
-                                      vertices_normal[c],
-                    ));
-                }
+                triangles.push(
+                    Triangle::new(vertices[a],
+                                  vertices[b],
+                                  vertices[c],
+                                  vertices_normal[a].normalize(),
+                                  vertices_normal[b].normalize(),
+                                  vertices_normal[c].normalize(),
+                ));
             }
         }
 
