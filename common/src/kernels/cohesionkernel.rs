@@ -34,8 +34,8 @@ impl Kernel for CohesionKernel {
         self.unormalized_apply_on_norm(r_norm, self.normalizer)
     }
 
-    fn gradient(&self, r: &Vector3<f32>) -> Vector3<f32> {
-        self.unormalized_gradient(r, self.normalizer)
+    fn gradient(&self, _r: &Vector3<f32>) -> Vector3<f32> {
+        panic!("cohesion kernel: gradient: not implement")
     }
 
     fn unormalized_apply_on_norm(&self, r_norm: f32, normalizer: f32) -> f32 {
@@ -46,10 +46,6 @@ impl Kernel for CohesionKernel {
             q if q <= 1.0 => (self.h - r_norm).powi(3) * r_norm.powi(3),
             _ => 0.0
         }
-    }
-
-    fn unormalized_gradient(&self, _r: &Vector3<f32>, _normalizer: f32) -> Vector3<f32> {
-        panic!("cohesion kernel: gradient: not implement")
     }
 
     fn radius(&self) -> f32 {
