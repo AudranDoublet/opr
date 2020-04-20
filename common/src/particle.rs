@@ -16,10 +16,11 @@ use serde::{Deserialize, Serialize};
 use crate::{HashGrid, RigidObject};
 use crate::kernel::{Kernel, kernels::CubicSpine};
 use crate::mesher::types::{FluidSnapshot, FluidSnapshotProvider, VertexWorld};
+use crate::external_forces::ExternalForces;
 
 const EPSILON: f32 = 1e-5;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize)]
 pub struct DFSPH
 {
     // parameters
@@ -56,6 +57,9 @@ pub struct DFSPH
     pub velocities: RwLock<Vec<Vector3<f32>>>,
     pub positions: RwLock<Vec<Vector3<f32>>>,
     pub accelerations: RwLock<Vec<Vector3<f32>>>,
+
+    #[serde(skip_serializing, skip_deserializing)]
+    external_forces: ExternalForces,
 
     len: usize,
 
@@ -139,7 +143,7 @@ impl FluidSnapshotProvider for DFSPH {
 
 impl DFSPH
 {
-    pub fn new(kernel_radius: f32, particle_radius: f32, solids: Vec<RigidObject>) -> DFSPH
+    pub fn new(kernel_radius: f32, particle_radius: f32, solids: Vec<RigidObject>, external_forces: ExternalForces) -> DFSPH
     {
         DFSPH {
             kernel: CubicSpine::new(kernel_radius),
@@ -175,6 +179,8 @@ impl DFSPH
             accelerations: RwLock::new(Vec::new()),
             velocities: RwLock::new(Vec::new()),
             positions: RwLock::new(Vec::new()),
+
+            external_forces: external_forces,
         }
     }
 
@@ -500,8 +506,8 @@ impl DFSPH
         }
     }
 
-    fn compute_non_pressure_forces(&self, _i: usize, acceleration: &mut Vector3<f32>) {
-        *acceleration = Vector3::new(0.0, -9.81, 0.0);
+    fn compute_non_pressure_forces(&self, i: usize, acceleration: &mut Vector3<f32>) {
+        *acceleration = self.external_forces.apply(self, i);
     }
 
     fn init(&mut self) {

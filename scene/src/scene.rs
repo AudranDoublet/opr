@@ -1,9 +1,11 @@
 extern crate serde_yaml;
 
+use nalgebra::Vector3;
+
 use std::fs::File;
 use std::path::Path;
 
-use sph_common::{RigidObject, DFSPH};
+use sph_common::{RigidObject, DFSPH, external_forces::ExternalForces};
 
 use serde_derive::*;
 use crate::{Solid, LiquidZone};
@@ -82,7 +84,11 @@ impl Scene
         self.create_cache_dir()?;
 
         let solids = self.load_solids()?;
-        let mut result = DFSPH::new(self.config.kernel_radius, self.config.particle_radius, solids);
+        let mut forces = ExternalForces::new();
+
+        forces.gravity(Vector3::new(0.0, -9.81, 0.0));
+
+        let mut result = DFSPH::new(self.config.kernel_radius, self.config.particle_radius, solids, forces);
 
         self.recreate(&mut result)?;
 
