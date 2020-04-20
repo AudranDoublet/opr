@@ -1,3 +1,5 @@
+extern crate image;
+
 use sph_common::{DiscreteGrid, RigidObject, mesh::Mesh, kernels::CubicSpine};
 
 use crate::Scene;
@@ -27,6 +29,9 @@ pub struct Solid {
 
     #[serde(default)]
     pub dynamic: bool,
+
+    #[serde(default)]
+    pub slice: bool,
 }
 
 impl Default for Solid {
@@ -42,6 +47,7 @@ impl Default for Solid {
             resolution: [10, 10, 10],
             display: true,
             dynamic: false,
+            slice: false,
         }
     }
 }
@@ -89,6 +95,43 @@ impl Solid {
         cache_path.join(cache_file)
     }
 
+    pub fn save_slice(&self, (min, max): (&Vector3<f32>, &Vector3<f32>), f: &dyn Fn(Vector3<f32>) -> Option<f32>) -> Result<(), Box<dyn std::error::Error>> {
+        let width = 512;
+        let height = 512;
+
+        let mut result = Vec::new();
+
+        let step = (max - min).component_div(&Vector3::new(width as f32, height as f32, 1.));
+
+        let scale = |v: f32| (v.min(0.1) * 10. * 255.) as u8;
+
+        for y in 0..height {
+            for x in 0..width {
+                let pos = min + step.component_mul(&Vector3::new(x as f32, y as f32, 0.5));
+
+                let (r, g, b) = if let Some(d) = f(pos) {
+                    if d < 0.0 {
+                        (scale(-d), 0, 0)
+                    } else {
+                        (0, scale(d), 0)
+                    }
+                } else {
+                    (0, 0, 0)
+                };
+
+                result.push(r);
+                result.push(g);
+                result.push(b);
+            }
+        }
+
+        image::save_buffer(
+            &std::path::Path::new("slice.png"), &result, width as u32, height as u32, image::ColorType::Rgb8
+        )?;
+
+        Ok(())
+    }
+
     pub fn load(&self, scene: &Scene) -> Result<RigidObject, Box<dyn std::error::Error>> {
         let kradius = scene.config.kernel_radius;
 
@@ -130,10 +173,16 @@ impl Solid {
             grid
         };
 
-        println!("{:?}", grid.interpolate(1, Vector3::new(0.5, 0.5, 0.5), true));
+        if self.slice {
+            self.save_slice(grid.get_domain_definition(), &|p| match grid.interpolate(0, p, false) {
+                Some((d, _)) => Some(d),
+                _ => None
+            })?;
+        }
+
         println!("{} loaded!", self.mesh);
 
-        let mut object = RigidObject::new(grid, mesh.compute_bvh(), self.dynamic, properties);
+        let mut object = RigidObject::new(grid, self.dynamic, properties);
 
         object.set_position(self.position());
 

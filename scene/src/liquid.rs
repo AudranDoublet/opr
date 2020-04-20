@@ -64,6 +64,7 @@ impl LiquidZone
                     resolution: *resolution,
                     display: true,
                     dynamic: false,
+                    slice: false,
                 };
 
                 let solid = solid.load(config)?;
