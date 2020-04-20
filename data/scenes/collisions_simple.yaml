@@ -8,7 +8,17 @@ solids:
       mesh_invert: false
       resolution: [31, 31, 31]
       scale: [0.3, 0.3, 0.3]
-      position: [0.0, 0.6, 0.0]
+      position: [0.0, 0.7, 0.0]
+      rotation_axis: [0.0, 0.0, 0.0]
+      rotation_angle: 0.0
+      display: true
+    - mesh: objects/dragon.obj
+      dynamic: true
+      density: 1000
+      mesh_invert: false
+      resolution: [31, 31, 31]
+      scale: [0.3, 0.3, 0.3]
+      position: [0.0, 1.2, 0.0]
       rotation_axis: [0.0, 0.0, 0.0]
       rotation_angle: 0.0
       display: true
@@ -16,7 +26,7 @@ solids:
       density: 1000
       dynamic: false
       mesh_invert: false
-      resolution: [11, 11, 11]
+      resolution: [31, 31, 31]
       scale: [1.0, 1.0, 1.0]
       position: [0.0, 0.0, 0.0]
       rotation_axis: [0.0, 0.0, 0.0]
