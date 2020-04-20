@@ -104,7 +104,7 @@ fn simulate(scene: Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Resul
                     }
                     render::event::Key::D => {
                         if !dump_all {
-                            dump_simulation(&fluid_simulation, dump_folder, idx, true)?;
+                            dump_simulation(&fluid_simulation, dump_folder, frame_idx, true)?;
                         }
                     }
                     render::event::Key::Y => {
@@ -228,7 +228,7 @@ fn simulate(scene: Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Resul
                 nb_solid_collisions: {}\n\
                 fps: {:.3} frame/s\n\
                 eye: {}\
-                ", idx, fluid_simulation.get_time_step(), total_time, fluid_simulation.len(), fluid_simulation.get_v_max(),
+                ", frame_idx, fluid_simulation.get_time_step(), total_time, fluid_simulation.len(), fluid_simulation.get_v_max(),
                                          !hide_solids,
                                          show_collisions,
                                          collision_size,
