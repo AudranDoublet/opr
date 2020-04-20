@@ -188,13 +188,6 @@ fn simulate(scene: Scene, dump_all: bool, dump_folder: &Path) -> Result<(), Box<
             }
 
 
-            if show_collisions {
-                fluid_simulation.debug_get_solid_collisions().iter().for_each(|(_, constraint)| {
-                    renderer.window.draw_point(&Point3::from(constraint.cp0), &Point3::new(1., 0., 0.));
-                    renderer.window.draw_point(&Point3::from(constraint.cp1), &Point3::new(0., 0., 1.));
-                });
-            }
-
             if !hide_solids {
                 for i in 0..fluid_simulation.solid_count() {
                     let solid = fluid_simulation.solid(i);
@@ -209,6 +202,12 @@ fn simulate(scene: Scene, dump_all: bool, dump_folder: &Path) -> Result<(), Box<
             total_time += fluid_simulation.get_time_step();
 
             idx += 1;
+        }
+
+        if show_collisions {
+            fluid_simulation.debug_get_solid_collisions().iter().for_each(|v| {
+                renderer.window.draw_point(&Point3::from(*v), &Point3::new(0., 0., 1.));
+            });
         }
 
         if show_info {
