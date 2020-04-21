@@ -26,18 +26,20 @@ impl SurfaceTensionForce {
 impl ExternalForce for SurfaceTensionForce {
     fn compute_acceleration(&self, sim: &DFSPH, accelerations: &mut Vec<Vector3<f32>>) {
         let positions = sim.positions.read().unwrap();
+        let densities = sim.density.read().unwrap();
+        let h = sim.kernel_radius();
 
         let mut normals = vec![Vector3::zeros(); positions.len()];
         normals.par_iter_mut().enumerate().for_each(|(i, v)| {
-            *v = 0.08 * sim.neighbours_reduce_v(i, &|r, i, j| {
-                r + sim.mass(j) / sim.density(j) * sim.gradient(positions[i], positions[j])
+            *v = h * sim.neighbours_reduce_v(i, &|r, i, j| {
+                r + sim.mass(j) / densities[j] * sim.gradient(positions[i], positions[j])
             });
         });
 
         accelerations.par_iter_mut().enumerate().for_each(|(i, v)| {
             // cohesion & curvature
             *v += sim.neighbours_reduce_v(i, &|r, i, j| {
-                let kij = 1.; // FIXME different liquids ?
+                let kij = 2. * sim.rest_density / (densities[i] + densities[j]);
                 let xij = positions[i] - positions[j];
                 let normsq = xij.norm_squared();
 

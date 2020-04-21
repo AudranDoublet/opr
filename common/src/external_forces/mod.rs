@@ -1,8 +1,30 @@
 mod gravity;
 mod surfacetension;
+mod basic_viscosity;
+
+use serde_derive::*;
 
 use nalgebra::Vector3;
 use crate::DFSPH;
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type")]
+pub enum ViscosityType {
+    #[serde(rename = "basic")]
+    Basic {
+        coefficient: f32,
+        surface_coefficient: f32,
+    },
+}
+
+impl Default for ViscosityType {
+    fn default() -> ViscosityType {
+        ViscosityType::Basic {
+            coefficient: 0.01,
+            surface_coefficient: 0.0,
+        }
+    }
+}
 
 pub trait ExternalForce
 {
@@ -27,6 +49,14 @@ impl ExternalForces {
 
     pub fn surface_tension(&mut self, kernel_radius: f32, surface_tension: f32, surface_adhesion: f32) -> &mut ExternalForces {
         self.add(surfacetension::SurfaceTensionForce::new(kernel_radius, surface_tension, surface_adhesion))
+    }
+
+    pub fn viscosity(&mut self, viscosity: &ViscosityType) -> &mut ExternalForces {
+        let force = match viscosity {
+            ViscosityType::Basic { coefficient, surface_coefficient } => basic_viscosity::BasicViscosityForce::new(*coefficient, *surface_coefficient),
+        };
+
+        self.add(force)
     }
 
     pub fn add(&mut self, force: Box<dyn ExternalForce + Sync + Send>) -> &mut ExternalForces {

@@ -50,7 +50,7 @@ pub struct DFSPH
     debug_solid_collisions: Vec<Vector3<f32>>,
 
     // Particle data
-    density: RwLock<Vec<f32>>,
+    pub density: RwLock<Vec<f32>>,
     stiffness: RwLock<Vec<f32>>,
     neighbours: Vec<Vec<usize>>,
     density_prediction: RwLock<Vec<f32>>,
@@ -197,6 +197,10 @@ impl DFSPH
         self.len = 0;
     }
 
+    pub fn kernel_radius(&self) -> f32 {
+        self.kernel.radius()
+    }
+
     pub fn solid_count(&self) -> usize {
         self.solids.len()
     }
@@ -254,10 +258,6 @@ impl DFSPH
 
     pub fn mass(&self, _i: usize) -> f32 {
         self.volume * self.rest_density
-    }
-
-    pub fn density(&self, _i: usize) -> f32 {
-        self.rest_density
     }
 
     fn neighbours_count(&self, i: usize) -> usize {
@@ -331,7 +331,7 @@ impl DFSPH
     fn compute_density(&self, i: usize, positions: &Vec<Vector3<f32>>) -> f32 {
         let pos = positions[i];
 
-        let self_dens = 0.0;
+        let self_dens = self.volume(i) * self.kernel_apply(pos, positions[i]);
 
         let neighbour_dens = self.neighbours_reduce_f(i, &|density, _, j| {
             density + self.volume(j) * self.kernel_apply(pos, positions[j])
