@@ -48,9 +48,16 @@ impl Mesher {
 
         let mut density = 0.;
 
-        for j in neighbours {
-            density += snapshot.volume(j) * f_approx_density(j);
-        }
+        neighbours.iter()
+            .map(|j| (j, snapshot.density(*j)))
+            .filter(|(_, density_j)| *density_j > 0.)
+            .for_each(|(j, density_j)| {
+                density += snapshot.mass(*j) / density_j * f_approx_density(*j);
+            });
+
+        // if density > 0. {
+        //     println!("d: {}", density);
+        // }
 
         density
     }

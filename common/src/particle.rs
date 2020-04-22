@@ -84,10 +84,11 @@ macro_rules! timeit {
 pub struct DFSPHFluidSnapshot
 {
     particles: Vec<Vector3<f32>>,
+    densities: Vec<f32>,
     neighbours_struct: HashGrid,
     neighbours: Vec<Vec<usize>>,
     kernel: CubicSpine,
-    volume: f32,
+    mass: f32,
 }
 
 impl FluidSnapshot for DFSPHFluidSnapshot {
@@ -111,8 +112,12 @@ impl FluidSnapshot for DFSPHFluidSnapshot {
         self.neighbours_struct.find_neighbours(self.len(), &self.particles, *x)
     }
 
-    fn volume(&self, _i: usize) -> f32 {
-        self.volume
+    fn mass(&self, _i: usize) -> f32 {
+        self.mass
+    }
+
+    fn density(&self, i: usize) -> f32 {
+        self.densities[i]
     }
 
     fn get_kernel(&self) -> &dyn Kernel {
@@ -127,16 +132,18 @@ impl FluidSnapshotProvider for DFSPH {
 
     fn snapshot(&self, radius: f32) -> Box<dyn FluidSnapshot> {
         let particles = self.positions.read().unwrap().clone();
+        let densities = self.density.read().unwrap().clone();
         let mut neighbours_struct = HashGrid::new(radius);
         neighbours_struct.insert(&particles);
         let neighbours = neighbours_struct.find_all_neighbours(&particles);
 
         Box::new(DFSPHFluidSnapshot {
             particles,
+            densities,
             neighbours_struct,
             neighbours,
             kernel: CubicSpine::new(self.kernel.radius()),
-            volume: self.volume(0),
+            mass: self.mass(0),
         })
     }
 }

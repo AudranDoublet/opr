@@ -51,9 +51,9 @@ pub trait FluidSnapshot {
     /// * `x` - center of the sphere of research
     fn find_neighbours(&self, x: &VertexWorld) -> Vec<usize>;
 
-    /// Returns the volume of the given particle
-    /// * `i` - index of the particle
-    fn volume(&self, i: usize) -> f32;
+    fn mass(&self, i: usize) -> f32;
+
+    fn density(&self, i: usize) -> f32;
 
     /// Returns a reference to the kernel used by the simulation
     fn get_kernel(&self) -> &dyn Kernel;
