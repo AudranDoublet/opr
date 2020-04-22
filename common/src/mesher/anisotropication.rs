@@ -2,8 +2,6 @@ use nalgebra::{Matrix3, SVD, U3, Vector3};
 
 use crate::mesher::types::{FluidSnapshot, VertexWorld};
 
-const CST_EPSILON: f32 = 1.0e-5;
-
 #[derive(Clone)]
 pub struct Anisotropicator {
     // x_i' = (1-λ)*x_i + λ*sum(W_ij*x_j)/sum(W_ij)
@@ -16,7 +14,6 @@ pub struct Anisotropicator {
 
     // radius of the isotropic weighting function (usually 2*h with `h` the smoothing radius of the kernel of the particle)
     radius: f32,
-    radius_sq: f32,
 
     cst_smoothness: f32, // λ ~= 0.9
 
@@ -31,7 +28,7 @@ pub struct Anisotropicator {
     cst_ks: f32,
 
     // k_n such that, on too low neighborhood, Σ~ = k_n * I. Should be similar to the kernel radius
-    cst_kn_inv: Matrix3<f32>,
+    cst_kn: f32,
 }
 
 impl Anisotropicator {
@@ -44,22 +41,20 @@ impl Anisotropicator {
 
             kernel_radius_inv: -1.,
             radius: -1.,
-            radius_sq: -1.,
 
             cst_smoothness,
             cst_min_nb_neighbours,
             cst_kr,
             cst_ks,
-
-            cst_kn_inv: (Matrix3::identity() * cst_kn).pseudo_inverse(CST_EPSILON).unwrap(),
+            cst_kn,
         }
     }
 
     /// isotropic weighting function 2 particles at positions x_i and x_j
     /// * `n_sq`: ||x_j - x_i||^2
-    fn w(&self, n_sq: f32) -> f32 {
-        if n_sq < self.radius_sq {
-            1. - (n_sq.sqrt() / self.radius).powi(3)
+    fn w(&self, d: f32) -> f32 {
+        if d < self.radius {
+            1. - (d / self.radius).powi(3)
         } else {
             0.
         }
@@ -72,11 +67,8 @@ impl Anisotropicator {
     fn init_kernels_centers(&mut self, snapshot: &Box<dyn FluidSnapshot>) {
         let kernel = snapshot.get_kernel();
 
-        assert!(self.cst_ks.log10() >= kernel.radius().log10());
-
         self.kernel_radius_inv = 1. / kernel.radius();
         self.radius = Anisotropicator::compute_radius(kernel.radius());
-        self.radius_sq = self.radius * self.radius;
 
         self.smoothed_positions.resize(snapshot.len(), Vector3::zeros());
         self.weighted_means.resize(snapshot.len(), Vector3::zeros());
@@ -84,12 +76,12 @@ impl Anisotropicator {
         for i in 0..snapshot.len() {
             let x_i = &snapshot.position(i);
 
-            let mut sum_w_ij = 0.;
-            let mut weighted_mean = Vector3::zeros(); // sum of the weighted position of the neighborhood
+            let mut sum_w_ij = 1.;
+            let mut weighted_mean = *x_i;
 
-            for j in snapshot.neighbours_anisotropic_kernel(i).iter().chain([i].iter()) {
+            for j in snapshot.neighbours_anisotropic_kernel(i) {
                 let x_j = &snapshot.position(*j);
-                let w_ij = self.w((x_i - x_j).norm_squared());
+                let w_ij = self.w((x_i - x_j).norm());
 
                 sum_w_ij += w_ij;
                 weighted_mean += w_ij * x_j;
@@ -104,17 +96,14 @@ impl Anisotropicator {
 
     fn compute_covariance_matrix(&self, snapshot: &Box<dyn FluidSnapshot>, i: usize) -> Matrix3<f32> {
         let mut c = Matrix3::zeros();
-        let x_i = &snapshot.position(i);
         let x_w_i = &self.weighted_means[i];
 
-        let mut sum_w_ij = 0.;
+        let mut sum_w_ij = 1.;
 
-        for j in snapshot.neighbours_anisotropic_kernel(i).iter().chain([i].iter()) {
+        for j in snapshot.neighbours_anisotropic_kernel(i).iter() {
             let x_j = &snapshot.position(*j);
-            let w_ij = self.w((x_i - x_j).norm_squared());
-
             let variance = x_j - x_w_i;
-
+            let w_ij = self.w(variance.norm());
             sum_w_ij += w_ij;
             c += w_ij * (variance * variance.transpose());
         }
@@ -129,12 +118,12 @@ impl Anisotropicator {
             svd.singular_values[2]
         );
 
-        let sig_min = sig_1 / self.cst_kr;
+        let sig_min = svd.singular_values.max() / self.cst_kr;
 
-        Vector3::new(
-            self.cst_ks * sig_1,
-            self.cst_ks * sig_2.max(sig_min),
-            self.cst_ks * sig_3.max(sig_min),
+        self.cst_ks * Vector3::new(
+            sig_1.max(sig_min),
+            sig_2.max(sig_min),
+            sig_3.max(sig_min),
         )
     }
 
@@ -147,18 +136,20 @@ impl Anisotropicator {
     }
 
     pub fn compute_anisotropy(&self, snapshot: &Box<dyn FluidSnapshot>, i: usize) -> Matrix3<f32> {
-        let c = self.compute_covariance_matrix(snapshot, i);
-        let c_svd = &mut c.svd(true, false);
-
-        let u = c_svd.u.unwrap();
-
-        let eigen_mat_inv = if snapshot.neighbours_anisotropic_kernel(i).len() < self.cst_min_nb_neighbours {
-            self.cst_kn_inv
+        self.kernel_radius_inv * if snapshot.neighbours_anisotropic_kernel(i).len() < self.cst_min_nb_neighbours {
+            Matrix3::identity() * (1. / self.cst_kn)
         } else {
-            let eigen_values = self.normalize_eigen_values(c_svd);
-            Matrix3::from_diagonal(&eigen_values).pseudo_inverse(CST_EPSILON).unwrap()
-        };
+            let c = self.compute_covariance_matrix(snapshot, i);
+            let c_svd = &mut c.svd(true, false);
 
-        self.kernel_radius_inv * u * eigen_mat_inv * u.transpose()
+            let u = c_svd.u.unwrap();
+
+            let eigen_mat_inv = {
+                let eigen_values_inv = self.normalize_eigen_values(c_svd).apply_into(|v| 1. / v);
+                Matrix3::from_diagonal(&eigen_values_inv)
+            };
+
+            u * eigen_mat_inv * u.transpose()
+        }
     }
 }

@@ -1,0 +1,78 @@
+mod gravity;
+mod surfacetension;
+mod basic_viscosity;
+
+use serde_derive::*;
+
+use nalgebra::Vector3;
+use crate::DFSPH;
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type")]
+pub enum ViscosityType {
+    #[serde(rename = "basic")]
+    Basic {
+        coefficient: f32,
+        surface_coefficient: f32,
+    },
+}
+
+impl Default for ViscosityType {
+    fn default() -> ViscosityType {
+        ViscosityType::Basic {
+            coefficient: 0.01,
+            surface_coefficient: 0.0,
+        }
+    }
+}
+
+pub trait ExternalForce
+{
+    fn compute_acceleration(&self, sim: &DFSPH, accelerations: &mut Vec<Vector3<f32>>);
+}
+
+pub struct ExternalForces
+{
+    forces: Vec<Box<dyn ExternalForce + Sync + Send>>,
+}
+
+impl ExternalForces {
+    pub fn new() -> ExternalForces {
+        ExternalForces {
+            forces: Vec::new(),
+        }
+    }
+
+    pub fn gravity(&mut self, intensity: Vector3<f32>) -> &mut ExternalForces {
+        self.add(gravity::GravityForce::new(intensity))
+    }
+
+    pub fn surface_tension(&mut self, kernel_radius: f32, surface_tension: f32, surface_adhesion: f32) -> &mut ExternalForces {
+        self.add(surfacetension::SurfaceTensionForce::new(kernel_radius, surface_tension, surface_adhesion))
+    }
+
+    pub fn viscosity(&mut self, viscosity: &ViscosityType) -> &mut ExternalForces {
+        let force = match viscosity {
+            ViscosityType::Basic { coefficient, surface_coefficient } => basic_viscosity::BasicViscosityForce::new(*coefficient, *surface_coefficient),
+        };
+
+        self.add(force)
+    }
+
+    pub fn add(&mut self, force: Box<dyn ExternalForce + Sync + Send>) -> &mut ExternalForces {
+        self.forces.push(force);
+        self
+    }
+
+    pub fn apply(&self, sim: &DFSPH, accelerations: &mut Vec<Vector3<f32>>) {
+        for v in &self.forces {
+            v.compute_acceleration(sim, accelerations);
+        }
+    }
+}
+
+impl Default for ExternalForces {
+    fn default() -> ExternalForces {
+        ExternalForces::new()
+    }
+}

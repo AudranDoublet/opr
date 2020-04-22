@@ -1,3 +1,5 @@
+extern crate image;
+
 use sph_common::{DiscreteGrid, RigidObject, mesh::Mesh, kernels::CubicSpine};
 
 use crate::Scene;
@@ -19,8 +21,35 @@ pub struct Solid {
     pub rotation_axis: [f32; 3],
     pub rotation_angle: f32,
 
+    pub density: f32,
     pub resolution: [u32; 3],
+
+    #[serde(default)]
     pub display: bool,
+
+    #[serde(default)]
+    pub dynamic: bool,
+
+    #[serde(default)]
+    pub slice: bool,
+}
+
+impl Default for Solid {
+    fn default() -> Self {
+        Solid {
+            mesh: "".to_string(),
+            mesh_invert:  false,
+            scale: [0., 0., 0.],
+            position: [0., 0., 0.],
+            rotation_axis: [0., 0., 0.],
+            rotation_angle: 0.0,
+            density: 1000.,
+            resolution: [10, 10, 10],
+            display: true,
+            dynamic: false,
+            slice: false,
+        }
+    }
 }
 
 impl Solid {
@@ -66,11 +95,57 @@ impl Solid {
         cache_path.join(cache_file)
     }
 
+    pub fn save_slice(&self, (min, max): (&Vector3<f32>, &Vector3<f32>), f: &dyn Fn(Vector3<f32>) -> Option<f32>) -> Result<(), Box<dyn std::error::Error>> {
+        let width = 512;
+        let height = 512;
+
+        let mut result = Vec::new();
+
+        let step = (max - min).component_div(&Vector3::new(width as f32, height as f32, 1.));
+
+        let scale = |v: f32| (v.min(0.1) * 10. * 255.) as u8;
+
+        for y in 0..height {
+            for x in 0..width {
+                let pos = min + step.component_mul(&Vector3::new(x as f32, y as f32, 0.5));
+
+                let (r, g, b) = if let Some(d) = f(pos) {
+                    if d < 0.0 {
+                        (scale(-d), 0, 0)
+                    } else {
+                        (0, scale(d), 0)
+                    }
+                } else {
+                    (0, 0, 0)
+                };
+
+                result.push(r);
+                result.push(g);
+                result.push(b);
+            }
+        }
+
+        image::save_buffer(
+            &std::path::Path::new("slice.png"), &result, width as u32, height as u32, image::ColorType::Rgb8
+        )?;
+
+        Ok(())
+    }
+
     pub fn load(&self, scene: &Scene) -> Result<RigidObject, Box<dyn std::error::Error>> {
         let kradius = scene.config.kernel_radius;
 
         let cache_file = self.cache_file(Path::new(&scene.global_config.cache_path), kradius);
         let mesh_file = self.file(Path::new(&scene.global_config.data_path));
+
+        let mut mesh = Mesh::load_obj(&mesh_file, self.scale())?;
+
+        if self.mesh_invert {
+            mesh.invert();
+        }
+
+        let properties = mesh.compute_mass_properties(self.density);
+        mesh.set_translate(properties.center_of_mass);
 
         let grid = if scene.global_config.use_cache && cache_file.as_path().exists() {
             println!("Use cache {:?} for {}", cache_file, self.mesh);
@@ -81,15 +156,10 @@ impl Solid {
             println!("Compute sdf and volume for {}", self.mesh);
             let extend = 2. * Vector3::new(kradius, kradius, kradius);
 
-            let mut mesh = Mesh::load_obj(&mesh_file, self.scale())?;
-
-            if self.mesh_invert {
-                mesh.invert();
-            }
-
+            let (min, max) = mesh.boundings();
             let mut grid = DiscreteGrid::new(
-                mesh.bounding_min - extend,
-                mesh.bounding_max + extend,
+                min - extend,
+                max + extend,
                 self.resolution(),
             );
 
@@ -103,12 +173,17 @@ impl Solid {
             grid
         };
 
-        println!("{:?}", grid.interpolate(1, Vector3::new(0.5, 0.5, 0.5), true));
+        if self.slice {
+            self.save_slice(grid.get_domain_definition(), &|p| match grid.interpolate(0, p, false) {
+                Some((d, _)) => Some(d),
+                _ => None
+            })?;
+        }
+
         println!("{} loaded!", self.mesh);
 
-        let mut object = RigidObject::new(grid);
+        let mut object = RigidObject::new(grid, self.dynamic, properties);
 
-        object.set_scale(self.scale());
         object.set_position(self.position());
 
         Ok(object)

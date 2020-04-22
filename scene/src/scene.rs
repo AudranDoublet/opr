@@ -1,31 +1,40 @@
 extern crate serde_yaml;
 
+use nalgebra::Vector3;
+
 use std::fs::File;
 use std::path::Path;
 
-use sph_common::{RigidObject, DFSPH};
+use sph_common::{RigidObject, DFSPH, external_forces::ExternalForces, external_forces::ViscosityType};
 
 use serde_derive::*;
 use crate::{Solid, LiquidZone};
 
+fn default_gravity() -> [f32; 3] {
+    [0.0, -9.81, 0.0]
+}
+
+fn default_surface_tension() -> f32 {
+    0.05
+}
+
+fn default_surface_adhesion() -> f32 {
+    0.01
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Configuration
 {
-    #[serde(default)]
+    #[serde(default = "default_gravity")]
     pub gravity: [f32; 3],
     pub kernel_radius: f32, //FIXME mark as default ?
     pub particle_radius: f32,
-}
-
-impl Default for Configuration
-{
-    fn default() -> Self {
-        Configuration {
-            gravity: [0.0, -9.81, 0.0],
-            kernel_radius: 0.1,
-            particle_radius: 0.025,
-        }
-    }
+    #[serde(default = "default_surface_tension")]
+    pub surface_tension: f32,
+    #[serde(default = "default_surface_adhesion")]
+    pub surface_adhesion: f32,
+    #[serde(default)]
+    pub viscosity: ViscosityType,
 }
 
 #[derive(Debug)]
@@ -64,6 +73,12 @@ impl Scene
         Ok(())
     }
 
+    pub fn gravity(&self) -> Vector3<f32> {
+        let g = &self.config.gravity;
+        Vector3::new(g[0], g[1], g[2])
+    }
+
+
     pub fn load_solids(&self) -> Result<Vec<RigidObject>, Box<dyn std::error::Error>>
     {
         self.create_cache_dir()?;
@@ -82,33 +97,41 @@ impl Scene
         self.create_cache_dir()?;
 
         let solids = self.load_solids()?;
-        let mut result = DFSPH::new(self.config.kernel_radius, self.config.particle_radius, solids);
+        let mut forces = ExternalForces::new();
 
-        self.recreate(&mut result);
+        forces.gravity(self.gravity())
+              .surface_tension(self.config.kernel_radius, self.config.surface_tension, self.config.surface_adhesion)
+              .viscosity(&self.config.viscosity);
+
+        let mut result = DFSPH::new(self.config.kernel_radius, self.config.particle_radius, solids, forces);
+
+        self.recreate(&mut result)?;
 
         Ok(result)
     }
 
-    pub fn recreate(&self, scene: &mut DFSPH) {
+    pub fn recreate(&self, scene: &mut DFSPH) -> Result<(), Box<dyn std::error::Error>> {
         scene.clear();
 
         for liquid in &self.liquids_blocks {
-            liquid.create_particles(scene);
+            liquid.create_particles(self, scene)?;
         }
 
         scene.sync();
+
+        Ok(())
     }
 
-    pub fn add_blocks(&self, scene: &mut DFSPH) -> std::ops::Range<usize> {
+    pub fn add_blocks(&self, scene: &mut DFSPH) -> Result<std::ops::Range<usize>, Box<dyn std::error::Error>> {
         let prev_size = scene.len();
 
         for liquid in &self.liquids_add_blocks {
-            liquid.create_particles(scene);
+            liquid.create_particles(self, scene)?;
         }
 
         scene.sync();
 
-        prev_size..scene.len()
+        Ok(prev_size..scene.len())
     }
 }
 

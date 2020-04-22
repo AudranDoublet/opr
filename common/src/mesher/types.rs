@@ -1,7 +1,8 @@
 use std::f32;
 
 use nalgebra::Vector3;
-use crate::{Kernel, HashGrid};
+use crate::HashGrid;
+use crate::kernels::Kernel;
 
 pub type VertexWorld = Vector3<f32>;
 pub type VertexLocal = Vector3<i32>;
@@ -51,9 +52,9 @@ pub trait FluidSnapshot {
     /// * `x` - center of the sphere of research
     fn neighbours_kernel(&self, x: &VertexWorld) -> Vec<usize>;
 
-    /// Returns the volume of the given particle
-    /// * `i` - index of the particle
-    fn volume(&self, i: usize) -> f32;
+    fn mass(&self, i: usize) -> f32;
+
+    fn density(&self, i: usize) -> f32;
 
     /// Returns a reference to the kernel used by the simulation
     fn get_kernel(&self) -> &dyn Kernel;

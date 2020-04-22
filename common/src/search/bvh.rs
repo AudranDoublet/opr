@@ -114,12 +114,14 @@ impl<T: BVHShape + Clone> BVHNode<T> {
         }
     }
 
-    #[allow(dead_code)]
-    fn dump_nodes(&self, id: usize, f: &mut dyn Fn(usize, &T)) {
-        match self {
-            BVHNode::Leaf{shapes} => {
-                for v in shapes {
-                    f(id, v);
+
+    fn dump_nodes(&self, f: &mut Vec<(T, T)>, other: &BVHNode<T>) {
+        match (self, other) {
+            (BVHNode::Leaf{shapes: a}, BVHNode::Leaf{shapes: b}) => {
+                for v in a {
+                    for w in b {
+                        f.push((v.clone(), w.clone()));
+                    }
                 }
             },
             _ => ()
@@ -128,7 +130,7 @@ impl<T: BVHShape + Clone> BVHNode<T> {
 
     #[allow(dead_code)]
     fn intersect_iter(&self,
-            f: &mut dyn Fn(usize, &T),
+            vec: &mut Vec<(T, T)>,
             rotation: &Matrix3<f32>,
             translation: &Vector3<f32>,
             self_aabb: &AABB,
@@ -142,24 +144,23 @@ impl<T: BVHShape + Clone> BVHNode<T> {
 
         if self.is_leaf() {
             if other.is_leaf() {
-                other.dump_nodes(1, f);
-                self.dump_nodes(0, f);
+                self.dump_nodes(vec, other);
             } else if let BVHNode::Node { left_box, right_box, left_node, right_node } = other {
-                self.intersect_iter(f, rotation, translation, self_aabb, &modify(left_box), left_node);
-                self.intersect_iter(f, rotation, translation, self_aabb, &modify(right_box), right_node);
+                self.intersect_iter(vec, rotation, translation, self_aabb, &modify(left_box), left_node);
+                self.intersect_iter(vec, rotation, translation, self_aabb, &modify(right_box), right_node);
             }
         } else if let BVHNode::Node { left_box: lb, right_box: rb, left_node: ln, right_node: rn } = self {
             if other.is_leaf() {
-                ln.intersect_iter(f, rotation, translation, lb, other_aabb, other);
-                rn.intersect_iter(f, rotation, translation, rb, other_aabb, other);
+                ln.intersect_iter(vec, rotation, translation, lb, other_aabb, other);
+                rn.intersect_iter(vec, rotation, translation, rb, other_aabb, other);
             } else if let BVHNode::Node { left_box, right_box, left_node, right_node } = other {
                 let left_box = modify(left_box);
                 let right_box = modify(right_box);
 
-                ln.intersect_iter(f, rotation, translation, lb, &left_box, left_node);
-                ln.intersect_iter(f, rotation, translation, lb, &right_box, right_node);
-                rn.intersect_iter(f, rotation, translation, rb, &left_box, left_node);
-                rn.intersect_iter(f, rotation, translation, rb, &right_box, right_node);
+                ln.intersect_iter(vec, rotation, translation, lb, &left_box, left_node);
+                ln.intersect_iter(vec, rotation, translation, lb, &right_box, right_node);
+                rn.intersect_iter(vec, rotation, translation, rb, &left_box, left_node);
+                rn.intersect_iter(vec, rotation, translation, rb, &right_box, right_node);
             }
         }
     }
@@ -191,15 +192,21 @@ impl<T: BVHShape + Clone> BVH<T> {
         }
     }
 
-    #[allow(dead_code)]
+    pub fn aabb(&self) -> AABB {
+        self.aabb
+    }
+
     pub fn intersects(&self,
             other: &BVH<T>,
-            f: &mut dyn Fn(usize, &T),
             rotation: &Matrix3<f32>,
-            translation: &Vector3<f32>) {
-        self.root.intersect_iter(f, rotation, translation,
+            translation: &Vector3<f32>) -> Vec<(T, T)> {
+        let mut result = Vec::new();
+
+        self.root.intersect_iter(&mut result, rotation, translation,
                                  &self.aabb,
                                  &other.aabb.transform(rotation, translation), &other.root);
+
+        result
     }
 
     #[allow(dead_code)]
@@ -218,5 +225,28 @@ impl<T: BVHShape + Clone> Default for BVH<T> {
 impl BVHShape for Triangle {
     fn aabb(&self) -> AABB {
         AABB::new_from_pointset(&[self.v1, self.v2, self.v3])
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Sphere {
+    pub position: Vector3<f32>,
+    pub radius: f32,
+}
+
+impl Sphere {
+    pub fn new(position: &Vector3<f32>, radius: f32) -> Sphere {
+        Sphere {
+            position: *position,
+            radius: radius,
+        }
+    }
+}
+
+impl BVHShape for Sphere {
+    fn aabb(&self) -> AABB {
+        let radius = Vector3::new(self.radius, self.radius, self.radius);
+
+        AABB::new(self.position - radius, self.position + radius)
     }
 }
