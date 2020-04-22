@@ -11,6 +11,10 @@ use nalgebra::Vector3;
 
 use std::fs::File;
 
+fn particle_size() -> f32 {
+    0.01
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Solid {
     pub mesh: String,
@@ -24,6 +28,9 @@ pub struct Solid {
     pub density: f32,
     pub resolution: [u32; 3],
 
+    #[serde(default = "particle_size")]
+    pub particle_size: f32,
+
     #[serde(default)]
     pub display: bool,
 
@@ -32,24 +39,6 @@ pub struct Solid {
 
     #[serde(default)]
     pub slice: bool,
-}
-
-impl Default for Solid {
-    fn default() -> Self {
-        Solid {
-            mesh: "".to_string(),
-            mesh_invert:  false,
-            scale: [0., 0., 0.],
-            position: [0., 0., 0.],
-            rotation_axis: [0., 0., 0.],
-            rotation_angle: 0.0,
-            density: 1000.,
-            resolution: [10, 10, 10],
-            display: true,
-            dynamic: false,
-            slice: false,
-        }
-    }
 }
 
 impl Solid {
@@ -182,7 +171,7 @@ impl Solid {
 
         println!("{} loaded!", self.mesh);
 
-        let mut object = RigidObject::new(grid, self.dynamic, properties);
+        let mut object = RigidObject::new(grid, self.dynamic, self.particle_size, properties);
 
         object.set_position(self.position());
 

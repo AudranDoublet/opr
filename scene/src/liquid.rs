@@ -64,6 +64,7 @@ impl LiquidZone
                     resolution: *resolution,
                     display: true,
                     dynamic: false,
+                    particle_size: 1000.0,
                     slice: false,
                 };
 

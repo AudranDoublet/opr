@@ -58,7 +58,7 @@ pub struct Constraint
  */
 impl RigidObject
 {
-    pub fn new(grid: DiscreteGrid, dynamic: bool, properties: MassProperties) -> RigidObject {
+    pub fn new(grid: DiscreteGrid, dynamic: bool, particle_size: f32, properties: MassProperties) -> RigidObject {
         let mut res = RigidObject {
             dynamic: dynamic,
 
@@ -81,7 +81,7 @@ impl RigidObject
             mass: properties.mass,
         };
 
-        res.bvh = res.to_particle_tree(0.01);
+        res.bvh = res.to_particle_tree(particle_size);
         res
     }
 
@@ -373,8 +373,6 @@ impl RigidObject
             return vec![];
         }
 
-        let d: f32 = 0.02;
-
         let k = 1.7;
         let damping_coeff = 0.5;
         let t = 1.2;
@@ -388,6 +386,7 @@ impl RigidObject
 
         let v = collisions.iter()
             .map(|(a, b)| {
+                let d = a.radius + b.radius;
                 let pa = self.position_in_world_space(a.position);
                 let pb = other.position_in_world_space(b.position);
 
