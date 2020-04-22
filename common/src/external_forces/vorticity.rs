@@ -32,7 +32,6 @@ impl VorticityForce {
 
 impl ExternalForce for VorticityForce {
     fn compute_acceleration(&self, sim: &DFSPH, accelerations: &mut Vec<Vector3<f32>>) {
-        println!("coucou");
         let densities = sim.density.read().unwrap();
         let positions = sim.positions.read().unwrap();
         let velocities = sim.velocities.read().unwrap();
