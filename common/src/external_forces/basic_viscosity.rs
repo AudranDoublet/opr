@@ -35,6 +35,8 @@ impl ExternalForce for BasicViscosityForce {
 
                 r + 10. * self.viscosity_coeffcient * volume * vij.dot(&xij) / (xij.norm_squared() + h2) * grad
             });
+
+            // FIXME surface viscosity ?
         });
     }
 }

@@ -39,7 +39,7 @@ pub struct DFSPH
     cfl_factor: f32,
 
     // iteration data
-    time_step: f32,
+    pub time_step: f32,
 
     v_max: f32,
     debug_v_max_sq: f32,

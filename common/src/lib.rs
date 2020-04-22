@@ -4,6 +4,7 @@ mod particle;
 mod discretegrid;
 mod rigid_object;
 mod hashgrid;
+mod conjugate_gradient_solver;
 
 pub mod kernels;
 pub mod utils;
@@ -16,3 +17,4 @@ pub use particle::*;
 pub use discretegrid::*;
 pub use rigid_object::*;
 pub use hashgrid::*;
+pub use conjugate_gradient_solver::*;

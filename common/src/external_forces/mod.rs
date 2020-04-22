@@ -1,6 +1,7 @@
 mod gravity;
 mod surfacetension;
 mod basic_viscosity;
+mod high_viscosity;
 
 use serde_derive::*;
 
@@ -15,6 +16,13 @@ pub enum ViscosityType {
         coefficient: f32,
         surface_coefficient: f32,
     },
+    #[serde(rename = "weiler2018")]
+    Weiler2018 {
+        coefficient: f32,
+        surface_coefficient: f32,
+        max_iteration: usize,
+        tolerance: f32,
+    }
 }
 
 impl Default for ViscosityType {
@@ -52,8 +60,9 @@ impl ExternalForces {
     }
 
     pub fn viscosity(&mut self, viscosity: &ViscosityType) -> &mut ExternalForces {
-        let force = match viscosity {
+        let force: Box<dyn ExternalForce + Sync + Send> = match viscosity {
             ViscosityType::Basic { coefficient, surface_coefficient } => basic_viscosity::BasicViscosityForce::new(*coefficient, *surface_coefficient),
+            ViscosityType::Weiler2018{ coefficient, surface_coefficient, max_iteration, tolerance} => high_viscosity::ViscosityWeiler2018Force::new(*coefficient, *surface_coefficient, *max_iteration, *tolerance),
         };
 
         self.add(force)
