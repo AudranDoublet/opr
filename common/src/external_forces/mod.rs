@@ -2,6 +2,7 @@ mod gravity;
 mod surfacetension;
 mod basic_viscosity;
 mod high_viscosity;
+mod vorticity;
 
 use serde_derive::*;
 
@@ -30,6 +31,23 @@ impl Default for ViscosityType {
         ViscosityType::Basic {
             coefficient: 0.01,
             surface_coefficient: 0.0,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct VorticityConfig {
+    inertia_inverse: f32,
+    viscosity_omega: f32,
+    vorticity_coefficient: f32,
+}
+
+impl Default for VorticityConfig {
+    fn default() -> VorticityConfig {
+        VorticityConfig {
+            inertia_inverse: 0.5,
+            viscosity_omega: 0.1,
+            vorticity_coefficient: 0.01,
         }
     }
 }
@@ -66,6 +84,14 @@ impl ExternalForces {
         };
 
         self.add(force)
+    }
+
+    pub fn vorticity(&mut self, config: &VorticityConfig) -> &mut ExternalForces {
+        self.add(vorticity::VorticityForce::new(
+            config.vorticity_coefficient,
+            config.inertia_inverse,
+            config.viscosity_omega,
+        ))
     }
 
     pub fn add(&mut self, force: Box<dyn ExternalForce + Sync + Send>) -> &mut ExternalForces {

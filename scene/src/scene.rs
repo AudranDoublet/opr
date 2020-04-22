@@ -5,7 +5,7 @@ use nalgebra::Vector3;
 use std::fs::File;
 use std::path::Path;
 
-use sph_common::{RigidObject, DFSPH, external_forces::ExternalForces, external_forces::ViscosityType};
+use sph_common::{RigidObject, DFSPH, external_forces::ExternalForces, external_forces::ViscosityType, external_forces::VorticityConfig};
 
 use serde_derive::*;
 use crate::{Solid, LiquidZone};
@@ -35,6 +35,8 @@ pub struct Configuration
     pub surface_adhesion: f32,
     #[serde(default)]
     pub viscosity: ViscosityType,
+    #[serde(default)]
+    pub vorticity: VorticityConfig,
 }
 
 #[derive(Debug)]
@@ -101,7 +103,8 @@ impl Scene
 
         forces.gravity(self.gravity())
               .surface_tension(self.config.kernel_radius, self.config.surface_tension, self.config.surface_adhesion)
-              .viscosity(&self.config.viscosity);
+              .viscosity(&self.config.viscosity)
+              .vorticity(&self.config.vorticity);
 
         let mut result = DFSPH::new(self.config.kernel_radius, self.config.particle_radius, solids, forces);
 
