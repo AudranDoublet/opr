@@ -961,6 +961,7 @@ dependencies = [
  "nalgebra",
  "rand 0.7.3",
  "rayon",
+ "raytracer",
  "render",
  "sph_common",
  "sph_scene",
@@ -1332,6 +1333,22 @@ dependencies = [
  "crossbeam-utils",
  "lazy_static",
  "num_cpus",
+]
+
+[[package]]
+name = "raytracer"
+version = "0.1.0"
+dependencies = [
+ "cfg-if",
+ "image 0.23.2",
+ "nalgebra",
+ "rand 0.4.6",
+ "rayon",
+ "search",
+ "serde",
+ "serde_derive",
+ "serde_yaml",
+ "tobj",
 ]
 
 [[package]]

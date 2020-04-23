@@ -1,7 +1,7 @@
-use crate::{AABB, Bucket};
+use crate::{AABB, Bucket, Ray, Intersection};
 use std::f32;
 
-use nalgebra::{Matrix3, Vector3};
+use nalgebra::{Matrix3, Vector3, Vector2};
 
 const EPSILON: f32 = 1e-5;
 
@@ -13,6 +13,12 @@ pub struct BVHParameters {
 
 pub trait BVHShape {
     fn aabb(&self) -> AABB;
+}
+
+pub trait IntersectsBVHShape {
+    fn intersects(&self, ray: &Ray) -> Option<Intersection>;
+
+    fn get_tex_coords(&self, u: f32, v: f32) -> Vector2<f32>;
 }
 
 #[derive(Debug)]
@@ -162,9 +168,6 @@ impl<T: BVHShape + Clone> BVHNode<T> {
     }
 
     fn intersect_one(&self, shape: &AABB, vec: &mut Vec<T>) {
-        if self.is_leaf() {
-
-        }
         match self {
             BVHNode::Leaf { shapes } => {
                 for v in shapes {
@@ -178,6 +181,40 @@ impl<T: BVHShape + Clone> BVHNode<T> {
 
                 if right_box.intersects(shape) {
                     right_node.intersect_one(shape, vec)
+                }
+            }
+        }
+    }
+}
+
+impl<T: BVHShape + IntersectsBVHShape + Clone> BVHNode<T> {
+    fn ray_intersects(&self, ray: &Ray, result: &mut (Intersection, Option<T>)) {
+        match self {
+            BVHNode::Leaf { shapes } => {
+                for s in shapes {
+                    if let Some(i) = s.intersects(ray) {
+                        if i.distance < result.0.distance {
+                            *result = (i, Some(s.clone()))
+                        }
+                    }
+                }
+            },
+            BVHNode::Node { left_box, right_box, left_node, right_node } => {
+                let a = ray.intersects_aabb(left_box).unwrap_or(std::f32::INFINITY);
+                let b = ray.intersects_aabb(right_box).unwrap_or(std::f32::INFINITY);
+
+                if a <= b && a < result.0.distance {
+                    left_node.ray_intersects(ray, result);
+
+                    if b < result.0.distance {
+                        right_node.ray_intersects(ray, result);
+                    }
+                } else if b <= a && b < result.0.distance {
+                    right_node.ray_intersects(ray, result);
+
+                    if a < result.0.distance {
+                        left_node.ray_intersects(ray, result);
+                    }
                 }
             }
         }
@@ -235,6 +272,22 @@ impl<T: BVHShape + Clone> BVH<T> {
         }
 
         result
+    }
+}
+
+impl<T: BVHShape + IntersectsBVHShape + Clone> BVH<T> {
+    pub fn ray_intersect(&self, ray: &Ray) -> Option<(Intersection, T)> {
+        let mut result = (Intersection::new_empty(), None);
+
+        if !ray.intersects_aabb(&self.aabb()).is_none() {
+            self.root.ray_intersects(ray, &mut result);
+        }
+
+        if let Some(s) = result.1 {
+            Some((result.0, s))
+        } else {
+            None
+        }
     }
 }
 

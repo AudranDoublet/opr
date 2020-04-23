@@ -8,6 +8,7 @@ edition = "2018"
 sph_common = { path = "common" }
 sph_scene = { path = "scene" }
 render = { path = "render" }
+raytracer = { path = "raytracer" }
 
 image = "0.23.2"
 

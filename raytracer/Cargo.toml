@@ -1,0 +1,19 @@
+[package]
+name = "raytracer"
+version = "0.1.0"
+authors = ["Audran Doublet <audran.doublet@epita.fr>"]
+edition = "2018"
+
+[dependencies]
+nalgebra = { version = "0.20.0", features = ["serde-serialize"] }
+
+image = "0.23.0"
+rand = ""
+tobj = ""
+rayon = ""
+serde = ""
+serde_yaml = ""
+serde_derive = ""
+cfg-if = ""
+
+search = { path = "../search" }

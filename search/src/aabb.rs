@@ -61,6 +61,13 @@ impl AABB {
         }
     }
 
+    pub fn get(&self, i: usize) -> &Vector3<f32> {
+        match i {
+            0 => &self.min,
+            _ => &self.max,
+        }
+    }
+
     pub fn is_inside(&self, p: Vector3<f32>) -> bool {
         self.min < p && p < self.max
     }
