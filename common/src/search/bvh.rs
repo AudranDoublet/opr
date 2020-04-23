@@ -161,6 +161,28 @@ impl<T: BVHShape + Clone> BVHNode<T> {
             }
         }
     }
+
+    fn intersect_one(&self, shape: &AABB, vec: &mut Vec<T>) {
+        if self.is_leaf() {
+
+        }
+        match self {
+            BVHNode::Leaf { shapes } => {
+                for v in shapes {
+                    vec.push(v.clone())
+                }
+            },
+            BVHNode::Node { left_box, right_box, left_node, right_node } => {
+                if left_box.intersects(shape) {
+                    left_node.intersect_one(shape, vec)
+                }
+
+                if right_box.intersects(shape) {
+                    right_node.intersect_one(shape, vec)
+                }
+            }
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -202,6 +224,16 @@ impl<T: BVHShape + Clone> BVH<T> {
         self.root.intersect_iter(&mut result, rotation, translation,
                                  &self.aabb,
                                  &other.aabb.transform(rotation, translation), &other.root);
+
+        result
+    }
+
+    pub fn intersect_one(&self, shape: &AABB) -> Vec<T> {
+        let mut result = Vec::new();
+
+        if self.aabb().intersects(shape) {
+            self.root.intersect_one(shape, &mut result)
+        }
 
         result
     }

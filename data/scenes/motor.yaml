@@ -32,11 +32,8 @@ solids:
               value: [0.0, 5.0, 0.0]
 liquids_blocks:
     - type: block
-      from: [-0.430, -0.450, -0.430]
-      to: [-0.130, 0.450, -0.130]
-    - type: block
-      from: [0.130, -0.450, 0.130]
-      to: [0.430, 0.450, 0.430]
+      from: [-0.500, -0.500, -0.500]
+      to: [0.500, -0.300, 0.500]
 liquids_add_blocks:
     - type: block
       from:  [-0.100, 0.200, -0.100]

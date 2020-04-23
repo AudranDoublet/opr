@@ -5,7 +5,9 @@ use std::sync::Mutex;
 use nalgebra::{Matrix3, Quaternion, UnitQuaternion, Vector3};
 use serde::{Deserialize, Serialize};
 
-use crate::{DiscreteGrid, mesh::MassProperties, search::BVH, search::Sphere, Animation, VariableType, AnimationHandler};
+use crate::{DiscreteGrid, mesh::MassProperties, Animation, VariableType, AnimationHandler};
+use crate::search::*;
+
 use crate::mesher::types::{VertexWorld};
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -359,6 +361,16 @@ impl RigidObject
             }).collect();
 
         v
+    }
+
+    pub fn is_particle_inside(&self, position: &Vector3<f32>, radius: f32) -> bool {
+        let position = &self.position_in_mesh_space(*position);
+        let sphere = Sphere::new(position, radius);
+
+        self.bvh.intersect_one(&sphere.aabb())
+            .iter()
+            .filter(|v| v.radius + radius > (v.position - position).norm())
+            .peekable().peek().is_some()
     }
 
     pub fn compute_volume_and_boundary_x(&self, position: &mut Vector3<f32>, velocity: &mut Vector3<f32>, particle_radius: f32, kernel_radius: f32, dt: f32) -> (f32, Vector3<f32>)

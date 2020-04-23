@@ -238,8 +238,16 @@ impl DFSPH
 
     pub fn add_particle(&mut self, x: f32, y: f32, z: f32)
     {
+        let position = Vector3::new(x, y, z);
+
+        for solid in &self.solids {
+            if solid.is_particle_inside(&position, self.particle_radius) {
+                return;
+            }
+        }
+
         self.density_prediction.write().unwrap().push(0.0);
-        self.positions.write().unwrap().push(Vector3::new(x, y, z));
+        self.positions.write().unwrap().push(position);
         self.velocities.write().unwrap().push(Vector3::zeros());
         self.accelerations.write().unwrap().push(Vector3::zeros());
         self.stiffness.write().unwrap().push(0.0);
