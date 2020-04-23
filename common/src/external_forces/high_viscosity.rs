@@ -3,7 +3,8 @@ use std::sync::RwLock;
 use nalgebra::{Vector3, Matrix3};
 use rayon::prelude::*;
 
-use crate::{DFSPH, external_forces::ExternalForce, ConjugateGradientSolver};
+use crate::{DFSPH, external_forces::ExternalForce};
+use crate::utils::ConjugateGradientSolver;
 
 pub struct ViscosityWeiler2018Force {
     solver: ConjugateGradientSolver,
