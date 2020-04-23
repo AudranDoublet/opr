@@ -1,12 +1,14 @@
-use serde_derive::*;
+use dashmap::DashMap;
+
 use derivative::*;
-
-use rayon::prelude::*;
 use nalgebra::Vector3;
+use rayon::prelude::*;
+use serde_derive::*;
 
-use chashmap::CHashMap;
+use crate::mesher::types::{VertexLocal, VertexWorld};
+use std::collections::HashMap;
 
-#[derive(Hash, Copy, Clone, PartialEq, Eq)]
+#[derive(Hash, Debug, Copy, Clone, PartialEq, Eq)]
 pub struct HashGridKey
 {
     x: isize,
@@ -17,10 +19,7 @@ pub struct HashGridKey
 impl HashGridKey
 {
     pub fn new(cell_size: f32, position: Vector3<f32>) -> HashGridKey {
-        let coord = |v| match v {
-            v if v > 0.0 => 0,
-            _ => -1,
-        } + (v / cell_size) as isize;
+        let coord = |v: f32| (v / cell_size).ceil() as isize;
 
         HashGridKey {
             x: coord(position.x),
@@ -38,15 +37,22 @@ impl HashGridKey
     }
 }
 
-#[derive(Serialize, Deserialize, Derivative, Clone)]
+#[derive(PartialEq, Debug, Eq, Clone, Copy)]
+enum LakeState {
+    EXTERNAL = -1,
+    JUNCTURE = 0,
+    INTERNAL = 1,
+}
+
+#[derive(Serialize, Deserialize, Derivative)]
 #[derivative(Debug)]
 pub struct HashGrid
 {
     cell_size: f32,
     cell_size_sq: f32,
     #[serde(skip_serializing, skip_deserializing)]
-    #[derivative(Debug="ignore")]
-    map: CHashMap<HashGridKey, Vec<usize>>,
+    #[derivative(Debug = "ignore")]
+    map: DashMap<HashGridKey, Vec<usize>>,
 }
 
 impl HashGrid
@@ -55,21 +61,14 @@ impl HashGrid
         HashGrid {
             cell_size: cell_size,
             cell_size_sq: cell_size.powi(2),
-            map: CHashMap::new(),
+            map: DashMap::new(),
         }
     }
 
     pub fn insert(&mut self, particles: &Vec<Vector3<f32>>) {
         particles.par_iter().enumerate().for_each(|(i, &p)| {
             let position = self.key(p);
-
-            if !self.map.contains_key(&position) {
-                self.map.insert_new(position, Vec::new());
-            }
-
-            if let Some(mut pos) = self.map.get_mut(&position) {
-                pos.push(i)
-            }
+            self.map.entry(position).or_insert(Vec::new()).push(i);
         });
     }
 
@@ -104,27 +103,91 @@ impl HashGrid
         }).collect()
     }
 
-    pub fn update_particles(&self, dt: f32, particles: &mut Vec<Vector3<f32>>, velocity: &Vec<Vector3<f32>>) {
-        particles.par_iter_mut().zip(velocity.par_iter()).enumerate().for_each(|(i, (p, v))| {
-            let old_key = self.key(*p);
-
-            *p += dt * v;
-
-            let new_key = self.key(*p);
-
-            if old_key != new_key {
-                if let Some(mut vec) = self.map.get_mut(&old_key) {
-                    vec.retain(|&x| x != i); // FIXME remove vector if empty ?
+    pub fn update_particles(&mut self, old_positions: &Vec<VertexWorld>, new_positions: &Vec<VertexWorld>) {
+        let cell_size= self.cell_size;
+        old_positions.par_iter().zip(new_positions.par_iter()).enumerate()
+            .filter(|(_, (old, new))| *old != *new)
+            .map(|(i, (&old, &new))| (i, (HashGridKey::new(cell_size, old), HashGridKey::new(cell_size, new))))
+            .for_each(|(i, (old, new))| {
+                if let Some(mut vec) = self.map.get_mut(&old) {
+                    vec.retain(|&x| x != i); // FIXME: delete empty vector
                 }
 
-                if !self.map.contains_key(&new_key) {
-                    self.map.insert_new(new_key, Vec::new());
-                }
+                self.map.entry(new).or_insert(vec![]).push(i);
+            })
+    }
 
-                if let Some(mut vec) = self.map.get_mut(&new_key) {
-                    vec.push(i);
+    fn _get_borders_rec(&self, cell: &HashGridKey, grid: &mut HashMap<HashGridKey, LakeState>) -> LakeState {
+        grid.insert(*cell, LakeState::INTERNAL);
+
+        let mut count_non_void_neighbours: u8 = 0;
+
+        for dz in -1..=1 {
+            for dy in -1..=1 {
+                for dx in -1..=1 {
+                    if dx == 0 && dy == 0 && dz == 0 {
+                        continue;
+                    }
+
+                    let neighbour = cell.relative(dx, dy, dz);
+
+                    let neighbour_state = match grid.get(&neighbour) {
+                        Some(&state) => state,
+                        None => {
+                            match self.map.get(&neighbour) {
+                                Some(particles) =>
+                                    if particles.is_empty() { LakeState::EXTERNAL } else { self._get_borders_rec(&neighbour, grid) }
+                                None =>
+                                    LakeState::EXTERNAL
+                            }
+                        }
+                    };
+
+                    if neighbour_state == LakeState::EXTERNAL {
+                        grid.entry(neighbour).or_insert(LakeState::EXTERNAL);
+                    }
+
+                    count_non_void_neighbours += (neighbour_state != LakeState::EXTERNAL) as u8;
                 }
             }
-        });
+        }
+
+        if count_non_void_neighbours == 26 {
+            LakeState::INTERNAL
+        } else {
+            grid.insert(*cell, LakeState::JUNCTURE);
+            LakeState::JUNCTURE
+        }
+    }
+
+    pub fn cell_to_world(&self, v: &HashGridKey) -> VertexWorld {
+        (VertexWorld::new(v.x as f32, v.y as f32, v.z as f32)) * self.cell_size
+    }
+
+    pub fn coord_to_world(&self, v: &VertexLocal) -> VertexWorld {
+        (VertexWorld::new(v.x as f32, v.y as f32, v.z as f32)) * self.cell_size
+    }
+
+    pub fn get_borders(&self) -> (Vec<VertexWorld>, f32) {
+        let mut result = vec![];
+
+        let mut grid: HashMap<HashGridKey, LakeState> = HashMap::new();
+
+        self.map.iter()
+            .filter(|v| !v.is_empty())
+            .for_each(|v| {
+                let k = v.key();
+                if !grid.contains_key(k) {
+                    self._get_borders_rec(k, &mut grid);
+                }
+            });
+
+        result.par_extend(
+            grid.into_par_iter()
+                .filter(|(_, s)| *s != LakeState::INTERNAL)
+                .map(|(k, _)| self.cell_to_world(&k))
+        );
+
+        (result, self.cell_size)
     }
 }

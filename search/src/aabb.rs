@@ -10,16 +10,13 @@ pub struct AABB {
 impl AABB {
     pub fn new(min: Vector3<f32>, max: Vector3<f32>) -> AABB {
         AABB {
-            min: min,
-            max: max,
+            min,
+            max,
         }
     }
 
     pub fn empty() -> AABB {
-        AABB {
-            min: Vector3::new(f32::INFINITY, f32::INFINITY, f32::INFINITY),
-            max: Vector3::new(f32::NEG_INFINITY, f32::NEG_INFINITY, f32::NEG_INFINITY),
-        }
+        AABB::new(Vector3::new(f32::INFINITY, f32::INFINITY, f32::INFINITY), Vector3::new(f32::NEG_INFINITY, f32::NEG_INFINITY, f32::NEG_INFINITY))
     }
 
     pub fn new_from_pointset(points: &[Vector3<f32>]) -> AABB {
@@ -33,10 +30,7 @@ impl AABB {
             }
         }
 
-        AABB {
-            min: min,
-            max: max,
-        }
+        AABB::new(min, max)
     }
 
     pub fn new_from_pointset_mm(mins: &[Vector3<f32>], maxs: &[Vector3<f32>]) -> AABB {
@@ -55,10 +49,7 @@ impl AABB {
             }
         }
 
-        AABB {
-            min: min,
-            max: max,
-        }
+        AABB::new(min, max)
     }
 
     pub fn get(&self, i: usize) -> &Vector3<f32> {
@@ -68,10 +59,12 @@ impl AABB {
         }
     }
 
+    #[allow(dead_code)]
     pub fn is_inside(&self, p: Vector3<f32>) -> bool {
         self.min < p && p < self.max
     }
 
+    #[allow(dead_code)]
     pub fn intersects(&self, other: &AABB) -> bool {
         self.min <= other.max && self.max >= other.min
     }
@@ -111,10 +104,12 @@ impl AABB {
         result
     }
 
+    #[allow(dead_code)]
     pub fn coord(&self, i: f32, j: f32, k: f32) -> Vector3<f32> {
         self.min + (self.max - self.min).component_mul(&Vector3::new(i, j, k))
     }
 
+    #[allow(dead_code)]
     pub fn transform(&self, rotation: &Matrix3<f32>, translation: &Vector3<f32>) -> AABB {
         let origin = rotation*self.min + translation;
 

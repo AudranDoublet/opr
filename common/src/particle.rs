@@ -86,7 +86,7 @@ pub struct DFSPHFluidSnapshot
     particles: Vec<Vector3<f32>>,
     densities: Vec<f32>,
     neighbours_struct: HashGrid,
-    neighbours: Vec<Vec<usize>>,
+    anisotropic_neighbours: Vec<Vec<usize>>,
     kernel: CubicSpine,
     mass: f32,
 }
@@ -104,11 +104,11 @@ impl FluidSnapshot for DFSPHFluidSnapshot {
         self.particles[i]
     }
 
-    fn neighbours(&self, i: usize) -> &Vec<usize> {
-        &self.neighbours[i]
+    fn neighbours_anisotropic_kernel(&self, i: usize) -> &Vec<usize> {
+        self.anisotropic_neighbours[i].as_ref()
     }
 
-    fn find_neighbours(&self, x: &VertexWorld) -> Vec<usize> {
+    fn neighbours_kernel(&self, x: &VertexWorld) -> Vec<usize> {
         self.neighbours_struct.find_neighbours(self.len(), &self.particles, *x)
     }
 
@@ -123,6 +123,10 @@ impl FluidSnapshot for DFSPHFluidSnapshot {
     fn get_kernel(&self) -> &dyn Kernel {
         &self.kernel
     }
+
+    fn get_grid(&self) -> &HashGrid {
+        &self.neighbours_struct
+    }
 }
 
 impl FluidSnapshotProvider for DFSPH {
@@ -130,18 +134,23 @@ impl FluidSnapshotProvider for DFSPH {
         self.kernel.radius()
     }
 
-    fn snapshot(&self, radius: f32) -> Box<dyn FluidSnapshot> {
+    fn snapshot(&self, kernel_radius: f32, anisotropic_radius: Option<f32>) -> Box<dyn FluidSnapshot> {
         let particles = self.positions.read().unwrap().clone();
         let densities = self.density.read().unwrap().clone();
-        let mut neighbours_struct = HashGrid::new(radius);
+        let mut neighbours_struct = HashGrid::new(kernel_radius);
         neighbours_struct.insert(&particles);
-        let neighbours = neighbours_struct.find_all_neighbours(&particles);
+
+        let anisotropic_neighbours = if let Some(an_radius) = anisotropic_radius {
+            let mut an_grid = HashGrid::new(an_radius);
+            an_grid.insert(&particles); // that is sad :(
+            an_grid.find_all_neighbours(&particles)
+        } else { vec![] };
 
         Box::new(DFSPHFluidSnapshot {
             particles,
             densities,
             neighbours_struct,
-            neighbours,
+            anisotropic_neighbours,
             kernel: CubicSpine::new(self.kernel.radius()),
             mass: self.mass(0),
         })
@@ -578,7 +587,9 @@ impl DFSPH
         }
 
         self.correct_density_error();
-        self.neighbours_struct.update_particles(self.time_step, &mut self.positions.write().unwrap(), &self.velocities.read().unwrap());
+        let old = self.positions.read().unwrap().clone();
+        self.positions.write().unwrap().par_iter_mut().zip(self.velocities.read().unwrap().par_iter()).for_each(|(p, v)| *p += dt * v);
+        self.neighbours_struct.update_particles(&old, &self.positions.read().unwrap());
 
         let gravity = Vector3::new(0.0, -9.81, 0.0);
         self.solids.iter_mut().for_each(|v| v.update(gravity, dt));

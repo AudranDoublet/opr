@@ -51,7 +51,7 @@ pub fn pipeline_polygonize(scene: &Scene, input_directory: &Path, dump_directory
         let path        = dump_directory.join(format!("{:08}.obj", idx));
         let buffer      = &mut fs::File::create(path).unwrap();
 
-        mesher.clone().to_obj(&simulation, buffer);
+        mesher.clone().convert_into_obj(&simulation, buffer);
 
         pb.inc(1);
     });
