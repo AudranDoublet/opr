@@ -586,6 +586,8 @@ impl DFSPH
             self.velocities.write().unwrap().par_iter_mut().enumerate().for_each(|(i, v)| *v += accelerations[i] * dt);
         }
 
+        let velocities_copy = self.velocities.read().unwrap().clone();
+
         self.correct_density_error();
         let old = self.positions.read().unwrap().clone();
         self.positions.write().unwrap().par_iter_mut().zip(self.velocities.read().unwrap().par_iter()).for_each(|(p, v)| *p += dt * v);
@@ -605,6 +607,12 @@ impl DFSPH
         for i in 0..self.solids.len() {
             self.solids[i].update_vel(dt);
         }
+
+        // add pressure to accelerations for next simulation steps (foam & bubble generation)
+        let velocities = self.velocities.read().unwrap();
+        self.accelerations.write().unwrap().par_iter_mut()
+            .enumerate()
+            .for_each(|(i, a)| *a += (velocities[i] - velocities_copy[i]) / self.time_step);
 
         self.debug_solid_collisions = collisions;
         self.time_step
