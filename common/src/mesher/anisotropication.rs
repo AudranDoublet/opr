@@ -79,7 +79,7 @@ impl Anisotropicator {
             let mut sum_w_ij = 1.;
             let mut weighted_mean = *x_i;
 
-            for j in snapshot.neighbours(i) {
+            for j in snapshot.neighbours_anisotropic_kernel(i) {
                 let x_j = &snapshot.position(*j);
                 let w_ij = self.w((x_i - x_j).norm());
 
@@ -100,7 +100,7 @@ impl Anisotropicator {
 
         let mut sum_w_ij = 1.;
 
-        for j in snapshot.neighbours(i).iter() {
+        for j in snapshot.neighbours_anisotropic_kernel(i).iter() {
             let x_j = &snapshot.position(*j);
             let variance = x_j - x_w_i;
             let w_ij = self.w(variance.norm());
@@ -136,7 +136,7 @@ impl Anisotropicator {
     }
 
     pub fn compute_anisotropy(&self, snapshot: &Box<dyn FluidSnapshot>, i: usize) -> Matrix3<f32> {
-        self.kernel_radius_inv * if snapshot.neighbours(i).len() < self.cst_min_nb_neighbours {
+        self.kernel_radius_inv * if snapshot.neighbours_anisotropic_kernel(i).len() < self.cst_min_nb_neighbours {
             Matrix3::identity() * (1. / self.cst_kn)
         } else {
             let c = self.compute_covariance_matrix(snapshot, i);

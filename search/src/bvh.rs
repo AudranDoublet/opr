@@ -111,12 +111,14 @@ impl<T: BVHShape + Clone> BVHNode<T> {
         }
     }
 
+    #[allow(dead_code)]
     pub fn is_leaf(&self) -> bool {
         match self {
             BVHNode::Leaf {..} => true,
             _ => false,
         }
     }
+
 
     fn dump_nodes(&self, f: &mut Vec<(T, T)>, other: &BVHNode<T>) {
         match (self, other) {
@@ -131,6 +133,7 @@ impl<T: BVHShape + Clone> BVHNode<T> {
         }
     }
 
+    #[allow(dead_code)]
     fn intersect_iter(&self,
             vec: &mut Vec<(T, T)>,
             rotation: &Matrix3<f32>,
