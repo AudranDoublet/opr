@@ -12,14 +12,16 @@ use crate::mesher::types::*;
 #[derive(Clone)]
 pub struct Mesher {
     iso_value: f32,
+    cube_size: f32,
     interpolation_algorithm: InterpolationAlgorithms,
     anisotropicator: Option<Anisotropicator>,
 }
 
 impl Mesher {
-    pub fn new(iso_value: f32, interpolation_algorithm: InterpolationAlgorithms, anisotropicator: Option<Anisotropicator>) -> Mesher {
+    pub fn new(iso_value: f32, cube_size: f32, interpolation_algorithm: InterpolationAlgorithms, anisotropicator: Option<Anisotropicator>) -> Mesher {
         Mesher {
             iso_value,
+            cube_size,
             interpolation_algorithm,
             anisotropicator,
         }
@@ -54,31 +56,41 @@ impl Mesher {
         density
     }
 
+    fn to_local(&self, point: &VertexWorld) -> VertexLocal {
+        VertexLocal::new(
+            (point.x / self.cube_size).ceil() as i32,
+            (point.y / self.cube_size).ceil() as i32,
+            (point.z / self.cube_size).ceil() as i32,
+        )
+    }
+
+    fn to_world(&self, point: &VertexLocal) -> VertexWorld {
+        nalgebra::convert::<VertexLocal, VertexWorld>(point.clone()) * self.cube_size
+    }
+
     fn get_cube_density(&self, snapshot: &Box<dyn FluidSnapshot>, cache_densities: &mut HashMap<VertexLocal, f32>, x_local: &VertexLocal, x_world: &VertexWorld) -> f32 {
         *cache_densities.entry(*x_local)
             .or_insert_with(|| self.compute_density_at(snapshot, x_world))
     }
 
-    fn generate_cube_vertices(&mut self, snapshot: &Box<dyn FluidSnapshot>, origin: &VertexLocal,
-                              cache_densities: &mut HashMap<VertexLocal, f32>) -> CubeVertices {
+    fn generate_cube_vertices(&mut self, snapshot: &Box<dyn FluidSnapshot>, cache_densities: &mut HashMap<VertexLocal, f32>,
+                              local: &VertexLocal) -> CubeVertices {
         let vertices_local = [
-            origin + VertexLocal::new(-1, 0, 0),   // 0
-            origin + VertexLocal::new(0, 0, 0),    // 1
-            origin + VertexLocal::new(0, 0, -1),   // 2
-            origin + VertexLocal::new(-1, 0, -1),  // 3
-            origin + VertexLocal::new(-1, -1, 0),  // 4
-            origin + VertexLocal::new(0, -1, 0),   // 5
-            origin + VertexLocal::new(0, -1, -1),  // 6
-            origin + VertexLocal::new(-1, -1, -1), // 7
+            local + VertexLocal::new(-1, 0, 0),   // 0
+            local + VertexLocal::new(0, 0, 0),    // 1
+            local + VertexLocal::new(0, 0, -1),   // 2
+            local + VertexLocal::new(-1, 0, -1),  // 3
+            local + VertexLocal::new(-1, -1, 0),  // 4
+            local + VertexLocal::new(0, -1, 0),   // 5
+            local + VertexLocal::new(0, -1, -1),  // 6
+            local + VertexLocal::new(-1, -1, -1), // 7
         ];
 
         let mut vertices_world: [VertexWorld; 8] = [Vector3::zeros(); 8];
         let mut densities: [f32; 8] = [0.; 8];
 
-        let grid = snapshot.get_grid();
-
         for i in 0..8 {
-            vertices_world[i] = grid.coord_to_world(&vertices_local[i]);
+            vertices_world[i] = self.to_world(&vertices_local[i]);
             densities[i] = self.get_cube_density(snapshot, cache_densities, &vertices_local[i], &vertices_world[i])
         }
 
@@ -99,7 +111,7 @@ impl Mesher {
     }
 
     fn compute_mesh(&mut self, snapshot: &Box<dyn FluidSnapshot>) -> Mesh {
-        let borders = snapshot.get_grid().get_borders();
+        let (borders, cell_discretization) = snapshot.get_grid().get_borders();
 
         let iso_value = self.iso_value;
         let interpolation_algorithm = self.interpolation_algorithm;
@@ -111,23 +123,35 @@ impl Mesher {
 
         let mut cache_vertices: HashMap<VertexLocal, f32> = HashMap::new();
 
+
         borders.iter()
             .for_each(|cube_origin| {
-                let cube_vertices = self.generate_cube_vertices(snapshot, &cube_origin, &mut cache_vertices);
-                let config_id = self.search_configuration(&cube_vertices);
+                let (min, max) = (self.to_local(&cube_origin.add_scalar(-cell_discretization)), self.to_local(cube_origin));
 
-                for triangle in &constants::MC_CONFIGS_TRIANGLES[config_id] {
-                    if triangle[0] == -1 {
-                        break;
+                let steps: Vector3<i32> = max - min;
+
+                for dz in 0..=steps.z {
+                    for dy in 0..=steps.y {
+                        for dx in 0..=steps.x {
+                            let local_pos = &min + Vector3::new(dx, dy, dz);
+                            let cube_vertices = self.generate_cube_vertices(snapshot, &mut cache_vertices, &local_pos);
+                            let config_id = self.search_configuration(&cube_vertices);
+
+                            for triangle in &constants::MC_CONFIGS_TRIANGLES[config_id] {
+                                if triangle[0] == -1 {
+                                    break;
+                                }
+
+                                mesh.add_triangle(
+                                    &cube_vertices,
+                                    &MC_CONFIGS_EDGES[triangle[0] as usize],
+                                    &MC_CONFIGS_EDGES[triangle[1] as usize],
+                                    &MC_CONFIGS_EDGES[triangle[2] as usize],
+                                    &interpolator,
+                                );
+                            }
+                        }
                     }
-
-                    mesh.add_triangle(
-                        &cube_vertices,
-                        &MC_CONFIGS_EDGES[triangle[0] as usize],
-                        &MC_CONFIGS_EDGES[triangle[1] as usize],
-                        &MC_CONFIGS_EDGES[triangle[2] as usize],
-                        &interpolator,
-                    );
                 }
             });
 

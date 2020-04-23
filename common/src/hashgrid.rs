@@ -160,11 +160,15 @@ impl HashGrid
         }
     }
 
+    pub fn cell_to_world(&self, v: &HashGridKey) -> VertexWorld {
+        (VertexWorld::new(v.x as f32, v.y as f32, v.z as f32)) * self.cell_size
+    }
+
     pub fn coord_to_world(&self, v: &VertexLocal) -> VertexWorld {
         (VertexWorld::new(v.x as f32, v.y as f32, v.z as f32)) * self.cell_size
     }
 
-    pub fn get_borders(&self) -> Vec<VertexLocal> {
+    pub fn get_borders(&self) -> (Vec<VertexWorld>, f32) {
         let mut result = vec![];
 
         let mut grid: HashMap<HashGridKey, LakeState> = HashMap::new();
@@ -180,10 +184,10 @@ impl HashGrid
 
         result.par_extend(
             grid.into_par_iter()
-                // .filter(|(_, s)| *s != LakeState::INTERNAL)
-                .map(|(k, _)| VertexLocal::new(k.x as i32, k.y as i32, k.z as i32))
+                .filter(|(_, s)| *s != LakeState::INTERNAL)
+                .map(|(k, _)| self.cell_to_world(&k))
         );
 
-        result
+        (result, self.cell_size)
     }
 }

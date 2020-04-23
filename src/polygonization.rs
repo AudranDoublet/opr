@@ -7,15 +7,14 @@ use clap::ArgMatches;
 use indicatif::{ProgressBar, ProgressStyle};
 use kiss3d::camera::camera::Camera;
 use nalgebra::Point3;
+use rayon::prelude::*;
 use sph_common::DFSPH;
+use sph_common::mesher::anisotropication::Anisotropicator;
 use sph_common::mesher::interpolation::InterpolationAlgorithms;
 use sph_common::mesher::Mesher;
-
-use rayon::prelude::*;
+use sph_common::mesher::types::FluidSnapshotProvider;
 
 use crate::simulation::add_particles;
-use sph_common::mesher::anisotropication::Anisotropicator;
-use sph_common::mesher::types::FluidSnapshotProvider;
 
 fn get_simulation_dumps_paths(folder: &Path) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
     let mut files: Vec<PathBuf> = fs::read_dir(folder)?
@@ -139,6 +138,8 @@ pub fn main_polygonization(args: &ArgMatches) -> Result<(), Box<dyn std::error::
     let disable_interpolation = args.is_present("disable_interpolation");
     let disable_anisotropication = args.is_present("disable_anisotropication");
     let render = args.is_present("render");
+    let cst_meshing_iso_value = args.value_of("iso_value").unwrap_or("0.05").parse::<f32>().unwrap();
+    let cst_meshing_cube_size = args.value_of("cube_size").unwrap_or("0.04").parse::<f32>().unwrap();
 
     let interpolation_algorithm = match disable_interpolation {
         true => InterpolationAlgorithms::None,
@@ -147,13 +148,13 @@ pub fn main_polygonization(args: &ArgMatches) -> Result<(), Box<dyn std::error::
 
     let anisotropicator = if !disable_anisotropication {
         Some(
+            // FIXME: the hyper-parameters should be asked in CLI (in yaml conf maybe?) instead of being hardcoded
             Anisotropicator::new(0.9, 5, 8., 1400., 0.5)
+            // FIXME-END
         )
     } else { None };
 
-    // FIXME: the ISO-VALUE and CUBE-SIZE should be asked in CLI instead of being hardcoded
-    let mesher = Mesher::new(0.05, interpolation_algorithm, anisotropicator);
-    // FIXME-END
+    let mesher = Mesher::new(cst_meshing_iso_value, cst_meshing_cube_size, interpolation_algorithm, anisotropicator);
 
     fs::create_dir_all(output_directory)?;
 
