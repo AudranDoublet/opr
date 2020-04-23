@@ -44,8 +44,7 @@ impl Scene {
         }
     }
 
-    pub fn from_file(path: &Path, default_material: &Path) -> Result<Scene, Box<dyn Error>> {
-        let file : scene_config::SceneConfig = serde_yaml::from_reader(File::open(path)?)?;
+    pub fn from_config(file: scene_config::SceneConfig, default_material: &Path) -> Result<Scene, Box<dyn Error>> {
         let mut scene = Scene::new();
 
         scene.load_mtl(default_material)?[0];
@@ -60,9 +59,14 @@ impl Scene {
         }
 
         scene.camera = file.camera;
-        //scene.build(file.params.build_max_depth);
 
         Ok(scene)
+    }
+
+    pub fn from_file(path: &Path, default_material: &Path) -> Result<Scene, Box<dyn Error>> {
+        let file : scene_config::SceneConfig = serde_yaml::from_reader(File::open(path)?)?;
+
+        Scene::from_config(file, default_material)
     }
 
     pub fn load_mtl(&mut self, path: &Path) -> Result<Vec<usize>, Box<dyn Error>> {
@@ -237,7 +241,6 @@ impl Scene {
                         )
                     );
                 }
-
 
                 Some(triangle_color)
             } else {

@@ -1,9 +1,10 @@
+extern crate pipeline;
+
 use std::fs;
 use std::path::Path;
 use std::time::Instant;
 
 use clap::ArgMatches;
-use indicatif::{ProgressBar, ProgressStyle};
 use kiss3d::{camera::camera::Camera, scene::SceneNode};
 use nalgebra::{Point3, Translation3};
 use sph_common::DFSPH;
@@ -64,7 +65,7 @@ fn dump_simulation(simulation: &DFSPH, dump_folder: &Path, idx: usize, verbose: 
     Ok(())
 }
 
-fn simulate(scene: Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Result<(), Box<dyn std::error::Error>> {
+fn simulate(scene: &Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Result<(), Box<dyn std::error::Error>> {
     let mut fluid_simulation = scene.load()?;
     let mut total_time = 0.0;
     let mut time_simulated_since_last_frame = fps;
@@ -243,43 +244,6 @@ fn simulate(scene: Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Resul
     Ok(())
 }
 
-fn simulate_cli(scene: Scene, max_time: f32, dump_folder: &Path, fps: f32) -> Result<(), Box<dyn std::error::Error>> {
-    let mut fluid_simulation = scene.load()?;
-    let mut total_time = 0.0;
-    let mut time_simulated_since_last_frame = fps;
-
-    total_time += fluid_simulation.get_time_step();
-
-    let mut idx = 0;
-
-    let pb = ProgressBar::new(100);
-
-    pb.set_style(ProgressStyle::default_bar()
-        .template("[{elapsed}] [{per_sec}] [{eta}] {bar:40.cyan/blue} {pos:>7}/{len:7}"));
-
-    let perc = |x| ((x / max_time) * 100.) as u64;
-
-    while total_time < max_time {
-        if time_simulated_since_last_frame >= fps {
-            dump_simulation(&fluid_simulation, dump_folder, idx, false)?;
-            time_simulated_since_last_frame = 0.;
-            idx += 1;
-        }
-
-        time_simulated_since_last_frame += fluid_simulation.tick();
-
-        let old = perc(total_time);
-        total_time += fluid_simulation.get_time_step();
-
-        let percent = perc(total_time);
-        pb.inc(percent - old);
-    }
-
-    pb.finish_with_message("polygonization done");
-
-    Ok(())
-}
-
 pub fn main_simulation(args: &ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
     let scene_file = args.value_of("scene").unwrap();
     let mut scene_c = sph_scene::load_scene(scene_file)?;
@@ -307,16 +271,12 @@ pub fn main_simulation(args: &ArgMatches) -> Result<(), Box<dyn std::error::Erro
 
     fs::create_dir_all(dump_folder)?;
 
-    let fps = 1. / args.value_of("fps").unwrap_or("-1.").parse::<f32>()?;
-
-    let mut max_time = 4.0;
-    if let Some(mt) = args.value_of("max_time") {
-        max_time = mt.parse()?;
-    }
+    scene_c.simulation_config.fps = args.value_of("fps").unwrap_or("-1.").parse::<f32>()?;
+    scene_c.simulation_config.max_time = args.value_of("max_time").unwrap_or("4.0").parse::<f32>()?;
 
     if args.is_present("no_gui") {
-        simulate_cli(scene_c, max_time, dump_folder, fps)
+        pipeline::simulate::pipeline_simulate(&scene_c, dump_folder)
     } else {
-        simulate(scene_c, dump_all, dump_folder, fps)
+        simulate(&scene_c, dump_all, dump_folder, 1. / scene_c.simulation_config.fps)
     }
 }

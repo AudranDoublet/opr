@@ -39,6 +39,42 @@ pub struct Configuration
     pub vorticity: VorticityConfig,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct SimulationConfig
+{
+    pub max_time: f32,
+    pub fps: f32,
+}
+
+impl Default for SimulationConfig {
+    fn default() -> SimulationConfig {
+        SimulationConfig {
+            max_time: 4.,
+            fps: 24.,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct MeshingConfig
+{
+    pub iso_value: f32,
+    pub cube_size: f32,
+    pub enable_interpolation: bool,
+    pub enable_anisotropication: bool,
+}
+
+impl Default for MeshingConfig {
+    fn default() -> MeshingConfig {
+        MeshingConfig {
+            iso_value: 0.05,
+            cube_size: 0.04,
+            enable_interpolation: true,
+            enable_anisotropication: true,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct CommandLineConfiguration
 {
@@ -62,6 +98,10 @@ pub struct Scene
 {
     #[serde(skip_deserializing)]
     pub global_config: CommandLineConfiguration,
+    #[serde(default)]
+    pub simulation_config: SimulationConfig,
+    #[serde(default)]
+    pub meshing_config: MeshingConfig,
     pub config: Configuration,
     pub solids: Vec<Solid>,
     pub liquids_blocks: Vec<LiquidZone>,

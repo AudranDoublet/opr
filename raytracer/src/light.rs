@@ -3,7 +3,7 @@ use search::Ray;
 use crate::vector3_from_const;
 use serde_derive::*;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[serde(tag = "type")]
 pub enum Light {
     #[serde(rename = "ambient")]

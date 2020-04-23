@@ -44,18 +44,33 @@ subcommands:
                 -   no_gui:
                         long: no-gui
                         help: use CLI interface for simulation
+    -   pipeline:
+            about: run OPR pipeline
+            args:
+                -   scene:
+                        help: Sets the scene file
+                        required: true
+                        index: 1
+                -   output_directory:
+                        help: Sets the output directory
+                        required: true
+                        index: 2
+                -   from:
+                        long: from
+                        help: step to begin with
+                        takes_value: true
     -   polygonize:
             about: polygonize a fluid simulation into 3d objs
             args:
-                -   render:
-                        short: r
-                        long: render
-                        help: if present, the fluid simulation is rendered during the polygonization
+                -   scene:
+                        help: Sets the scene file
+                        required: true
+                        index: 1
                 -   dump_directory:
                         help: folder that contains the dumps of a simulation
                         value_name: FILE
                         required: true
-                        index: 1
+                        index: 2
                 -   output_directory:
                         short: o
                         help: folder where the generated mesh should be saved

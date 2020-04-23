@@ -959,6 +959,7 @@ dependencies = [
  "indicatif",
  "kiss3d",
  "nalgebra",
+ "pipeline",
  "rand 0.7.3",
  "rayon",
  "raytracer",
@@ -1062,6 +1063,18 @@ checksum = "29c127eea4a29ec6c85d153c59dc1213f33ec74cead30fe4730aecc88cc1fd92"
 dependencies = [
  "fixedbitset",
  "indexmap",
+]
+
+[[package]]
+name = "pipeline"
+version = "0.1.0"
+dependencies = [
+ "indicatif",
+ "nalgebra",
+ "rayon",
+ "raytracer",
+ "sph_common",
+ "sph_scene",
 ]
 
 [[package]]

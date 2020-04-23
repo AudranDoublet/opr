@@ -14,6 +14,7 @@ mod polygonization;
 mod simulation;
 mod viewer;
 mod raytrace;
+mod pipeline;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let conf = load_yaml!("cli.yml");
@@ -27,6 +28,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         main_viewer(args)?;
     } else if let Some(args) = matches.subcommand_matches("render") {
         main_render(args)?;
+    } else if let Some(args) = matches.subcommand_matches("pipeline") {
+        pipeline::main_pipeline(args)?;
     } else {
         println!("Please refer to the usage:\n{}", matches.usage())
     }

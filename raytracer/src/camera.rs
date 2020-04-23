@@ -4,7 +4,7 @@ use nalgebra::Vector3;
 use search::Ray;
 use crate::vector3_from_const;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Camera
 {
     origin: Vector3<f32>,
