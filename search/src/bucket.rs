@@ -1,4 +1,4 @@
-use crate::search::AABB;
+use crate::AABB;
 
 #[derive(Clone, Copy)]
 pub struct Bucket {

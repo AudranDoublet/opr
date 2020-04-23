@@ -24,3 +24,5 @@ derivative = "2.0.2"
 
 # helpers
 tobj = "0.1.12"
+
+search = { path = "../search" }

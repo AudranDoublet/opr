@@ -1,7 +1,6 @@
-use crate::search::{AABB, Bucket};
+use crate::{AABB, Bucket};
 use std::f32;
 
-use crate::mesh::Triangle;
 use nalgebra::{Matrix3, Vector3};
 
 const EPSILON: f32 = 1e-5;
@@ -242,13 +241,6 @@ impl<T: BVHShape + Clone> BVH<T> {
 impl<T: BVHShape + Clone> Default for BVH<T> {
     fn default() -> BVH<T> {
         BVH::build(&Vec::new())
-    }
-}
-
-/** Implement BVH types for Vector3 */
-impl BVHShape for Triangle {
-    fn aabb(&self) -> AABB {
-        AABB::new_from_pointset(&[self.v1, self.v2, self.v3])
     }
 }
 

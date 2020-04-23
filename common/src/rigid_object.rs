@@ -6,7 +6,7 @@ use nalgebra::{Matrix3, Quaternion, UnitQuaternion, Vector3};
 use serde::{Deserialize, Serialize};
 
 use crate::{DiscreteGrid, mesh::MassProperties, Animation, VariableType, AnimationHandler};
-use crate::search::*;
+use search::*;
 
 use crate::mesher::types::{VertexWorld};
 

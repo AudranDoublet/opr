@@ -5,8 +5,6 @@ use crate::mesh::{Triangle, BoundingSphereHierarchy, tobj};
 use crate::{utils, kernels, kernels::Kernel, DiscreteGrid};
 use nalgebra::{Vector3, Matrix3};
 
-use crate::search::BVH;
-
 pub struct Mesh
 {
     bsh: BoundingSphereHierarchy,
@@ -172,19 +170,6 @@ impl Mesh
         });
 
         grid.add_function(func);
-    }
-
-    pub fn compute_bvh(&self) -> BVH<Triangle> {
-        BVH::build(&self.triangles.iter().map(|t| {
-            Triangle::new(
-                t.v1 - self.translate,
-                t.v2 - self.translate,
-                t.v3 - self.translate,
-                t.v1_normal,
-                t.v2_normal,
-                t.v3_normal,
-            )
-        }).collect())
     }
 
     /**

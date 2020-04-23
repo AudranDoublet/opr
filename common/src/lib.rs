@@ -11,7 +11,6 @@ pub mod kernels;
 pub mod utils;
 pub mod mesh;
 pub mod mesher;
-pub mod search;
 pub mod external_forces;
 
 pub use particle::*;
