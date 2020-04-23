@@ -84,9 +84,9 @@ subcommands:
                         help: disable the anisotropication of the kernel used to approximate densities over fluid space (fluid will appear blobby, don't do that :p)
                 -   cube_size:
                         long: cube-size
-                        help: the cube size used during the marshing cube, should be inferior to the support radius `h` used during the fluid simulation.\
-                            Smaller is the value, better is the quality, slower is the meshing (a good trade-off is ~`h/2`).\
-                            Warning:: A too small value may result in hideous result too. (default=0.04)
+                        help: "the cube size used during the marshing cube, should be inferior to the support radius `h` used during the fluid simulation.
+                            Smaller is the value, better is the quality, slower is the meshing (a good trade-off is ~`h/2`).
+                            Warning:: A too small value may result in hideous result too. (default=0.04)"
                 -   iso_value:
                         long: iso-value
                         help: iso-value (or threshold) used by the marching cube to determine if a vertex of the marching cube is in/out of fluid (default=0.05)
