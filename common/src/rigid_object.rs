@@ -5,7 +5,7 @@ use std::sync::Mutex;
 use nalgebra::{Matrix3, Quaternion, UnitQuaternion, Vector3};
 use serde::{Deserialize, Serialize};
 
-use crate::{DiscreteGrid, mesh::MassProperties, search::BVH, search::Sphere};
+use crate::{DiscreteGrid, mesh::MassProperties, search::BVH, search::Sphere, Animation, VariableType, AnimationHandler};
 use crate::mesher::types::{VertexWorld};
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -18,6 +18,9 @@ pub struct RigidObject
     pub velocity: Vector3<f32>,
     angular_velocity: Vector3<f32>,
     rotation: Quaternion<f32>,
+
+    acceleration: Vector3<f32>,
+    angular_acceleration: Vector3<f32>,
 
     /** Geometric mesh-constants */
     body_inertia_tensor: Matrix3<f32>,
@@ -37,6 +40,8 @@ pub struct RigidObject
     forces: Vec<Mutex<Vector3<f32>>>,
     #[serde(skip_serializing, skip_deserializing)]
     torques: Vec<Mutex<Vector3<f32>>>,
+    #[serde(skip_serializing, skip_deserializing)]
+    animation: Animation,
 }
 
 #[derive(Debug)]
@@ -67,6 +72,8 @@ impl RigidObject
             angular_velocity: Vector3::zeros(),
             velocity: Vector3::zeros(),
             rotation: Quaternion::new(1.0, 0.0, 0.0, 0.0),
+            acceleration: Vector3::zeros(),
+            angular_acceleration: Vector3::zeros(),
 
             grid,
             bvh: BVH::build(&vec![]),
@@ -79,6 +86,8 @@ impl RigidObject
             body_inertia_tensor: properties.inertia,
             inv_body_inertia_tensor: properties.inertia.try_inverse().expect("can't inverse inertia tensor"),
             mass: properties.mass,
+
+            animation: Animation::Blank,
         };
 
         res.bvh = res.to_particle_tree(particle_size);
@@ -148,6 +157,10 @@ impl RigidObject
         *v_torque += (position - self.center_position()).cross(&force);
     }
 
+    pub fn set_animation(&mut self, animation: Animation) {
+        self.animation = animation;
+    }
+
     /**
      * Compute rotation matrix from rotation quaternion
      */
@@ -184,18 +197,21 @@ impl RigidObject
     }
 
     pub fn update(&mut self, gravity: Vector3<f32>, dt: f32) {
-        if !self.dynamic {
-            return;
-        }
+        let mut handler = RAnimationHandler::new(self);
+
+        self.animation.animate(&mut handler, dt, false);
+        handler.apply(self);
 
         let (mut force, torque) = self.get_force_and_torque();
 
-        force += gravity * self.mass;
+        if self.dynamic {
+            force += gravity * self.mass;
+        }
 
-        self.velocity += (force / self.mass) * dt;
+        self.velocity += (force / self.mass + self.acceleration) * dt;
         self.position += self.velocity * dt;
 
-        self.angular_velocity += self.inv_inertia_tensor() * torque * dt;
+        self.angular_velocity += (self.inv_inertia_tensor() * torque + self.angular_acceleration) * dt;
 
         let q = Quaternion::new(0.0, self.angular_velocity.x, self.angular_velocity.y, self.angular_velocity.z);
 
@@ -292,78 +308,6 @@ impl RigidObject
         }
     }
 
-    /*
-    fn prepare_constraint(&self, other: &RigidObject,
-                          depth: f32,
-                          cp0: Vector3<f32>, cp1: Vector3<f32>,
-                          normal: Vector3<f32>) -> Constraint {
-        let restitution = 0.1; //FIXME
-
-        let v0 = self.pred_point_velocity(cp0);
-        let v1 = other.pred_point_velocity(cp1);
-
-        let u_rel = v0 - v1;
-        let u_rel_n = normal.dot(&u_rel);
-
-        let k = self.compute_k_matrix(cp0) + other.compute_k_matrix(cp1);
-        let mut tangent = u_rel - u_rel_n * normal;
-
-        if tangent.norm_squared() > 1e-6 {
-            tangent.normalize_mut();
-        }
-
-        Constraint {
-            cp0: cp0,
-            cp1: cp1,
-            normal: normal,
-            tangent: tangent,
-            depth: depth,
-            nkn_inv: 1.0 / normal.dot(&(k * normal)),
-            p_max: 1.0 / tangent.dot(&(k * tangent)) * u_rel.dot(&tangent),
-            goal_u_rel_n: match u_rel_n {
-                v if v < 0.0 => -restitution * v,
-                _ => 0.0,
-            },
-            sum: 0.0,
-        }
-    }
-
-    fn solve_constraint(&self, other: &RigidObject, constraint: &mut Constraint) {
-        // let p = self.dynamic && other.dynamic;
-
-        let stiffness = 1.1;
-        let friction = 0.5;
-
-        let v0 = self.pred_point_velocity(constraint.cp0);
-        let v1 = other.pred_point_velocity(constraint.cp1);
-
-        let u_rel = v0 - v1;
-        let u_rel_n = u_rel.dot(&constraint.normal);
-
-        let delta_u_rel_n = constraint.goal_u_rel_n - u_rel_n;
-
-        let mut correction_magnitude = (constraint.nkn_inv * delta_u_rel_n).max(-constraint.sum);
-
-        if constraint.depth < 0.0 {
-            correction_magnitude -= stiffness * constraint.nkn_inv * constraint.depth;
-        }
-
-        constraint.sum += correction_magnitude;
-
-        let mut force = correction_magnitude * constraint.normal;
-
-        // friction
-        force += match correction_magnitude.abs() * friction {
-            v if v > constraint.p_max => -constraint.p_max * constraint.tangent,
-            v if v < -constraint.p_max => constraint.p_max * constraint.tangent,
-            v => -v * constraint.tangent,
-        };
-
-        self.add_force(constraint.cp0, force);
-        other.add_force(constraint.cp1, -force);
-    }
-    */
-
     /**
      * Reference:
      * A review of computer simulation of tumbling mills by the discrete element method: Part I—contact mechanics
@@ -457,5 +401,63 @@ impl RigidObject
         }
 
         (volume, boundary_x)
+    }
+}
+
+struct RAnimationHandler {
+    angular_velocity: Vector3<f32>,
+    velocity: Vector3<f32>,
+    angular_acceleration: Vector3<f32>,
+    acceleration: Vector3<f32>,
+    position: Vector3<f32>,
+    rotation: Quaternion<f32>,
+}
+
+impl RAnimationHandler {
+    pub fn new(obj: &RigidObject) -> RAnimationHandler {
+        RAnimationHandler {
+            angular_velocity: obj.angular_velocity,
+            velocity: obj.velocity,
+            angular_acceleration: obj.angular_acceleration,
+            acceleration: obj.acceleration,
+            position: obj.position,
+            rotation: obj.rotation,
+        }
+    }
+
+    pub fn apply(&self, obj: &mut RigidObject) {
+        obj.angular_velocity = self.angular_velocity;
+        obj.velocity = self.velocity;
+        obj.angular_acceleration = self.angular_acceleration;
+        obj.acceleration = self.acceleration;
+        obj.position = self.position;
+        obj.rotation = self.rotation;
+    }
+}
+
+impl AnimationHandler for RAnimationHandler {
+    fn get_variable(&self, variable: &VariableType) -> Vector3<f32> {
+        match variable {
+            VariableType::AngularVelocity => self.angular_velocity,
+            VariableType::Velocity => self.velocity,
+            VariableType::AngularAcceleration => self.angular_acceleration,
+            VariableType::Acceleration => self.acceleration,
+            VariableType::Position => self.position,
+            VariableType::Rotation => {
+                let (x, y, z) = UnitQuaternion::from_quaternion(self.rotation).euler_angles();
+                Vector3::new(x, y, z)
+            },
+        }
+    }
+
+    fn set_variable(&mut self, variable: &VariableType, value: Vector3<f32>) {
+        match variable {
+            VariableType::AngularVelocity => self.angular_velocity = value,
+            VariableType::Velocity => self.velocity = value,
+            VariableType::AngularAcceleration => self.angular_acceleration = value,
+            VariableType::Acceleration => self.acceleration = value,
+            VariableType::Position => self.position = value,
+            VariableType::Rotation => self.rotation = *UnitQuaternion::from_euler_angles(value.x, value.y, value.z).quaternion(),
+        }
     }
 }

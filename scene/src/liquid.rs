@@ -1,7 +1,7 @@
 use serde_derive::*;
 use nalgebra::Vector3;
 
-use sph_common::DFSPH;
+use sph_common::{DFSPH, Animation};
 
 use crate::{Scene, Solid};
 
@@ -54,6 +54,7 @@ impl LiquidZone
             },
             LiquidZone::Mesh { mesh, scale, position, rotation_axis, rotation_angle, resolution } => {
                 let solid = Solid {
+                    animation: Animation::Blank,
                     mesh: mesh.to_string(),
                     mesh_invert: false,
                     scale: *scale,

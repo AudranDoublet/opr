@@ -1,6 +1,6 @@
 extern crate image;
 
-use sph_common::{DiscreteGrid, RigidObject, mesh::Mesh, kernels::CubicSpine};
+use sph_common::{DiscreteGrid, RigidObject, mesh::Mesh, kernels::CubicSpine, Animation};
 
 use crate::Scene;
 
@@ -39,6 +39,9 @@ pub struct Solid {
 
     #[serde(default)]
     pub slice: bool,
+
+    #[serde(default)]
+    pub animation: Animation,
 }
 
 impl Solid {
@@ -174,6 +177,7 @@ impl Solid {
         let mut object = RigidObject::new(grid, self.dynamic, self.particle_size, properties);
 
         object.set_position(self.position());
+        object.set_animation(self.animation.clone());
 
         Ok(object)
     }
