@@ -10,7 +10,7 @@ sph_scene = { path = "scene" }
 render = { path = "render" }
 raytracer = { path = "raytracer" }
 pipeline = { path = "pipeline" }
-unifobub = { path = "unifobub" }
+bubbler = { path = "bubbler" }
 
 image = "0.23.2"
 

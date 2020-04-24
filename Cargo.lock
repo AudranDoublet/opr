@@ -134,6 +134,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0d8c1fef690941d3e7788d328517591fecc684c084084702d6ff1641e993699a"
 
 [[package]]
+name = "bubbler"
+version = "0.1.0"
+
+[[package]]
 name = "bumpalo"
 version = "3.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -993,6 +997,7 @@ dependencies = [
 name = "opr"
 version = "0.1.0"
 dependencies = [
+ "bubbler",
  "clap",
  "image 0.23.2",
  "indicatif",
@@ -1005,7 +1010,6 @@ dependencies = [
  "render",
  "sph_common",
  "sph_scene",
- "unifobub",
 ]
 
 [[package]]
@@ -1807,10 +1811,6 @@ name = "unicode-xid"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "826e7639553986605ec5979c7dd957c7895e93eabed50ab2ffa7f6128a75097c"
-
-[[package]]
-name = "unifobub"
-version = "0.1.0"
 
 [[package]]
 name = "vec_map"

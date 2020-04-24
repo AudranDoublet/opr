@@ -1,5 +1,5 @@
 [package]
-name = "unifobub"
+name = "bubbler"
 version = "0.1.0"
 authors = ["Issaadi Sami <samiisd@hotmail.fr>"]
 edition = "2018"
