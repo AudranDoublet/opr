@@ -8,13 +8,13 @@ use sph_scene::Scene;
 use nalgebra::Vector3;
 
 extern crate raytracer;
-use raytracer::{write_image, Camera, Light};
+use raytracer::{write_image, Light};
 use raytracer::scene_config::*;
 
 fn get_obj(folder: &Path) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
     let mut files: Vec<PathBuf> = fs::read_dir(folder)?
         .filter_map(Result::ok)
-        .filter_map(|d| d.path().to_str().and_then(|f| if f.ends_with(".obj") { Some(d) } else { None }))
+        .filter_map(|d| d.path().to_str().and_then(|f| if f.ends_with(".yaml") { Some(d) } else { None }))
         .map(|d| d.path())
         .collect();
 
@@ -35,24 +35,12 @@ pub fn pipeline_render(_scene: &Scene, input_directory: &Path, dump_directory: &
 
     let lights = vec![
         Light::ambient(Vector3::new(0.3, 0.3, 0.3)),
-        Light::directional(Vector3::new(1., -1., 1.), Vector3::new(1., 1., 1.)),
+        Light::directional(Vector3::new(1., 1., 1.), Vector3::new(1., 1., 1.)),
     ];
 
-    let camera = Camera::new(Vector3::new(0.0, 0.0, -4.0), Vector3::new(0.0, 1.0, 0.0), Vector3::new(0.0, 0.0, 1.0), 512., 512.);
-
     for idx in 0..simulations.len() {
-        let ray_scene = SceneConfig {
-            params: ParamsConfig::default(),
-            objects: vec![
-                ObjectConfig {
-                    path: simulations[idx].to_str().unwrap().to_string(),
-                    rotation: Vector3::zeros(),
-                    position: Vector3::zeros(),
-                },
-            ],
-            lights: lights.clone(),
-            camera: camera.clone(),
-        };
+        let mut ray_scene = SceneConfig::load(&simulations[idx])?;
+        ray_scene.lights = lights.clone();
 
         let mut scene = raytracer::Scene::from_config(ray_scene, &Path::new("data/materials/white.mtl"))?;
         scene.build(12);

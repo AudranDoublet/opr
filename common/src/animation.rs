@@ -55,6 +55,10 @@ pub enum Animation {
         #[serde(skip_deserializing)]
         current_time: f32,
     },
+    #[serde(rename = "lookat")]
+    LookAt {
+        position: Vector3<f32>,
+    },
     Blank,
 }
 
@@ -62,6 +66,8 @@ pub trait AnimationHandler {
     fn get_variable(&self, variable: &VariableType) -> Vector3<f32>;
 
     fn set_variable(&mut self, variable: &VariableType, value: Vector3<f32>);
+
+    fn look_at(&mut self, at: Vector3<f32>);
 }
 
 fn timer(current: &mut f32, max: f32, dt: &mut f32) -> f32 {
@@ -71,6 +77,8 @@ fn timer(current: &mut f32, max: f32, dt: &mut f32) -> f32 {
     if *current > max {
         *dt = *current - max;
         *current = max;
+    } else {
+        *dt = 0.0;
     }
 
     *current = next;
@@ -149,6 +157,10 @@ impl Animation {
 
                     dt
                 }
+            },
+            Animation::LookAt { position } => {
+                handler.look_at(*position);
+                0.0
             },
             Animation::Blank => 0.0,
         }

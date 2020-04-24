@@ -13,6 +13,7 @@ use nalgebra::Vector3;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
+use crate::{Animation, Camera};
 use crate::{HashGrid, RigidObject};
 use crate::kernels::{Kernel, CubicSpine};
 use crate::mesher::types::{FluidSnapshot, FluidSnapshotProvider, VertexWorld};
@@ -57,6 +58,11 @@ pub struct DFSPH
     pub velocities: RwLock<Vec<Vector3<f32>>>,
     pub positions: RwLock<Vec<Vector3<f32>>>,
     pub accelerations: RwLock<Vec<Vector3<f32>>>,
+
+    pub camera: Camera,
+
+    #[serde(skip_serializing, skip_deserializing)]
+    camera_animation: Animation,
 
     #[serde(skip_serializing, skip_deserializing)]
     external_forces: ExternalForces,
@@ -159,7 +165,12 @@ impl FluidSnapshotProvider for DFSPH {
 
 impl DFSPH
 {
-    pub fn new(kernel_radius: f32, particle_radius: f32, solids: Vec<RigidObject>, external_forces: ExternalForces) -> DFSPH
+    pub fn new(
+        kernel_radius: f32, particle_radius: f32,
+        solids: Vec<RigidObject>,
+        external_forces: ExternalForces,
+        camera_position: Vector3<f32>,
+        camera_animation: Animation) -> DFSPH
     {
         DFSPH {
             kernel: CubicSpine::new(kernel_radius),
@@ -197,10 +208,15 @@ impl DFSPH
             positions: RwLock::new(Vec::new()),
 
             external_forces: external_forces,
+
+            camera: Camera::new(camera_position),
+            camera_animation: camera_animation,
         }
     }
 
-    pub fn len(&self) -> usize { self.len }
+    pub fn len(&self) -> usize {
+        self.len
+    }
 
     pub fn clear(&mut self) {
         self.accelerations.write().unwrap().clear();
@@ -613,6 +629,8 @@ impl DFSPH
         self.accelerations.write().unwrap().par_iter_mut()
             .enumerate()
             .for_each(|(i, a)| *a += (velocities[i] - velocities_copy[i]) / self.time_step);
+
+        self.camera.tick(dt, &mut self.camera_animation);
 
         self.debug_solid_collisions = collisions;
         self.time_step

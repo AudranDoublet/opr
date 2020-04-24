@@ -3,7 +3,7 @@ extern crate rayon;
 extern crate serde_yaml;
 
 use search::{BVH, Ray, BVHParameters};
-use nalgebra::{Vector3, Vector2};
+use nalgebra::{Vector3, Vector2, UnitQuaternion};
 use std::collections::HashMap;
 use std::error::Error;
 use std::path::Path;
@@ -50,7 +50,8 @@ impl Scene {
         scene.load_mtl(default_material)?[0];
 
         for obj in file.objects {
-            scene.load_obj(Path::new(&obj.path))?;
+            let r = UnitQuaternion::from_euler_angles(obj.rotation.x, obj.rotation.y, obj.rotation.z);
+            scene.load_obj(Path::new(&obj.path), obj.position, r, obj.scale)?;
         }
 
         for mut light in file.lights {
@@ -98,7 +99,7 @@ impl Scene {
         Ok(result)
     }
 
-    pub fn load_obj(&mut self, path: &Path) -> Result<(), Box<dyn Error>> {
+    pub fn load_obj(&mut self, path: &Path, position: Vector3<f32>, rotation: UnitQuaternion<f32>, scale: Vector3<f32>) -> Result<(), Box<dyn Error>> {
         let root = path.parent().ok_or("bad path")?;
         let (models, materials) = tobj::load_obj(path)?;
 
@@ -137,16 +138,17 @@ impl Scene {
 
             for i in (0..mesh.positions.len()).step_by(3)
             {
-                vertices.push(Vector3::new(mesh.positions[i + 0],
-                                           mesh.positions[i + 1],
-                                           mesh.positions[i + 2]));
+                let pos = rotation * Vector3::new(mesh.positions[i + 0],
+                               mesh.positions[i + 1],
+                               mesh.positions[i + 2]).component_mul(&scale) + position;
+                vertices.push(pos);
             }
 
             let mut vertices_normal = vec![];
 
             for i in (0..mesh.normals.len()).step_by(3)
             {
-                vertices_normal.push(Vector3::new(mesh.normals[i + 0],
+                vertices_normal.push(rotation * Vector3::new(mesh.normals[i + 0],
                                            mesh.normals[i + 1],
                                            mesh.normals[i + 2]));
             }
@@ -165,13 +167,15 @@ impl Scene {
                 let b = mesh.indices[i + 1] as usize;
                 let c = mesh.indices[i + 2] as usize;
 
+                let normal = (vertices[b] - vertices[a]).cross(&(vertices[c] - vertices[a]));
+
                 self.triangles.push(
                     shapes::Triangle::new(vertices[a],
                                           vertices[b],
                                           vertices[c],
-                                          vertices_normal[a],
-                                          vertices_normal[b],
-                                          vertices_normal[c],
+                                          *vertices_normal.get(a).unwrap_or(&normal),
+                                          *vertices_normal.get(b).unwrap_or(&normal),
+                                          *vertices_normal.get(c).unwrap_or(&normal),
                                           vertices_tex[a],
                                           vertices_tex[b] - vertices_tex[a],
                                           vertices_tex[c] - vertices_tex[a],

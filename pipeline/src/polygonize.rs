@@ -1,3 +1,5 @@
+use nalgebra::Vector3;
+
 use std::path::{Path, PathBuf};
 use std::fs;
 
@@ -9,6 +11,8 @@ use sph_common::DFSPH;
 use sph_common::mesher::interpolation::InterpolationAlgorithms;
 use sph_common::mesher::Mesher;
 use sph_common::mesher::anisotropication::Anisotropicator;
+
+use raytracer::{scene_config, Camera};
 
 use rayon::prelude::*;
 
@@ -48,10 +52,44 @@ pub fn pipeline_polygonize(scene: &Scene, input_directory: &Path, dump_directory
 
     simulations.par_iter().enumerate().for_each(|(idx, path)| {
         let simulation  = DFSPH::load(&path).unwrap();
-        let path        = dump_directory.join(format!("{:08}.obj", idx));
+        let path        = &dump_directory.join(format!("{:08}.obj", idx));
+        let path_yaml   = dump_directory.join(format!("{:08}.yaml", idx));
         let buffer      = &mut fs::File::create(path).unwrap();
 
+        let camera = &simulation.camera;
+
+        let mut objects: Vec<scene_config::ObjectConfig> = (0..simulation.solid_count()).filter_map(|i| {
+            let v = simulation.solid(i);
+            let conf = &scene.solids[i];
+
+            if conf.display {
+                Some(scene_config::ObjectConfig {
+                    path: scene.solids[i].file(&Path::new(&scene.global_config.data_path)).to_str().unwrap().to_string(),
+                    scale: conf.scale(),
+                    rotation: v.euler_angle(),
+                    position: v.final_position(),
+                })
+            } else {
+                None
+            }
+        }).collect();
+
+        objects.push(scene_config::ObjectConfig {
+            path: path.to_str().unwrap().to_string(),
+            scale: Vector3::new(1., 1., 1.),
+            rotation: Vector3::zeros(),
+            position: Vector3::zeros(),
+        });
+
+        let config = scene_config::SceneConfig {
+            objects: objects,
+            params: scene_config::ParamsConfig::default(),
+            lights: Vec::new(),
+            camera: Camera::new(camera.position(), camera.up(), camera.forward(), 512., 512.),
+        };
+
         mesher.clone().convert_into_obj(&simulation, buffer);
+        config.save(&path_yaml).unwrap();
 
         pb.inc(1);
     });

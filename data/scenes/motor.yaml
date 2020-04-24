@@ -1,6 +1,17 @@
 config:
     kernel_radius: 0.08
     particle_radius: 0.02
+camera:
+    position: [0.0, 0.0, -1.0]
+    animation:
+      type: group
+      elements:
+          - type: lerp
+            time: 4
+            variable: Position
+            to_value: [0.0, 2.0, -1.0]
+          - type: lookat
+            position: [0.0, 0.0, 0.0]
 solids:
     - mesh: objects/box.obj
       density: 1000
@@ -29,11 +40,11 @@ solids:
             - type: constant
               time: 1
               variable: AngularVelocity
-              value: [0.0, 5.0, 0.0]
+              value: [0.0, 25.0, 0.0]
 liquids_blocks:
     - type: block
       from: [-0.500, -0.500, -0.500]
-      to: [0.500, -0.300, 0.500]
+      to: [0.500, -0.100, 0.500]
 liquids_add_blocks:
     - type: block
       from:  [-0.100, 0.200, -0.100]

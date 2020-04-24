@@ -163,6 +163,15 @@ impl RigidObject
         self.animation = animation;
     }
 
+    pub fn euler_angle(&self) -> Vector3<f32> {
+        let (x, y, z) = UnitQuaternion::from_quaternion(self.rotation).euler_angles();
+        Vector3::new(x, y, z)
+    }
+
+    pub fn final_position(&self) -> Vector3<f32> {
+        self.position + self.center_of_mass
+    }
+
     /**
      * Compute rotation matrix from rotation quaternion
      */
@@ -471,5 +480,9 @@ impl AnimationHandler for RAnimationHandler {
             VariableType::Position => self.position = value,
             VariableType::Rotation => self.rotation = *UnitQuaternion::from_euler_angles(value.x, value.y, value.z).quaternion(),
         }
+    }
+
+    fn look_at(&mut self, _: Vector3<f32>) {
+
     }
 }

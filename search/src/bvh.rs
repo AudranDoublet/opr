@@ -206,16 +206,16 @@ impl<T: BVHShape + IntersectsBVHShape + Clone> BVHNode<T> {
                 let a = ray.intersects_aabb(left_box).unwrap_or(std::f32::INFINITY);
                 let b = ray.intersects_aabb(right_box).unwrap_or(std::f32::INFINITY);
 
-                if a <= b && a < result.0.distance {
+                if a <= b && a <= result.0.distance && a != std::f32::INFINITY {
                     left_node.ray_intersects(ray, result);
 
-                    if b < result.0.distance {
+                    if b <= result.0.distance {
                         right_node.ray_intersects(ray, result);
                     }
-                } else if b <= a && b < result.0.distance {
+                } else if b <= a && b <= result.0.distance && b != std::f32::INFINITY {
                     right_node.ray_intersects(ray, result);
 
-                    if a < result.0.distance {
+                    if a <= result.0.distance {
                         left_node.ray_intersects(ray, result);
                     }
                 }

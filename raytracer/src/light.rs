@@ -3,7 +3,7 @@ use search::Ray;
 use crate::vector3_from_const;
 use serde_derive::*;
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(tag = "type")]
 pub enum Light {
     #[serde(rename = "ambient")]
@@ -48,7 +48,7 @@ impl Light
 
     pub fn shadow_ray(&self, origin: Vector3<f32>) -> Option<Ray> {
         match *self {
-            Light::DirectionalLight { direction, color: _ } =>  Some(Ray::new(origin, direction)),
+            Light::DirectionalLight { direction, color: _ } => Some(Ray::new(origin, direction)),
             _ => None
         }
     }

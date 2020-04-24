@@ -5,6 +5,7 @@ mod discretegrid;
 mod rigid_object;
 mod hashgrid;
 mod animation;
+mod camera;
 
 pub mod kernels;
 pub mod utils;
@@ -17,3 +18,4 @@ pub use discretegrid::*;
 pub use rigid_object::*;
 pub use hashgrid::*;
 pub use animation::*;
+pub use camera::*;

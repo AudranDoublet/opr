@@ -5,7 +5,7 @@ use nalgebra::Vector3;
 use std::fs::File;
 use std::path::Path;
 
-use sph_common::{RigidObject, DFSPH, external_forces::ExternalForces, external_forces::ViscosityType, external_forces::VorticityConfig};
+use sph_common::{Animation, RigidObject, DFSPH, external_forces::ExternalForces, external_forces::ViscosityType, external_forces::VorticityConfig};
 
 use serde_derive::*;
 use crate::{Solid, LiquidZone};
@@ -20,6 +20,22 @@ fn default_surface_tension() -> f32 {
 
 fn default_surface_adhesion() -> f32 {
     0.01
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CameraConfiguration
+{
+    pub position: Vector3<f32>,
+    pub animation: Animation,
+}
+
+impl Default for CameraConfiguration {
+    fn default() -> CameraConfiguration {
+        CameraConfiguration {
+            position: Vector3::zeros(),
+            animation: Animation::Blank,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -102,6 +118,8 @@ pub struct Scene
     pub simulation_config: SimulationConfig,
     #[serde(default)]
     pub meshing_config: MeshingConfig,
+    #[serde(default)]
+    pub camera: CameraConfiguration,
     pub config: Configuration,
     pub solids: Vec<Solid>,
     pub liquids_blocks: Vec<LiquidZone>,
@@ -146,7 +164,14 @@ impl Scene
               .viscosity(&self.config.viscosity)
               .vorticity(&self.config.vorticity);
 
-        let mut result = DFSPH::new(self.config.kernel_radius, self.config.particle_radius, solids, forces);
+        let mut result = DFSPH::new(
+            self.config.kernel_radius,
+            self.config.particle_radius,
+            solids,
+            forces,
+            self.camera.position,
+            self.camera.animation.clone(),
+        );
 
         self.recreate(&mut result)?;
 
