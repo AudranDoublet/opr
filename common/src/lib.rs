@@ -6,6 +6,7 @@ mod rigid_object;
 mod hashgrid;
 mod animation;
 mod camera;
+mod emitter;
 
 pub mod kernels;
 pub mod utils;
@@ -19,3 +20,4 @@ pub use rigid_object::*;
 pub use hashgrid::*;
 pub use animation::*;
 pub use camera::*;
+pub use emitter::*;

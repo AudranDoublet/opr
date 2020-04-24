@@ -5,10 +5,10 @@ use nalgebra::Vector3;
 use std::fs::File;
 use std::path::Path;
 
-use sph_common::{Animation, RigidObject, DFSPH, external_forces::ExternalForces, external_forces::ViscosityType, external_forces::VorticityConfig};
+use sph_common::{Emitter, Animation, RigidObject, DFSPH, external_forces::ExternalForces, external_forces::ViscosityType, external_forces::VorticityConfig};
 
 use serde_derive::*;
-use crate::{Solid, LiquidZone};
+use crate::{Solid, LiquidZone, EmitterConfig};
 
 fn default_gravity() -> [f32; 3] {
     [0.0, -9.81, 0.0]
@@ -126,6 +126,8 @@ pub struct Scene
     pub solids: Vec<Solid>,
     pub liquids_blocks: Vec<LiquidZone>,
     pub liquids_add_blocks: Vec<LiquidZone>,
+    #[serde(default)]
+    pub emitters: Vec<EmitterConfig>,
 }
 
 impl Scene
@@ -166,6 +168,8 @@ impl Scene
               .viscosity(&self.config.viscosity)
               .vorticity(&self.config.vorticity);
 
+        let (emitters, emitters_animations) = self.emitters();
+
         let mut result = DFSPH::new(
             self.config.kernel_radius,
             self.config.particle_radius,
@@ -173,11 +177,20 @@ impl Scene
             forces,
             self.camera.position,
             self.camera.animation.clone(),
+            emitters,
+            emitters_animations,
         );
 
         self.recreate(&mut result)?;
 
         Ok(result)
+    }
+
+    pub fn emitters(&self) -> (Vec<Emitter>, Vec<Animation>) {
+        self.emitters
+            .iter()
+            .map(|v| v.load(self))
+            .unzip()
     }
 
     pub fn recreate(&self, scene: &mut DFSPH) -> Result<(), Box<dyn std::error::Error>> {

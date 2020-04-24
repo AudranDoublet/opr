@@ -161,7 +161,9 @@ fn simulate(scene: &Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Resu
                 frame_idx += 1;
             }
 
+            let prev = fluid_simulation.len();
             time_simulated_since_last_frame += fluid_simulation.tick();
+            add_particles(prev..fluid_simulation.len(), &fluid_simulation, &mut renderer);
 
             let d_v_mean_sq = fluid_simulation.debug_get_v_mean_sq();
             let d_v_max_sq_deviation = fluid_simulation.debug_get_v_max_sq() / d_v_mean_sq;

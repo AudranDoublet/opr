@@ -13,7 +13,7 @@ use nalgebra::Vector3;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::{Animation, Camera};
+use crate::{Animation, Camera, Emitter};
 use crate::{HashGrid, RigidObject};
 use crate::kernels::{Kernel, CubicSpine};
 use crate::mesher::types::{FluidSnapshot, FluidSnapshotProvider, VertexWorld};
@@ -60,6 +60,11 @@ pub struct DFSPH
     pub accelerations: RwLock<Vec<Vector3<f32>>>,
 
     pub camera: Camera,
+
+    #[serde(skip_serializing, skip_deserializing)]
+    pub emitters: Vec<Emitter>,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub emitters_animations: Vec<Animation>,
 
     #[serde(skip_serializing, skip_deserializing)]
     camera_animation: Animation,
@@ -170,7 +175,9 @@ impl DFSPH
         solids: Vec<RigidObject>,
         external_forces: ExternalForces,
         camera_position: Vector3<f32>,
-        camera_animation: Animation) -> DFSPH
+        camera_animation: Animation,
+        emitters: Vec<Emitter>,
+        emitters_animations: Vec<Animation>) -> DFSPH
     {
         DFSPH {
             kernel: CubicSpine::new(kernel_radius),
@@ -211,6 +218,9 @@ impl DFSPH
 
             camera: Camera::new(camera_position),
             camera_animation: camera_animation,
+
+            emitters: emitters,
+            emitters_animations: emitters_animations,
         }
     }
 
@@ -261,10 +271,8 @@ impl DFSPH
         self.time_step
     }
 
-    pub fn add_particle(&mut self, x: f32, y: f32, z: f32)
+    pub fn add_particle_with_velocity(&mut self, position: Vector3<f32>, velocity: Vector3<f32>)
     {
-        let position = Vector3::new(x, y, z);
-
         for solid in &self.solids {
             if solid.is_particle_inside(&position, self.particle_radius) {
                 return;
@@ -273,11 +281,16 @@ impl DFSPH
 
         self.density_prediction.write().unwrap().push(0.0);
         self.positions.write().unwrap().push(position);
-        self.velocities.write().unwrap().push(Vector3::zeros());
+        self.velocities.write().unwrap().push(velocity);
         self.accelerations.write().unwrap().push(Vector3::zeros());
         self.stiffness.write().unwrap().push(0.0);
         self.density.write().unwrap().push(0.0);
         self.len += 1;
+    }
+
+    pub fn add_particle(&mut self, x: f32, y: f32, z: f32)
+    {
+        self.add_particle_with_velocity(Vector3::new(x, y, z), Vector3::zeros());
     }
 
     pub fn gradient(&self, i: Vector3<f32>, j: Vector3<f32>) -> Vector3<f32> {
@@ -625,12 +638,23 @@ impl DFSPH
         }
 
         // add pressure to accelerations for next simulation steps (foam & bubble generation)
-        let velocities = self.velocities.read().unwrap();
-        self.accelerations.write().unwrap().par_iter_mut()
-            .enumerate()
-            .for_each(|(i, a)| *a += (velocities[i] - velocities_copy[i]) / self.time_step);
+        {
+            let velocities = self.velocities.read().unwrap();
+            self.accelerations.write().unwrap().par_iter_mut()
+                .enumerate()
+                .for_each(|(i, a)| *a += (velocities[i] - velocities_copy[i]) / self.time_step);
+        }
 
         self.camera.tick(dt, &mut self.camera_animation);
+
+        let particles: Vec<(Vector3<f32>, Vector3<f32>)> = self.emitters.par_iter_mut()
+            .zip(self.emitters_animations.par_iter_mut())
+            .map(|(e, a)| e.tick(dt, a))
+            .flatten().collect();
+
+        for (p, v) in particles {
+            self.add_particle_with_velocity(p, v);
+        }
 
         self.debug_solid_collisions = collisions;
         self.time_step
