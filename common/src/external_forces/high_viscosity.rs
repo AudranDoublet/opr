@@ -109,7 +109,7 @@ impl ViscosityWeiler2018Force {
             });
 
             if self.surface_viscosity_coefficient != 0.0 {
-                result += sim.solids_reduce(i, Matrix3::zeros(), &|solid, r, vol, p| {
+                result += sim.solids_reduce(i, Matrix3::zeros(), &|_, r, vol, p| {
                     let normal = p - positions[i];
                     let norm = normal.norm();
 
