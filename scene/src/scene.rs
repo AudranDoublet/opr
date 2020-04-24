@@ -60,6 +60,7 @@ pub struct SimulationConfig
 {
     pub max_time: f32,
     pub fps: f32,
+    pub render_fps: f32,
 }
 
 impl Default for SimulationConfig {
@@ -67,6 +68,7 @@ impl Default for SimulationConfig {
         SimulationConfig {
             max_time: 4.,
             fps: 24.,
+            render_fps: -1.,
         }
     }
 }
