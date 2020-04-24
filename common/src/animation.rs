@@ -160,7 +160,7 @@ impl Animation {
             },
             Animation::LookAt { position } => {
                 handler.look_at(*position);
-                0.0
+                dt
             },
             Animation::Blank => 0.0,
         }

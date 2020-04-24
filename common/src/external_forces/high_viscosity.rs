@@ -14,6 +14,19 @@ pub struct ViscosityWeiler2018Force {
     difference: RwLock<Vec<Vector3<f32>>>,
 }
 
+fn orthogonal_vectors(v: Vector3<f32>) -> Vec<Vector3<f32>> {
+    let mut up = Vector3::x();
+
+    if up.dot(&v) > 0.999 {
+        up = Vector3::y();
+    }
+
+    let a = v.cross(&up);
+    let b = v.cross(&a);
+
+    vec![a, -a, b, -b]
+}
+
 impl ViscosityWeiler2018Force {
     pub fn new(viscosity_coeffcient: f32, surface_viscosity_coefficient: f32, max_iteration: usize, tolerance: f32) -> Box<ViscosityWeiler2018Force> {
         Box::new(ViscosityWeiler2018Force {
@@ -29,10 +42,11 @@ impl ViscosityWeiler2018Force {
         let densities = sim.density.read().unwrap();
         let positions = sim.positions.read().unwrap();
 
+        let h = sim.kernel_radius();
         let h2 = sim.kernel_radius().powi(2) / 100.;
 
         vec.par_iter().enumerate().map(|(i, v)| {
-            let result = sim.neighbours_reduce_v(i, &|r, i, j| {
+            let mut result = sim.neighbours_reduce_v(i, &|r, i, j| {
                 let xij = positions[i] - positions[j];
                 let vij = vec[i] - vec[j];
 
@@ -42,6 +56,37 @@ impl ViscosityWeiler2018Force {
                 r + 10. * self.viscosity_coeffcient * volume * vij.dot(&xij) / (xij.norm_squared() + h2) * grad
             });
 
+            if self.surface_viscosity_coefficient != 0.0 {
+                result += sim.solids_reduce_v(i,  &|solid, r, vol, p| {
+                    let normal = p - positions[i];
+                    let norm = normal.norm();
+
+                    if norm < 0.0001 {
+                        return r;
+                    }
+
+                    let normal = normal / norm;
+                    let mut result = Vector3::zeros();
+
+                    for v in orthogonal_vectors(normal) {
+                        let x = p + v * (h / 2.);
+                        let xij = positions[i] - x;
+
+                        let grad = sim.gradient(positions[i], x);
+                        let volume = vol * 0.25;
+
+                        let vij = vec[i] - solid.point_velocity(x);
+
+                        let a = 10. * self.surface_viscosity_coefficient * volume * vij.dot(&xij) / (xij.norm_squared() + h2) * grad;
+
+                        solid.add_force(x, -a * (sim.mass(i) / densities[i]));
+                        result += a;
+                    }
+
+                    r + result
+                });
+            }
+
             v - (sim.time_step / densities[i]) * result
         }).collect()
     }
@@ -50,10 +95,11 @@ impl ViscosityWeiler2018Force {
         let densities = sim.density.read().unwrap();
         let positions = sim.positions.read().unwrap();
 
+        let h = sim.kernel_radius();
         let h2 = sim.kernel_radius().powi(2) / 100.;
 
         (0..sim.len()).into_par_iter().map(|i| {
-            let result = sim.neighbours_reduce(i, Matrix3::zeros(), &|r, i, j| {
+            let mut result = sim.neighbours_reduce(i, Matrix3::zeros(), &|r, i, j| {
                 let xij = positions[i] - positions[j];
 
                 let grad = sim.gradient(positions[i], positions[j]);
@@ -61,6 +107,32 @@ impl ViscosityWeiler2018Force {
 
                 r + 10. * self.viscosity_coeffcient * volume / (xij.norm_squared() + h2) * (grad * xij.transpose())
             });
+
+            if self.surface_viscosity_coefficient != 0.0 {
+                result += sim.solids_reduce(i, Matrix3::zeros(), &|solid, r, vol, p| {
+                    let normal = p - positions[i];
+                    let norm = normal.norm();
+
+                    if norm < 0.0001 {
+                        return r;
+                    }
+
+                    let normal = normal / norm;
+                    let mut result = Matrix3::zeros();
+
+                    for v in orthogonal_vectors(normal) {
+                        let x = p + v * (h / 2.);
+                        let xij = positions[i] - x;
+
+                        let grad = sim.gradient(positions[i], x);
+                        let volume = vol * 0.25;
+
+                        result += 10. * self.surface_viscosity_coefficient * volume / (xij.norm_squared() + h2) * (grad * xij.transpose());
+                    }
+
+                    r + result
+                });
+            }
 
             Matrix3::identity() - (sim.time_step / densities[i]) * result
         }).collect()
