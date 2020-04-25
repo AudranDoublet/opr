@@ -4,6 +4,7 @@ use std::fs;
 use indicatif::{ProgressBar, ProgressStyle};
 
 use sph_scene::Scene;
+use sph_common::Camera;
 
 use nalgebra::Vector3;
 
@@ -23,7 +24,7 @@ fn get_obj(folder: &Path) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
     Ok(files)
 }
 
-pub fn pipeline_render(_scene: &Scene, input_directory: &Path, dump_directory: &Path) -> Result<(), Box<dyn std::error::Error>> {
+pub fn pipeline_render(scene: &Scene, input_directory: &Path, dump_directory: &Path) -> Result<(), Box<dyn std::error::Error>> {
     fs::create_dir_all(dump_directory)?;
 
     let simulations: Vec<PathBuf> = get_obj(input_directory)?;
@@ -35,17 +36,26 @@ pub fn pipeline_render(_scene: &Scene, input_directory: &Path, dump_directory: &
 
     let lights = vec![
         Light::ambient(Vector3::new(0.3, 0.3, 0.3)),
-        Light::directional(Vector3::new(1., 1., 1.), Vector3::new(1., 1., 1.)),
+        Light::directional(Vector3::new(-1., 1., -1.), Vector3::new(1., 1., 1.)),
     ];
 
     for idx in 0..simulations.len() {
         let mut ray_scene = SceneConfig::load(&simulations[idx])?;
         ray_scene.lights = lights.clone();
 
-        let mut scene = raytracer::Scene::from_config(ray_scene, &Path::new("data/materials/white.mtl"))?;
-        scene.build(12);
+        let mut render_scene = raytracer::Scene::from_config(ray_scene, &Path::new("data/materials/white.mtl"))?;
 
-        let pixels  = scene.render(512, 512);
+        if scene.camera.generate_at_render {
+            let dt = (idx as f32) / scene.simulation_config.fps;
+            let mut camera = Camera::new(scene.camera.position);
+            camera.tick(dt, &mut scene.camera.animation.clone());
+
+            render_scene.setup_camera(camera.position(), camera.up(), camera.forward());
+        }
+
+        render_scene.build(12);
+
+        let pixels  = render_scene.render(512, 512);
 
         write_image(&dump_directory.join(format!("{:08}.png", idx)), &pixels, 512, 512);
 
@@ -55,4 +65,4 @@ pub fn pipeline_render(_scene: &Scene, input_directory: &Path, dump_directory: &
     pb.finish_with_message("rendering done");
 
     Ok(())
-}
+}   

@@ -36,7 +36,10 @@ emitters:
           steps:
               - type: lookat
                 position: [0.5, -1.0, 0.0]
-              - type: lerp
+              - type: curve
                 time: 6.
                 variable: Position
-                to_value: [-1.4, 0.0, 0.0]
+                curve:
+                    type: linear
+                    a: [1.4, 0.0, 0.0]
+                    b: [-1.4, 0.0, 0.0]

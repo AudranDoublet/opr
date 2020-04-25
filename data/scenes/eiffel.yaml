@@ -4,9 +4,34 @@ config:
     viscosity:
         type: weiler2018
         coefficient: 2000.0
-        surface_coefficient: 0.0
+        surface_coefficient: 1000.0
         max_iteration: 100
         tolerance: 0.01
+simulation_config:
+    fps: 48
+    render_fps: 24
+    max_time: 4.0
+camera:
+    position: [0.0, -3.0, -5.0]
+    generate_at_render: true
+    animation:
+      type: group
+      elements:
+          - type: curve
+            time: 2
+            variable: Position
+            smoothing:
+                begin: 0.20
+                end: 0.80
+            curve:
+                type: bezier
+                control_points:
+                  - [0.0, -3.0, -3.0]
+                  - [4.0, -5.0, -3.0]
+                  - [4.0, -5.0, 2.0]
+                  - [0.0, -3.0, 2.0]
+          - type: lookat
+            position: [0.0, -5.0, 0.0]
 solids:
     - mesh: objects/box.obj
       density: 1000
@@ -25,7 +50,7 @@ liquids_blocks:
       dynamic: true
       resolution: [41, 41, 41]
       scale: [1.5, 1.5, 1.5]
-      position: [0.0, -0.48, 0.0]
+      position: [0.0, -4.98, 0.0]
       rotation_axis: [0.0, 0.0, 0.0]
       rotation_angle: 0.0
       slice: true

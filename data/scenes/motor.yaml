@@ -1,17 +1,6 @@
 config:
     kernel_radius: 0.08
     particle_radius: 0.02
-camera:
-    position: [0.0, 0.0, -1.0]
-    animation:
-      type: group
-      elements:
-          - type: lerp
-            time: 4
-            variable: Position
-            to_value: [0.0, 2.0, -1.0]
-          - type: lookat
-            position: [0.0, 0.0, 0.0]
 solids:
     - mesh: objects/box.obj
       density: 1000

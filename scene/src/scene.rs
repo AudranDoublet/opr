@@ -26,12 +26,15 @@ fn default_surface_adhesion() -> f32 {
 pub struct CameraConfiguration
 {
     pub position: Vector3<f32>,
+    #[serde(default)]
+    pub generate_at_render: bool,
     pub animation: Animation,
 }
 
 impl Default for CameraConfiguration {
     fn default() -> CameraConfiguration {
         CameraConfiguration {
+            generate_at_render: false,
             position: Vector3::zeros(),
             animation: Animation::Blank,
         }
