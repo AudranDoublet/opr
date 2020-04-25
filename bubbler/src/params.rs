@@ -5,11 +5,11 @@ pub struct BubblerHyperParameters {
     pub dt_min: f32,
 
     /// Min-Max threshold for generating diffuse material due to Wave Crest
-    pub tau_wc: Range<usize>,
+    pub tau_wc: Range<f32>,
     /// Min-Max threshold for generating diffuse material due to Trapped Air
-    pub tau_ta: Range<usize>,
+    pub tau_ta: Range<f32>,
     /// Min-Max threshold for generating diffuse material due to kinetic energy of the particles
-    pub tau_k: Range<usize>,
+    pub tau_k: Range<f32>,
 
     /// Number of particles generated on wave crests per seconds (per particles)
     pub k_wc: f32,
@@ -41,19 +41,20 @@ pub struct BubblerHyperParameters {
 
 impl Default for BubblerHyperParameters {
     fn default() -> Self {
+        let dt_min = 1.0 / 120.0;
         BubblerHyperParameters {
-            dt_min: 1.0 / 60.0,
+            dt_min,
 
-            tau_wc: Range { start: 2, end: 8 },
-            tau_ta: Range { start: 5, end: 20 },
-            tau_k: Range { start: 5, end: 50 },
+            tau_wc: 1.0..6.0,
+            tau_ta: 0.05..1.0,
+            tau_k: 0.01..0.1,
 
             // FIXME: those value are totally random, we must find correct ones
-            k_wc: 10.0,
-            k_ta: 5.0,
+            k_wc: 10.0 / dt_min,
+            k_ta: 10.0 / dt_min,
             // FIXME-END;
 
-            lifetime: Range { start: 0.8, end: 4. },
+            lifetime: Range { start: 0.4, end: 1. },
 
             interval_neighbours_spray: 0..7,
             interval_neighbours_foam: 7..20,
