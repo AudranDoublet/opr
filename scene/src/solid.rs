@@ -99,7 +99,7 @@ impl Solid {
 
         for y in 0..height {
             for x in 0..width {
-                let pos = min + step.component_mul(&Vector3::new(x as f32, y as f32, 0.5));
+                let pos = min + step.component_mul(&Vector3::new(x as f32, y as f32, 0.4));
 
                 let (r, g, b) = if let Some(d) = f(pos) {
                     if d < 0.0 {

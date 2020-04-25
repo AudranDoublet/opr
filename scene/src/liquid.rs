@@ -15,6 +15,8 @@ pub enum LiquidZone {
     },
     #[serde(rename = "mesh")]
     Mesh {
+        #[serde(default)]
+        slice: bool,
         mesh: String,
         scale: [f32; 3],
 
@@ -52,7 +54,7 @@ impl LiquidZone
 
                 count
             },
-            LiquidZone::Mesh { mesh, scale, position, rotation_axis, rotation_angle, resolution } => {
+            LiquidZone::Mesh { mesh, scale, position, rotation_axis, rotation_angle, resolution, slice } => {
                 let solid = Solid {
                     animation: Animation::Blank,
                     mesh: mesh.to_string(),
@@ -66,7 +68,7 @@ impl LiquidZone
                     display: true,
                     dynamic: false,
                     particle_size: 1000.0,
-                    slice: false,
+                    slice: *slice,
                 };
 
                 let solid = solid.load(config)?;
