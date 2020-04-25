@@ -134,6 +134,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0d8c1fef690941d3e7788d328517591fecc684c084084702d6ff1641e993699a"
 
 [[package]]
+name = "bubbler"
+version = "0.1.0"
+dependencies = [
+ "nalgebra",
+ "rand 0.7.3",
+ "rayon",
+ "serde",
+ "serde_derive",
+ "serde_yaml",
+ "sph_common",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -993,6 +1006,7 @@ dependencies = [
 name = "opr"
 version = "0.1.0"
 dependencies = [
+ "bubbler",
  "clap",
  "image 0.23.2",
  "indicatif",
@@ -1356,7 +1370,7 @@ dependencies = [
  "cfg-if",
  "image 0.23.2",
  "nalgebra",
- "rand 0.6.5",
+ "rand 0.7.3",
  "rayon",
  "search",
  "serde",
@@ -1634,6 +1648,7 @@ dependencies = [
 name = "sph_scene"
 version = "0.1.0"
 dependencies = [
+ "bubbler",
  "image 0.23.2",
  "nalgebra",
  "serde",

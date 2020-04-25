@@ -9,6 +9,7 @@ use sph_common::{Emitter, Animation, RigidObject, DFSPH, external_forces::Extern
 
 use serde_derive::*;
 use crate::{Solid, LiquidZone, EmitterConfig};
+use bubbler::config::BubblerConfig;
 
 fn default_gravity() -> [f32; 3] {
     [0.0, -9.81, 0.0]
@@ -125,6 +126,8 @@ pub struct Scene
     pub meshing_config: MeshingConfig,
     #[serde(default)]
     pub camera: CameraConfiguration,
+    #[serde(default)]
+    pub bubbler_config: BubblerConfig,
     pub config: Configuration,
     pub solids: Vec<Solid>,
     pub liquids_blocks: Vec<LiquidZone>,
@@ -223,6 +226,7 @@ impl Scene
 
 pub fn load_scene(name: &str) -> Result<Scene, Box<dyn std::error::Error>> {
     let result: Scene = serde_yaml::from_reader(&File::open(name)?)?;
+    result.bubbler_config.assert_valid();
 
     Ok(result)
 }
