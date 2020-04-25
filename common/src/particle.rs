@@ -284,6 +284,10 @@ impl DFSPH
         self.volume * self.rest_density
     }
 
+    pub fn find_neighbours(&self, x: &VertexWorld) -> Vec<usize> {
+        self.neighbours_struct.find_neighbours(self.len(),&self.positions.read().unwrap(), *x)
+    }
+
     fn neighbours_count(&self, i: usize) -> usize {
         self.neighbours[i].len()
     }
@@ -573,6 +577,10 @@ impl DFSPH
         self.neighbours_struct.insert(&self.positions.read().unwrap());
     }
 
+    pub fn gravity(&self) -> Vector3<f32> {
+        Vector3::new(0.0, -9.81, 0.0)
+    }
+
     pub fn tick(&mut self) -> f32 {
         self.init();
 
@@ -593,7 +601,7 @@ impl DFSPH
         self.positions.write().unwrap().par_iter_mut().zip(self.velocities.read().unwrap().par_iter()).for_each(|(p, v)| *p += dt * v);
         self.neighbours_struct.update_particles(&old, &self.positions.read().unwrap());
 
-        let gravity = Vector3::new(0.0, -9.81, 0.0);
+        let gravity = self.gravity();
         self.solids.iter_mut().for_each(|v| v.update(gravity, dt));
 
         let mut collisions = vec![];

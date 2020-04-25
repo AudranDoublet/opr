@@ -136,6 +136,13 @@ checksum = "0d8c1fef690941d3e7788d328517591fecc684c084084702d6ff1641e993699a"
 [[package]]
 name = "bubbler"
 version = "0.1.0"
+dependencies = [
+ "itertools",
+ "nalgebra",
+ "rand 0.7.3",
+ "rayon",
+ "sph_common",
+]
 
 [[package]]
 name = "bumpalo"
@@ -1361,7 +1368,7 @@ dependencies = [
  "cfg-if",
  "image 0.23.2",
  "nalgebra",
- "rand 0.6.5",
+ "rand 0.7.3",
  "rayon",
  "search",
  "serde",
