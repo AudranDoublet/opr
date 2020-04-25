@@ -5,8 +5,10 @@ pub struct DiffuseParticle {
     pub position: Vector3<f32>,
     pub velocity: Vector3<f32>,
     pub lifetime: f32,
+    pub kind: DiffuseParticleType,
 }
 
+#[derive(Copy, Clone)]
 pub enum DiffuseParticleType {
     Spray,
     Foam,

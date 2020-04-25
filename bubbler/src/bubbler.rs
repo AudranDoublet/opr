@@ -199,11 +199,12 @@ impl Bubbler<'a> {
 
                     let dir = r * theta.cos() * e1 + r * theta.sin() * e2;
 
-                    let x_d: Vector3<f32> = &positions[i] + dir + h * v_normalized;
+                    let x_d = &positions[i] + dir + h * v_normalized;
                     let v_d = &velocities[i] + dir;
                     let lifetime = self.infer_diffuse_particle_lifetime(likelihood_ta[i], likelihood_wc[i], likelihood_k[i]);
 
-                    res.push(DiffuseParticle { position: x_d, velocity: v_d, lifetime: lifetime });
+                    let neighbours = self.simulation.find_neighbours(&x_d);
+                    res.push(DiffuseParticle { position: x_d, velocity: v_d, lifetime: lifetime, kind: self.infer_diffuse_particle_type(&neighbours) });
                 }
 
                 res
@@ -226,7 +227,7 @@ impl Bubbler<'a> {
     }
     // FIXME-END;
 
-    fn infer_diffuse_particle_type(&self, _p: &DiffuseParticle, p_neighbours: &Vec<usize>) -> DiffuseParticleType {
+    fn infer_diffuse_particle_type(&self, p_neighbours: &Vec<usize>) -> DiffuseParticleType {
         match p_neighbours.len() {
             n if self.hp.interval_neighbours_bubble.contains(&n) => DiffuseParticleType::Bubble,
             n if self.hp.interval_neighbours_spray.contains(&n) => DiffuseParticleType::Spray,
@@ -262,7 +263,7 @@ impl Bubbler<'a> {
             .filter(|p| !p.is_dissolved())
             .map(|p| {
                 let neighbours = simulation.find_neighbours(&p.position);
-                let p_type = self.infer_diffuse_particle_type(&p, &neighbours);
+                let p_type = self.infer_diffuse_particle_type(&neighbours);
 
                 let new_velocity = match p_type {
                     // FIXME: the paper is mentioning F_ext, but which forces should we add? Perhaps we should consider the fluid acceleration as well?
@@ -271,12 +272,14 @@ impl Bubbler<'a> {
                     DiffuseParticleType::Foam => compute_avg_local_fluid_velocity(&p.position, neighbours),
                     DiffuseParticleType::Bubble => &p.velocity +
                         self.dt * (-self.hp.k_b * gravity + self.hp.k_d * (&compute_avg_local_fluid_velocity(&p.position, neighbours) - &p.velocity) / self.dt),
+                    _ => panic!("this won't happened"),
                 };
 
                 DiffuseParticle {
                     position: &p.position + self.dt * new_velocity,
                     velocity: new_velocity,
                     lifetime: p.lifetime,
+                    kind: p_type,
                 }
             })
             .fold(|| vec![], |mut a, b| {
