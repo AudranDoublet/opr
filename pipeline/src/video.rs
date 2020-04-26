@@ -4,8 +4,8 @@ use std::path::Path;
 use std::process::Command;
 
 pub fn pipeline_video(scene: &Scene, input_directory: &Path, dump_directory: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let fps = if scene.simulation_config.render_fps > 0.0 {
-        scene.simulation_config.render_fps as usize
+    let fps = if scene.render_config.fps > 0.0 {
+        scene.render_config.fps as usize
     } else {
         scene.simulation_config.fps as usize
     };

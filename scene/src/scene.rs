@@ -64,7 +64,6 @@ pub struct SimulationConfig
 {
     pub max_time: f32,
     pub fps: f32,
-    pub render_fps: f32,
 }
 
 impl Default for SimulationConfig {
@@ -72,7 +71,22 @@ impl Default for SimulationConfig {
         SimulationConfig {
             max_time: 4.,
             fps: 24.,
-            render_fps: -1.,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RenderConfig
+{
+    pub fps: f32,
+    pub resolution: (usize, usize),
+}
+
+impl Default for RenderConfig {
+    fn default() -> RenderConfig {
+        RenderConfig {
+            fps: -1.,
+            resolution: (512, 512),
         }
     }
 }
@@ -124,6 +138,8 @@ pub struct Scene
     pub simulation_config: SimulationConfig,
     #[serde(default)]
     pub meshing_config: MeshingConfig,
+    #[serde(default)]
+    pub render_config: RenderConfig,
     #[serde(default)]
     pub camera: CameraConfiguration,
     #[serde(default)]

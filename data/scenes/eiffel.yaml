@@ -9,8 +9,10 @@ config:
         tolerance: 0.01
 simulation_config:
     fps: 48
-    render_fps: 24
     max_time: 4.0
+render_config:
+    fps: 24
+    resolution: [1024, 1024]
 camera:
     position: [0.0, -3.0, -5.0]
     generate_at_render: true

@@ -39,6 +39,8 @@ pub fn pipeline_render(scene: &Scene, input_directory: &Path, dump_directory: &P
         Light::directional(Vector3::new(-1., 1., -1.), Vector3::new(1., 1., 1.)),
     ];
 
+    let (width, height) = scene.render_config.resolution;
+
     for idx in 0..simulations.len() {
         let mut ray_scene = SceneConfig::load(&simulations[idx])?;
         ray_scene.lights = lights.clone();
@@ -55,9 +57,9 @@ pub fn pipeline_render(scene: &Scene, input_directory: &Path, dump_directory: &P
 
         render_scene.build(12);
 
-        let pixels  = render_scene.render(512, 512);
+        let pixels = render_scene.render(width, height);
 
-        write_image(&dump_directory.join(format!("{:08}.png", idx)), &pixels, 512, 512);
+        write_image(&dump_directory.join(format!("{:08}.png", idx)), &pixels, width, height);
 
         pb.inc(1);
     }
