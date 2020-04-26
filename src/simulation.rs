@@ -4,6 +4,8 @@ use std::fs;
 use std::path::Path;
 use std::time::Instant;
 
+use bubbler::bubbler::Bubbler;
+use bubbler::diffuse_particle::DiffuseParticleType;
 use clap::ArgMatches;
 use kiss3d::{camera::camera::Camera, scene::SceneNode};
 use nalgebra::{Point3, Translation3};
@@ -24,7 +26,7 @@ pub fn add_particles(range: std::ops::Range<usize>, dfsph: &DFSPH, scene: &mut r
     }
 }
 
-fn add_meshes(dfsph: &mut DFSPH, config: &sph_scene::Scene, scene: &mut render::scene::Scene) -> Vec<Option<SceneNode>> {
+fn add_meshes(dfsph: &DFSPH, config: &sph_scene::Scene, scene: &mut render::scene::Scene) -> Vec<Option<SceneNode>> {
     let mut result = Vec::new();
 
     for i in 0..config.solids.len() {
@@ -65,8 +67,34 @@ fn dump_simulation(simulation: &DFSPH, dump_folder: &Path, idx: usize, verbose: 
     Ok(())
 }
 
+fn update_diffuse(renderer: &mut render::scene::Scene, bubbler: &Bubbler) {
+    renderer.window.remove_node(&mut renderer.diffuse);
+    renderer.diffuse = renderer.window.add_group();
+
+    let radius = renderer.get_particle_radius();
+
+    for diffuse in bubbler.get_particles() {
+        let diffuse_radius = match diffuse.kind {
+            DiffuseParticleType::Spray => radius * 0.4,
+            DiffuseParticleType::Bubble => radius * 0.8,
+            DiffuseParticleType::Foam => radius * 0.7,
+        };
+        let (r, g, b) = match diffuse.kind {
+            DiffuseParticleType::Spray => (1., 1., 1.),
+            DiffuseParticleType::Bubble => (1., 0., 1.),
+            DiffuseParticleType::Foam => (1., 1., 0.),
+        };
+
+        let mut sphere = renderer.diffuse.add_sphere(diffuse_radius);
+        let (x, y, z) = (diffuse.position.x, diffuse.position.y, diffuse.position.z);
+        sphere.set_local_translation(Translation3::new(x, y, z));
+        sphere.set_color(r, g, b);
+    }
+}
+
 fn simulate(scene: &Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Result<(), Box<dyn std::error::Error>> {
     let mut fluid_simulation = scene.load()?;
+    let mut bubbler = Bubbler::new(scene.bubbler_config);
     let mut total_time = 0.0;
     let mut time_simulated_since_last_frame = fps;
     let mut display_high_speed_only = false;
@@ -79,7 +107,7 @@ fn simulate(scene: &Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Resu
     renderer.window.set_point_size(collision_size);
 
     add_particles(0..fluid_simulation.len(), &fluid_simulation, &mut renderer);
-    let mut meshes = add_meshes(&mut fluid_simulation, &scene, &mut renderer);
+    let mut meshes = add_meshes(&fluid_simulation, &scene, &mut renderer);
 
     let mut show_info: bool = true;
     let mut show_velocity: bool = false;
@@ -164,6 +192,9 @@ fn simulate(scene: &Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Resu
             let prev = fluid_simulation.len();
             time_simulated_since_last_frame += fluid_simulation.tick();
             add_particles(prev..fluid_simulation.len(), &fluid_simulation, &mut renderer);
+            if bubbler.tick(&fluid_simulation) {
+                update_diffuse(&mut renderer, &bubbler);
+            }
 
             let d_v_mean_sq = fluid_simulation.debug_get_v_mean_sq();
             let d_v_max_sq_deviation = fluid_simulation.debug_get_v_max_sq() / d_v_mean_sq;
@@ -209,7 +240,6 @@ fn simulate(scene: &Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Resu
             }
 
             total_time += fluid_simulation.get_time_step();
-
         }
 
         if show_collisions {
