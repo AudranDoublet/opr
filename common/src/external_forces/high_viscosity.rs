@@ -6,25 +6,14 @@ use rayon::prelude::*;
 use crate::{DFSPH, external_forces::ExternalForce};
 use crate::utils::ConjugateGradientSolver;
 
+use crate::utils::orthogonal_vectors;
+
 pub struct ViscosityWeiler2018Force {
     solver: ConjugateGradientSolver,
     viscosity_coeffcient: f32,
     surface_viscosity_coefficient: f32,
 
     difference: RwLock<Vec<Vector3<f32>>>,
-}
-
-fn orthogonal_vectors(v: Vector3<f32>) -> Vec<Vector3<f32>> {
-    let mut up = Vector3::x();
-
-    if up.dot(&v) > 0.999 {
-        up = Vector3::y();
-    }
-
-    let a = v.cross(&up);
-    let b = v.cross(&a);
-
-    vec![a, -a, b, -b]
 }
 
 impl ViscosityWeiler2018Force {

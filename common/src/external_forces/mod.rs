@@ -30,7 +30,7 @@ impl Default for ViscosityType {
     fn default() -> ViscosityType {
         ViscosityType::Basic {
             coefficient: 0.01,
-            surface_coefficient: 0.0,
+            surface_coefficient: 0.005,
         }
     }
 }
