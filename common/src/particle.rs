@@ -314,11 +314,19 @@ impl DFSPH
     }
 
     pub fn find_neighbours(&self, x: &VertexWorld) -> Vec<usize> {
-        self.neighbours_struct.find_neighbours(self.len(),&self.positions.read().unwrap(), *x)
+        self.neighbours_struct.find_neighbours(self.len(), &self.positions.read().unwrap(), *x)
     }
 
-    fn neighbours_count(&self, i: usize) -> usize {
+    pub fn neighbours_count(&self, i: usize) -> usize {
         self.neighbours[i].len()
+    }
+
+    pub fn neighbours_count_with_solids(&self, i: usize) -> usize {
+        let volume = self.volume(i);
+
+        self.neighbours_count(i) + self.solids_reduce(i, 0, &|_, r, s_volume, _| {
+            r + (s_volume / volume) as usize + 1
+        })
     }
 
     pub fn neighbours_reduce<V>(&self, i: usize, value: V, f: &dyn Fn(V, usize, usize) -> V) -> V {

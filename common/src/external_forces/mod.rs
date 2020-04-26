@@ -3,6 +3,7 @@ mod surfacetension;
 mod basic_viscosity;
 mod high_viscosity;
 mod vorticity;
+mod drag;
 
 use serde_derive::*;
 
@@ -52,6 +53,21 @@ impl Default for VorticityConfig {
     }
 }
 
+#[derive(Debug, Deserialize)]
+pub struct DragConfig {
+    drag_coefficient: f32,
+    air_velocity: Vector3<f32>,
+}
+
+impl Default for DragConfig {
+    fn default() -> DragConfig {
+        DragConfig {
+            drag_coefficient: 1.0,
+            air_velocity: Vector3::zeros(),
+        }
+    }
+}
+
 pub trait ExternalForce
 {
     fn compute_acceleration(&self, sim: &DFSPH, accelerations: &mut Vec<Vector3<f32>>);
@@ -91,6 +107,13 @@ impl ExternalForces {
             config.vorticity_coefficient,
             config.inertia_inverse,
             config.viscosity_omega,
+        ))
+    }
+
+    pub fn drag(&mut self, config: &DragConfig) -> &mut ExternalForces {
+        self.add(drag::DragForce::new(
+            config.air_velocity,
+            config.drag_coefficient,
         ))
     }
 
