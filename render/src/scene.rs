@@ -3,13 +3,13 @@ extern crate nalgebra as na;
 
 use kiss3d::camera::FirstPerson;
 use kiss3d::light::Light;
+use kiss3d::scene::SceneNode;
 use kiss3d::text::Font;
 use kiss3d::window::Window;
 
-use crate::particle::{Particle, V3};
+use crate::particle::Particle;
 
 use self::na::{Point2, Point3, Translation3};
-use kiss3d::scene::SceneNode;
 
 pub struct Scene {
     pub window: Window,
@@ -22,7 +22,7 @@ pub struct Scene {
 
 impl Scene {
     pub fn new(particle_radius: f32) -> Scene {
-        let window= Window::new("OPR - Fluid Simulation");
+        let window = Window::new("OPR - Fluid Simulation");
         let mut scene = Scene {
             window,
             camera: FirstPerson::new(Point3::origin(), Point3::origin()),

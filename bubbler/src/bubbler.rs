@@ -1,8 +1,6 @@
-use std::borrow::Borrow;
-use std::ops::{Div, Range};
+use std::ops::{Div};
 use std::sync::RwLock;
 
-use itertools::Itertools;
 use nalgebra::{RealField, Vector3};
 use rand::*;
 use rand::distributions::Uniform;
@@ -10,16 +8,15 @@ use rayon::prelude::*;
 use sph_common::DFSPH;
 use sph_common::mesher::types::VertexWorld;
 
+use crate::config::BubblerConfig;
 use crate::diffuse_particle::{DiffuseParticle, DiffuseParticleType};
-use crate::params::BubblerHyperParameters;
 
 pub struct Bubbler {
     /// Bubbler Hyper Parameters
-    hp: BubblerHyperParameters,
+    hp: BubblerConfig,
 
     /// Time elapsed between the last and the current tick
     dt: f32,
-    mass_spray: f32,
 
     /// Store the likelihood of particles to trap air
     likelihood_ta: RwLock<Vec<f32>>,
@@ -33,8 +30,8 @@ pub struct Bubbler {
     particles: Vec<DiffuseParticle>,
 }
 
-fn clamp_normalized(value: f32, range: &Range<f32>) -> f32 {
-    let (min, max) = (range.start, range.end);
+fn clamp_normalized(value: f32, range: &(f32, f32)) -> f32 {
+    let (min, max) = (range.0, range.1);
     (value.min(max) - value.min(min)) / (max - min)
 }
 
@@ -60,24 +57,25 @@ fn orthogonal_vector(v_normalized: &Vector3<f32>) -> (Vector3<f32>, Vector3<f32>
     (e1, e2)
 }
 
+fn contains<T: PartialOrd>(interval: (T, T), value: T) -> bool{
+    interval.0 <= value && value <= interval.1
+}
+
 fn make_cylinder_samplers() -> (Uniform<f32>, Uniform<f32>, Uniform<f32>) {
     (Uniform::new_inclusive(0.0, 1.0), Uniform::new_inclusive(0.0, 1.0), Uniform::new_inclusive(0.0, 1.0))
 }
 
 impl Bubbler {
-    pub fn new(parameters: BubblerHyperParameters, simulation: &DFSPH) -> Self {
-        // FIXME: won't work if the simulation is empty, or if the simulation contains different type of particles
-        let mass_spray = parameters.mass_ratio_spray * simulation.mass(0);
-        // FIXME-END
+    pub fn new(parameters: BubblerConfig) -> Self {
+        parameters.assert_valid();
 
         Bubbler {
             hp: parameters,
             dt: 0.0,
-            mass_spray,
-            likelihood_ta: RwLock::new(vec![0.; simulation.len()]),
-            likelihood_wc: RwLock::new(vec![0.; simulation.len()]),
-            likelihood_k: RwLock::new(vec![0.; simulation.len()]),
-            grad_densities: RwLock::new(vec![Vector3::zeros(); simulation.len()]),
+            likelihood_ta: RwLock::new(vec![]),
+            likelihood_wc: RwLock::new(vec![]),
+            likelihood_k: RwLock::new(vec![]),
+            grad_densities: RwLock::new(vec![]),
             particles: vec![],
         }
     }
@@ -186,13 +184,7 @@ impl Bubbler {
         self.particles.par_extend((0..simulation.len()).into_par_iter()
             .map(|i| {
                 let mut rng = rand::thread_rng();
-                let nb_diffuse = (likelihood_k[i] * (self.hp.k_ta * likelihood_ta[i] + self.hp.k_wc * likelihood_wc[i]) * self.dt);
-
-                // if likelihood_k[i] > 0.5 || likelihood_ta[i] > 0.5 || likelihood_wc[i] > 0.5 {
-                //     println!("{} => I_k = {}, I_ta = {}, I_wc = {} // nb_diffuse = {}", i, likelihood_k[i], likelihood_ta[i], likelihood_wc[i], nb_diffuse);
-                // }
-
-                let nb_diffuse = nb_diffuse as usize;
+                let nb_diffuse = (likelihood_k[i] * (self.hp.k_ta * likelihood_ta[i] + self.hp.k_wc * likelihood_wc[i]) * self.dt) as usize;
 
                 let (dist_r, dist_theta, dist_h) = make_cylinder_samplers();
                 let mut res = vec![];
@@ -230,16 +222,16 @@ impl Bubbler {
 
     // FIXME: not sure about this part, the paper doesn't give much information about how to compute the lifetime of a diffuse particle
     fn infer_diffuse_particle_lifetime(&self, potential_ta: f32, potential_wc: f32, potential_k: f32) -> f32 {
-        let (min, max) = (self.hp.lifetime.start, self.hp.lifetime.end);
+        let (min, max) = (self.hp.lifetime.0, self.hp.lifetime.1);
         min + (potential_ta + potential_wc + potential_k).div(3.0) * (max - min)
     }
     // FIXME-END;
 
     fn infer_diffuse_particle_type(&self, p_neighbours: &Vec<usize>) -> DiffuseParticleType {
         match p_neighbours.len() {
-            n if self.hp.interval_neighbours_bubble.contains(&n) => DiffuseParticleType::Bubble,
-            n if self.hp.interval_neighbours_spray.contains(&n) => DiffuseParticleType::Spray,
-            n if self.hp.interval_neighbours_foam.contains(&n) => DiffuseParticleType::Foam,
+            n if contains(self.hp.interval_neighbours_bubble, n) => DiffuseParticleType::Bubble,
+            n if contains(self.hp.interval_neighbours_spray, n) => DiffuseParticleType::Spray,
+            n if contains(self.hp.interval_neighbours_foam, n) => DiffuseParticleType::Foam,
             n => panic!(format!("the number of neighbours ({}) does not fit into any DiffuseParticleType, the ranges are:\n\
                 - Bubble => {:?}\n\
                 - Spray  => {:?}\n\
@@ -279,7 +271,6 @@ impl Bubbler {
                     DiffuseParticleType::Foam => compute_avg_local_fluid_velocity(&p.position, neighbours),
                     DiffuseParticleType::Bubble => &p.velocity +
                         self.dt * (-self.hp.k_b * gravity + self.hp.k_d * (&compute_avg_local_fluid_velocity(&p.position, neighbours) - &p.velocity) / self.dt),
-                    _ => panic!("this won't happened"),
                 };
 
                 DiffuseParticle {
@@ -306,24 +297,16 @@ impl Bubbler {
             return false;
         }
 
-        println!("curr_nb_particles           : {}", self.particles.len());
+        self.update_containers_capacities(&simulation);
+
         self.update_diffuse_particles(simulation);
-        let mut prev_len = self.particles.len();
-        println!("nb_particles_after_filter   : {}", self.particles.len());
 
         self.compute_grad_densities(simulation);
         self.compute_likelihood_ta(simulation);
         self.compute_likelihood_wc(simulation);
         self.compute_likelihood_k(simulation);
 
-        // println!("likelihood_k: {:?}", self.likelihood_k.read().unwrap());
-        // println!("likelihood_ta: {:?}", self.likelihood_ta.read().unwrap());
-        // println!("likelihood_wc: {:?}", self.likelihood_wc.read().unwrap());
-
         self.generate_diffuse_particles(simulation);
-        println!("nb_newly_generated_particles: {}", self.particles.len() - prev_len);
-        println!();
-
 
         self.dt = 0.0;
 

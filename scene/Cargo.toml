@@ -8,6 +8,8 @@ edition = "2018"
 
 [dependencies]
 sph_common = { path = "../common" }
+bubbler = { path = "../bubbler" }
+
 nalgebra = "0.20.0"
 serde = "1.0.105"
 serde_yaml = "0.8.11"

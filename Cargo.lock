@@ -137,10 +137,12 @@ checksum = "0d8c1fef690941d3e7788d328517591fecc684c084084702d6ff1641e993699a"
 name = "bubbler"
 version = "0.1.0"
 dependencies = [
- "itertools",
  "nalgebra",
  "rand 0.7.3",
  "rayon",
+ "serde",
+ "serde_derive",
+ "serde_yaml",
  "sph_common",
 ]
 
@@ -1646,6 +1648,7 @@ dependencies = [
 name = "sph_scene"
 version = "0.1.0"
 dependencies = [
+ "bubbler",
  "image 0.23.2",
  "nalgebra",
  "serde",

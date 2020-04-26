@@ -94,7 +94,7 @@ fn update_diffuse(renderer: &mut render::scene::Scene, bubbler: &Bubbler) {
 
 fn simulate(scene: &Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Result<(), Box<dyn std::error::Error>> {
     let mut fluid_simulation = scene.load()?;
-    let mut bubbler = Bubbler::new(Default::default(), &fluid_simulation);
+    let mut bubbler = Bubbler::new(scene.bubbler_config);
     let mut total_time = 0.0;
     let mut time_simulated_since_last_frame = fps;
     let mut display_high_speed_only = false;
