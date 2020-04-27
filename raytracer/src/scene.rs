@@ -12,11 +12,11 @@ use rayon::prelude::*;
 use search::{BVH, BVHParameters, Ray};
 
 use crate::*;
-use crate::shapes::Triangle;
 
 const ILLUM_AMBIENT: u8 = 0;
 const ILLUM_AMBIENT_COLOR: u8 = 1;
 const ILLUM_HIGHLIGHT: u8 = 2;
+const ILLUM_REFLECTION: u8 = 3;
 const ILLUM_REFRACTION_REFLECTION_FRESNEL: u8 = 7;
 
 pub struct Scene
@@ -27,7 +27,8 @@ pub struct Scene
     textures: Vec<Texture>,
     lights: Vec<Light>,
     light_ambient: Vector3<f32>,
-
+    correction_bias: f32,
+    air_ior: f32,
     tree: BVH<shapes::Triangle>,
 }
 
@@ -47,6 +48,39 @@ fn clamp_light(v: &Vector3<f32>) -> Vector3<f32> {
     )
 }
 
+fn reflect(ray: &Ray, normal: &Vector3<f32>) -> Vector3<f32> {
+    &ray.direction - 2.0 * normal.dot(&ray.direction) * normal
+}
+
+fn refract(ray: &Ray, normal: &Vector3<f32>, cos_i: f32, n1: f32, n2: f32) -> Vector3<f32> {
+    let n = n1 / n2;
+    let k = 1.0 - n * n * (1.0 - cos_i * cos_i);
+    assert!(k >= 0.0, "total internal reflection");
+    n * &ray.direction + (n * cos_i - k.sqrt()) * normal
+}
+
+fn reflectivity_fresnel(cos_i: f32, n1: f32, n2: f32) -> f32 {
+    let sin_t = (n1 / n2) * (1.0 - cos_i * cos_i).sqrt();
+    if sin_t > 1.0 { return 1.0; } // total internal reflection
+    let cos_t = 1. - sin_t * sin_t;
+    let r_par = ((n1 * cos_i - n2 * cos_t) / (n1 * cos_i + n2 * cos_t)).powi(2);
+    let r_orth = ((n2 * cos_i - n1 * cos_t) / (n2 * cos_i + n1 * cos_t)).powi(2);
+
+    (r_orth + r_par) / 2.0
+}
+
+fn reflectivity_schlick2(cos_i: f32, n1: f32, n2: f32) -> f32 {
+    let r0 = ((n1 - n2) / (n1 + n2)).powi(2);
+    let cos_i = if n1 > n2 {
+        let n = n1 / n2;
+        let sin_t2 = n * n * (1.0 - cos_i * cos_i);
+        if sin_t2 > 1.0 { return 1.0; }
+        (1.0 - sin_t2).sqrt()
+    } else { cos_i };
+    let x = 1.0 - cos_i;
+    r0 + (1.0 - r0) * x.powi(5)
+}
+
 impl Scene {
     pub fn new() -> Scene {
         Scene {
@@ -56,6 +90,8 @@ impl Scene {
             textures: Vec::new(),
             lights: Vec::new(),
             light_ambient: Vector3::zeros(),
+            correction_bias: 0.1,
+            air_ior: 1.,
             tree: BVH::default(),
         }
     }
@@ -230,11 +266,8 @@ impl Scene {
     }
 
     fn sky_color(&self, ray: Ray) -> Vector3<f32> {
-        ray.direction.normalize()
-    }
-
-    fn reflect(&self, ray: &Ray, normal: &Vector3<f32>) -> Vector3<f32> {
-        &ray.direction - 2.0 * (normal.dot(&ray.direction)) * normal
+        ray.direction.apply_into(|f| f.cos()).normalize()
+        // Vector3::zeros()
     }
 
     fn cast_ray(&self, ray: Ray, max_rec: u32) -> Vector3<f32> {
@@ -244,12 +277,6 @@ impl Scene {
                 + triangle.v3_normal * i.v).normalize();
 
             let material = &self.materials[triangle.material];
-
-            // let reflected_color = if max_rec == 0 {
-            //     self.sky_color(reflected_ray)
-            // } else {
-            //     self.cast_ray(reflected_ray, max_rec - 1)
-            // };
 
             let color = match material.illumination_model {
                 ILLUM_AMBIENT => {
@@ -277,7 +304,7 @@ impl Scene {
                     let mut diffuse = Vector3::zeros();
                     let mut specular = Vector3::zeros();
 
-                    let reflect_direction = self.reflect(&ray, &normal);
+                    let reflect_direction = reflect(&ray, &normal);
                     let specular_intensity = view_dir.dot(&reflect_direction).max(0.0).powf(material.shininess);
 
                     self.lights.iter().filter(|l| match l.shadow_ray(position) {
@@ -294,9 +321,43 @@ impl Scene {
 
                     ambient + diffuse + specular
                 }
-                // ILLUM_REFRACTION_REFLECTION_FRESNEL => {
-                //     self.light_ambient
-                // }
+                ILLUM_REFLECTION => {
+                    let reflect_direction = reflect(&ray, &normal);
+                    let position = i.position(&ray) + &reflect_direction * self.correction_bias;
+                    let reflect_ray = Ray::new(position, reflect_direction);
+                    if max_rec == 0 { self.sky_color(reflect_ray) } else {
+                        self.cast_ray(reflect_ray, max_rec - 1)
+                    }
+                }
+                ILLUM_REFRACTION_REFLECTION_FRESNEL => {
+                    let reflect_direction = reflect(&ray, &normal);
+
+                    let mut cos_i = normal.dot(&ray.direction);
+                    let (normal, n1, n2) = if cos_i > 0.0 { (-normal, material.optical_density, self.air_ior) } else {
+                        cos_i = -cos_i;
+                        (normal, self.air_ior, material.optical_density)
+                    };
+
+                    // let coeff_reflectivity = reflectivity_fresnel(cos_i, n1, n2);
+                    let coeff_reflectivity = reflectivity_schlick2(cos_i, n1, n2);
+
+                    let position = i.position(&ray);
+                    let reflect_ray = Ray::new(&position + &reflect_direction * self.correction_bias, reflect_direction);
+
+                    let reflect_color = if max_rec == 0 { self.sky_color(reflect_ray) } else {
+                        self.cast_ray(reflect_ray, max_rec - 1)
+                    };
+
+                    let refract_color = if coeff_reflectivity < 0.99 {
+                        let refract_direction = refract(&ray, &normal, cos_i, n1, n2);
+                        let refract_ray = Ray::new(&position + &refract_direction * self.correction_bias, refract_direction);
+                        if max_rec == 0 { self.sky_color(refract_ray) } else {
+                            self.cast_ray(refract_ray, max_rec - 1)
+                        }
+                    } else { Vector3::zeros() };
+
+                    coeff_reflectivity * reflect_color + (1.0 - coeff_reflectivity) * refract_color
+                }
                 _ => panic!(format!("Unknown illum model {}", material.illumination_model))
             };
 

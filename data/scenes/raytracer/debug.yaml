@@ -1,16 +1,20 @@
 objects:
-    - path: data/objects/box_blue.obj
+    - path: data/objects/sphere_transparent.obj
       rotation: [0, 45, 15]
       position: [0, 2, 2]
-      scale: [2, 2, 2]
+      scale: [0.05, 0.05, 0.05]
     - path: data/objects/box_red.obj
       rotation: [0, 0, 65]
       position: [-1, 0.7, -0.5]
       scale: [1, 1, 1]
+#    - path: data/objects/box_green.obj
+#      rotation: [25, 15, 0]
+#      position: [2.5, 3.5, 1]
+#      scale: [1.5, 1.5, 1.5]
     - path: data/objects/box_green.obj
-      rotation: [25, 15, 0]
-      position: [2.5, 3.5, 1]
-      scale: [1.5, 1.5, 1.5]
+      rotation: [10, 5, 0]
+      position: [0, 0, 15]
+      scale: [15, 15, 15]
 lights:
     - type: ambient
       color: [0.3, 0.3, 0.3]
