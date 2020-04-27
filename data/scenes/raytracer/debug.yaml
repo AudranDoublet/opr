@@ -8,13 +8,15 @@ objects:
       position: [-1, 0.7, -0.5]
       scale: [1, 1, 1]
     - path: data/objects/box_green.obj
-      rotation: [25, 0, 0]
+      rotation: [25, 15, 0]
       position: [2.5, 3.5, 1]
       scale: [1.5, 1.5, 1.5]
 lights:
     - type: ambient
-      color: [0.3, 0.3, 0.3]
+      intensity: 0.3
+      color: [1., 1., 1.]
     - type: directional
+      intensity: 1.0
       direction: [1, -1, 1]
       color: [1, 1, 1]
 camera:

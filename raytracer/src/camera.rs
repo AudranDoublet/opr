@@ -51,6 +51,10 @@ impl Camera
         aspect_ratio
     }
 
+    pub fn get_origin(&self) -> &Vector3<f32> {
+        &self.origin
+    }
+
     fn right(&self) -> Vector3<f32> {
         self.up.cross(&self.front)
     }

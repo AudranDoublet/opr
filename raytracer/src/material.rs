@@ -1,8 +1,10 @@
-use search::IntersectsBVHShape;
+extern crate tobj;
+
 use nalgebra::Vector3;
+use search::IntersectsBVHShape;
+
 use crate::vector3_from_array;
 
-extern crate tobj;
 
 pub struct Material
 {
@@ -10,6 +12,7 @@ pub struct Material
     diffuse: Vector3<f32>,
     pub specular: Vector3<f32>,
     pub shininess: f32,
+    pub optical_density: f32,
     diffuse_tex: Option<usize>,
 }
 
@@ -53,10 +56,11 @@ impl Material
             diffuse: vector3_from_array(&m.diffuse),
             specular: vector3_from_array(&m.specular),
             shininess: m.shininess,
+            optical_density: m.optical_density,
             diffuse_tex: match &m.diffuse_texture[..] {
                 "" => None,
                 v => Some(*texs.get::<str>(v).unwrap_or(&0)),
-            }
+            },
         }
     }
 
@@ -78,9 +82,7 @@ impl Material
             let pos = (x as isize) + (y as isize);
 
             texture.data[pos as usize]
-        }
-        else
-        {
+        } else {
             self.diffuse
         }
     }

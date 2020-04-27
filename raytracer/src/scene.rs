@@ -1,15 +1,15 @@
-extern crate tobj;
 extern crate rayon;
 extern crate serde_yaml;
+extern crate tobj;
 
-use search::{BVH, Ray, BVHParameters};
-use nalgebra::{Vector3, Vector2, UnitQuaternion};
 use std::collections::HashMap;
 use std::error::Error;
-use std::path::Path;
 use std::fs::File;
+use std::path::Path;
 
+use nalgebra::{UnitQuaternion, Vector2, Vector3};
 use rayon::prelude::*;
+use search::{BVH, BVHParameters, Ray};
 
 use crate::*;
 
@@ -65,7 +65,7 @@ impl Scene {
     }
 
     pub fn from_file(path: &Path, default_material: &Path) -> Result<Scene, Box<dyn Error>> {
-        let file : scene_config::SceneConfig = serde_yaml::from_reader(File::open(path)?)?;
+        let file: scene_config::SceneConfig = serde_yaml::from_reader(File::open(path)?)?;
 
         Scene::from_config(file, default_material)
     }
@@ -127,7 +127,7 @@ impl Scene {
 
         for model in models.iter()
         {
-            let mesh = &model.mesh; 
+            let mesh = &model.mesh;
             let mat_id = if let Some(mat) = mesh.material_id {
                 mat + mat_id_app
             } else {
@@ -139,8 +139,8 @@ impl Scene {
             for i in (0..mesh.positions.len()).step_by(3)
             {
                 let pos = rotation * Vector3::new(mesh.positions[i + 0],
-                               mesh.positions[i + 1],
-                               mesh.positions[i + 2]).component_mul(&scale) + position;
+                                                  mesh.positions[i + 1],
+                                                  mesh.positions[i + 2]).component_mul(&scale) + position;
                 vertices.push(pos);
             }
 
@@ -149,8 +149,8 @@ impl Scene {
             for i in (0..mesh.normals.len()).step_by(3)
             {
                 vertices_normal.push(rotation * Vector3::new(mesh.normals[i + 0],
-                                           mesh.normals[i + 1],
-                                           mesh.normals[i + 2]));
+                                                             mesh.normals[i + 1],
+                                                             mesh.normals[i + 2]));
             }
 
             let mut vertices_tex = vec![Vector2::zeros(); vertices.len()];
@@ -158,7 +158,7 @@ impl Scene {
             for i in (0..mesh.texcoords.len()).step_by(2)
             {
                 vertices_tex[i / 2] = Vector2::new(mesh.texcoords[i + 0],
-                                               mesh.texcoords[i + 1]);
+                                                   mesh.texcoords[i + 1]);
             }
 
             for i in (0..mesh.indices.len()).step_by(3)
@@ -180,7 +180,7 @@ impl Scene {
                                           vertices_tex[b] - vertices_tex[a],
                                           vertices_tex[c] - vertices_tex[a],
                                           mat_id,
-                ));
+                    ));
             }
         }
 
@@ -217,41 +217,49 @@ impl Scene {
         )
     }
 
-    fn cast_ray(&self, ray: Ray, max_rec: u32, apply_lights: bool) -> Option<Vector3<f32>> {
+    fn sky_color(&self, _ray: Ray) -> Vector3<f32> {
+        _ray.direction.normalize()
+        // Vector3::new(0.7, 0.7, 1.0)
+    }
+
+    fn cast_ray(&self, ray: Ray, max_rec: u32) -> Vector3<f32> {
         if let Some(tree) = &self.tree {
             if let Some((i, triangle)) = tree.ray_intersect(&ray) {
                 let normal = (triangle.v1_normal * (1.0 - i.u - i.v)
-                          + triangle.v2_normal * i.u
-                          + triangle.v3_normal * i.v).normalize();
+                    + triangle.v2_normal * i.u
+                    + triangle.v3_normal * i.v).normalize();
 
                 let position = i.position(&ray);
                 let material = &self.materials[triangle.material];
+                let view_dir = (self.camera.get_origin() - position).normalize();
 
                 let reflected_ray = ray.direction - 2.0 * (normal.dot(&ray.direction)) * normal;
+                // let reflected_color = if max_rec == 0 {
+                //     self.sky_color(reflected_ray)
+                // } else {
+                //     self.cast_ray(reflected_ray, max_rec - 1)
+                // };
 
-                let mut triangle_color = material.get_diffuse(&self.textures, &triangle, i.u, i.v);
+                let triangle_color = material.get_diffuse(&self.textures, &triangle, i.u, i.v);
 
-                if apply_lights {
-                    triangle_color = triangle_color.component_mul(
-                        &self.clamp_light(
-                            self.lights
-                            .iter()
-                            .filter(|l| match l.shadow_ray(position) {
-                                Some(v) => !self.cast_ray(v, 0, false).is_some(),
-                                _ => true
-                            })
-                            .map(|l| l.apply_light(normal))
-                            .fold(Vector3::zeros(), |a, b| a + b)
-                        )
-                    );
-                }
+                let lighting = self.lights.iter()
+                    .filter(|l| match l.shadow_ray(position) {
+                        Some(v) => tree.ray_intersect(&v).is_none(),
+                        _ => true
+                    })
+                    .map(|l| {
+                        l.apply_light(&view_dir, &normal, &reflected_ray, &material, &triangle_color)
+                    })
+                    .fold(Vector3::zeros(), |a, b| a + b);
 
-                Some(triangle_color)
+                self.clamp_light(lighting)
             } else {
-                None
+                // None
+                self.sky_color(ray)
             }
         } else {
-            None
+            self.sky_color(ray)
+            // None
         }
     }
 
@@ -259,8 +267,7 @@ impl Scene {
         self.camera.set_size(width as f32, height as f32);
 
         (0..width * height).into_par_iter()
-                           .map(|i| self.cast_ray(self.camera.generate_ray((i % width) as f32, (i / width) as f32), 10, true)
-                                        .unwrap_or(Vector3::zeros()))
-                           .collect()
+            .map(|i| self.cast_ray(self.camera.generate_ray((i % width) as f32, (i / width) as f32), 10))
+            .collect()
     }
 }

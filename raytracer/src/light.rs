@@ -1,54 +1,58 @@
 use nalgebra::Vector3;
 use search::Ray;
-use crate::vector3_from_const;
 use serde_derive::*;
+
+use crate::Material;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(tag = "type")]
 pub enum Light {
     #[serde(rename = "ambient")]
-    AmbientLight { color: Vector3<f32> },
+    AmbientLight { intensity: f32, color: Vector3<f32> },
     #[serde(rename = "directional")]
-    DirectionalLight { color: Vector3<f32>, direction: Vector3<f32> },
+    DirectionalLight { intensity: f32, color: Vector3<f32>, direction: Vector3<f32> },
 }
 
 impl Light
 {
-    pub fn ambient(color: Vector3<f32>) -> Light {
+    pub fn ambient(intensity: f32, color: Vector3<f32>) -> Light {
         Light::AmbientLight {
-            color: color,
+            intensity,
+            color,
         }
     }
 
-    pub fn directional(direction: Vector3<f32>, color: Vector3<f32>) -> Light {
+    pub fn directional(intensity: f32, direction: Vector3<f32>, color: Vector3<f32>) -> Light {
         Light::DirectionalLight {
+            intensity,
             direction: -direction.normalize(),
-            color: color,
+            color,
         }
     }
 
     pub fn init(&mut self) {
         match *self {
-            Light::DirectionalLight { ref mut direction, color: _ } => {
+            Light::DirectionalLight { ref mut direction, .. } => {
                 *direction = -direction.normalize();
-            },
+            }
             _ => (),
         }
     }
 
-    pub fn apply_light(&self, normal: Vector3<f32>) -> Vector3<f32> {
+    pub fn apply_light(&self, view_dir: &Vector3<f32>, normal: &Vector3<f32>, reflect: &Vector3<f32>, material: &Material, diffuse: &Vector3<f32>) -> Vector3<f32> {
         match *self {
-            Light::AmbientLight { color } => color,
-            Light::DirectionalLight { direction, color } => match normal.dot(&direction) {
-                                                                v if (v >= 0.0) => v * color,
-                                                                _ => vector3_from_const(0.0),
-                                                            }
+            Light::AmbientLight { intensity, color } => intensity * color.component_mul(&material.get_ambient()),
+            Light::DirectionalLight { intensity, direction, color } => {
+                let diffuse = diffuse * normal.dot(&direction).max(0.0);
+                let specular = &material.specular * view_dir.dot(&reflect).max(0.0).powf(material.shininess);
+                intensity * color.component_mul(&(diffuse + specular))
+            }
         }
     }
 
     pub fn shadow_ray(&self, origin: Vector3<f32>) -> Option<Ray> {
         match *self {
-            Light::DirectionalLight { direction, color: _ } => Some(Ray::new(origin, direction)),
+            Light::DirectionalLight { direction, .. } => Some(Ray::new(origin, direction)),
             _ => None
         }
     }
