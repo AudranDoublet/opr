@@ -12,6 +12,12 @@ use rayon::prelude::*;
 use search::{BVH, BVHParameters, Ray};
 
 use crate::*;
+use crate::shapes::Triangle;
+
+const ILLUM_AMBIENT: u8 = 0;
+const ILLUM_AMBIENT_COLOR: u8 = 1;
+const ILLUM_HIGHLIGHT: u8 = 2;
+const ILLUM_REFRACTION_REFLECTION_FRESNEL: u8 = 7;
 
 pub struct Scene
 {
@@ -20,8 +26,9 @@ pub struct Scene
     materials: Vec<Material>,
     textures: Vec<Texture>,
     lights: Vec<Light>,
+    light_ambient: Vector3<f32>,
 
-    tree: Option<BVH<shapes::Triangle>>,
+    tree: BVH<shapes::Triangle>,
 }
 
 fn load_texture(root: &Path, path: &Path) -> Result<Texture, Box<dyn Error>>
@@ -32,6 +39,14 @@ fn load_texture(root: &Path, path: &Path) -> Result<Texture, Box<dyn Error>>
     Ok(tex)
 }
 
+fn clamp_light(v: &Vector3<f32>) -> Vector3<f32> {
+    Vector3::new(
+        v.x.min(1.0).max(0.0),
+        v.y.min(1.0).max(0.0),
+        v.z.min(1.0).max(0.0),
+    )
+}
+
 impl Scene {
     pub fn new() -> Scene {
         Scene {
@@ -40,7 +55,8 @@ impl Scene {
             materials: Vec::new(),
             textures: Vec::new(),
             lights: Vec::new(),
-            tree: None,
+            light_ambient: Vector3::zeros(),
+            tree: BVH::default(),
         }
     }
 
@@ -56,8 +72,12 @@ impl Scene {
 
         for mut light in file.lights {
             light.init();
-            scene.add_light(light);
+            match light {
+                Light::AmbientLight { color, .. } => scene.light_ambient += color,
+                _ => scene.add_light(light)
+            }
         }
+        scene.light_ambient = clamp_light(&scene.light_ambient);
 
         scene.camera = file.camera;
 
@@ -202,64 +222,87 @@ impl Scene {
     }
 
     pub fn build(&mut self, max_depth: u32) {
-        self.tree = Some(BVH::build_params(&BVHParameters {
+        self.tree = BVH::build_params(&BVHParameters {
             max_depth: max_depth as usize,
             max_shapes_in_leaf: 1,
             bucket_count: 6,
-        }, &self.triangles))
+        }, &self.triangles)
     }
 
-    fn clamp_light(&self, v: Vector3<f32>) -> Vector3<f32> {
-        Vector3::new(
-            v.x.min(1.0).max(0.0),
-            v.y.min(1.0).max(0.0),
-            v.z.min(1.0).max(0.0),
-        )
+    fn sky_color(&self, ray: Ray) -> Vector3<f32> {
+        ray.direction.normalize()
     }
 
-    fn sky_color(&self, _ray: Ray) -> Vector3<f32> {
-        _ray.direction.normalize()
-        // Vector3::new(0.7, 0.7, 1.0)
+    fn reflect(&self, ray: &Ray, normal: &Vector3<f32>) -> Vector3<f32> {
+        &ray.direction - 2.0 * (normal.dot(&ray.direction)) * normal
     }
 
     fn cast_ray(&self, ray: Ray, max_rec: u32) -> Vector3<f32> {
-        if let Some(tree) = &self.tree {
-            if let Some((i, triangle)) = tree.ray_intersect(&ray) {
-                let normal = (triangle.v1_normal * (1.0 - i.u - i.v)
-                    + triangle.v2_normal * i.u
-                    + triangle.v3_normal * i.v).normalize();
+        if let Some((i, triangle)) = self.tree.ray_intersect(&ray) {
+            let normal = (triangle.v1_normal * (1.0 - i.u - i.v)
+                + triangle.v2_normal * i.u
+                + triangle.v3_normal * i.v).normalize();
 
-                let position = i.position(&ray);
-                let material = &self.materials[triangle.material];
-                let view_dir = (self.camera.get_origin() - position).normalize();
+            let material = &self.materials[triangle.material];
 
-                let reflected_ray = ray.direction - 2.0 * (normal.dot(&ray.direction)) * normal;
-                // let reflected_color = if max_rec == 0 {
-                //     self.sky_color(reflected_ray)
-                // } else {
-                //     self.cast_ray(reflected_ray, max_rec - 1)
-                // };
+            // let reflected_color = if max_rec == 0 {
+            //     self.sky_color(reflected_ray)
+            // } else {
+            //     self.cast_ray(reflected_ray, max_rec - 1)
+            // };
 
-                let triangle_color = material.get_diffuse(&self.textures, &triangle, i.u, i.v);
+            let color = match material.illumination_model {
+                ILLUM_AMBIENT => {
+                    material.get_ambient().component_mul(&self.light_ambient)
+                }
+                ILLUM_AMBIENT_COLOR => {
+                    let position = i.position(&ray);
+                    let ambient = material.get_ambient().component_mul(&self.light_ambient);
+                    let mut diffuse = self.lights.iter().filter(|l| match l.shadow_ray(position) {
+                        Some(v) => self.tree.ray_intersect(&v).is_none(),
+                        None => true,
+                    }).map(|l|
+                        l.get_color() * normal.dot(&l.get_direction(&position)).max(0.)
+                    ).fold(Vector3::zeros(), |a, b| a + b);
 
-                let lighting = self.lights.iter()
-                    .filter(|l| match l.shadow_ray(position) {
-                        Some(v) => tree.ray_intersect(&v).is_none(),
-                        _ => true
-                    })
-                    .map(|l| {
-                        l.apply_light(&view_dir, &normal, &reflected_ray, &material, &triangle_color)
-                    })
-                    .fold(Vector3::zeros(), |a, b| a + b);
+                    diffuse = diffuse.component_mul(&material.get_diffuse(&self.textures, &triangle, i.u, i.v));
 
-                self.clamp_light(lighting)
-            } else {
-                // None
-                self.sky_color(ray)
-            }
+                    ambient + diffuse
+                }
+                ILLUM_HIGHLIGHT => {
+                    let position = i.position(&ray);
+                    let view_dir = (self.camera.get_origin() - position).normalize();
+
+                    let ambient = material.get_ambient().component_mul(&self.light_ambient);
+                    let mut diffuse = Vector3::zeros();
+                    let mut specular = Vector3::zeros();
+
+                    let reflect_direction = self.reflect(&ray, &normal);
+                    let specular_intensity = view_dir.dot(&reflect_direction).max(0.0).powf(material.shininess);
+
+                    self.lights.iter().filter(|l| match l.shadow_ray(position) {
+                        Some(v) => self.tree.ray_intersect(&v).is_none(),
+                        None => true,
+                    }).for_each(|l| {
+                        let light_color = &l.get_color();
+                        diffuse += light_color * normal.dot(&l.get_direction(&position)).max(0.);
+                        specular += light_color * specular_intensity;
+                    });
+
+                    specular = specular.component_mul(&material.specular);
+                    diffuse = diffuse.component_mul(&material.get_diffuse(&self.textures, &triangle, i.u, i.v));
+
+                    ambient + diffuse + specular
+                }
+                // ILLUM_REFRACTION_REFLECTION_FRESNEL => {
+                //     self.light_ambient
+                // }
+                _ => panic!(format!("Unknown illum model {}", material.illumination_model))
+            };
+
+            clamp_light(&color)
         } else {
             self.sky_color(ray)
-            // None
         }
     }
 

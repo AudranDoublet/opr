@@ -13,6 +13,7 @@ pub struct Material
     pub specular: Vector3<f32>,
     pub shininess: f32,
     pub optical_density: f32,
+    pub illumination_model: u8,
     diffuse_tex: Option<usize>,
 }
 
@@ -57,6 +58,7 @@ impl Material
             specular: vector3_from_array(&m.specular),
             shininess: m.shininess,
             optical_density: m.optical_density,
+            illumination_model: m.illumination_model.unwrap_or(2),
             diffuse_tex: match &m.diffuse_texture[..] {
                 "" => None,
                 v => Some(*texs.get::<str>(v).unwrap_or(&0)),

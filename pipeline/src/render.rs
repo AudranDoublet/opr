@@ -33,8 +33,8 @@ pub fn pipeline_render(scene: &Scene, input_directory: &Path, dump_directory: &P
     pb.tick();
 
     let lights = vec![
-        Light::ambient(1., Vector3::new(0.3, 0.3, 0.3)),
-        Light::directional(1., Vector3::new(-1., 1., -1.), Vector3::new(1., 1., 1.)),
+        Light::ambient(Vector3::new(0.3, 0.3, 0.3)),
+        Light::directional(Vector3::new(-1., 1., -1.), Vector3::new(1., 1., 1.)),
     ];
 
     let (width, height) = scene.render_config.resolution;

@@ -2,29 +2,23 @@ use nalgebra::Vector3;
 use search::Ray;
 use serde_derive::*;
 
-use crate::Material;
-
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(tag = "type")]
 pub enum Light {
     #[serde(rename = "ambient")]
-    AmbientLight { intensity: f32, color: Vector3<f32> },
+    AmbientLight { color: Vector3<f32> },
     #[serde(rename = "directional")]
-    DirectionalLight { intensity: f32, color: Vector3<f32>, direction: Vector3<f32> },
+    DirectionalLight { color: Vector3<f32>, direction: Vector3<f32> },
 }
 
 impl Light
 {
-    pub fn ambient(intensity: f32, color: Vector3<f32>) -> Light {
-        Light::AmbientLight {
-            intensity,
-            color,
-        }
+    pub fn ambient(color: Vector3<f32>) -> Light {
+        Light::AmbientLight { color }
     }
 
-    pub fn directional(intensity: f32, direction: Vector3<f32>, color: Vector3<f32>) -> Light {
+    pub fn directional(direction: Vector3<f32>, color: Vector3<f32>) -> Light {
         Light::DirectionalLight {
-            intensity,
             direction: -direction.normalize(),
             color,
         }
@@ -39,14 +33,16 @@ impl Light
         }
     }
 
-    pub fn apply_light(&self, view_dir: &Vector3<f32>, normal: &Vector3<f32>, reflect: &Vector3<f32>, material: &Material, diffuse: &Vector3<f32>) -> Vector3<f32> {
+    pub fn get_direction(&self, _target: &Vector3<f32>) -> Vector3<f32> {
         match *self {
-            Light::AmbientLight { intensity, color } => intensity * color.component_mul(&material.get_ambient()),
-            Light::DirectionalLight { intensity, direction, color } => {
-                let diffuse = diffuse * normal.dot(&direction).max(0.0);
-                let specular = &material.specular * view_dir.dot(&reflect).max(0.0).powf(material.shininess);
-                intensity * color.component_mul(&(diffuse + specular))
-            }
+            Light::AmbientLight { .. } => Vector3::new(1., 1., 1.),
+            Light::DirectionalLight { direction, .. } => direction
+        }
+    }
+    pub fn get_color(&self) -> Vector3<f32> {
+        match *self {
+            Light::AmbientLight { color, .. } => color,
+            Light::DirectionalLight { color, .. } => color
         }
     }
 

@@ -13,10 +13,8 @@ objects:
       scale: [1.5, 1.5, 1.5]
 lights:
     - type: ambient
-      intensity: 0.3
-      color: [1., 1., 1.]
+      color: [0.3, 0.3, 0.3]
     - type: directional
-      intensity: 1.0
       direction: [1, -1, 1]
       color: [1, 1, 1]
 camera:
