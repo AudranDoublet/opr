@@ -1,3 +1,5 @@
+#![feature(in_band_lifetimes)]
+
 mod camera;
 mod material;
 mod scene;

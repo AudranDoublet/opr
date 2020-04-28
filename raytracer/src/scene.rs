@@ -95,6 +95,14 @@ fn reflectivity_coeff(cos_i: f32, n1: f32, n2: f32) -> f32 {
     r0 + (1.0 - r0) * x.powi(5)
 }
 
+fn beer_attenuation(transmittance: &Vector3<f32>, distance: f32) -> Vector3<f32> {
+    Vector3::new(
+        (transmittance.x * distance).exp(),
+        (transmittance.y * distance).exp(),
+        (transmittance.z * distance).exp(),
+    )
+}
+
 impl Scene {
     pub fn new() -> Scene {
         Scene {
@@ -284,6 +292,13 @@ impl Scene {
         // Vector3::zeros()
     }
 
+    fn filtering_lights(&'a self, position: &'a Vector3<f32>) -> impl Iterator<Item=&'a Light> + 'a {
+        self.lights.iter().filter(move |l| match l.shadow_ray(*position) {
+            Some(v) => self.tree.ray_intersect(&v).is_none(),
+            None => true,
+        })
+    }
+
     fn compute_diffuse(&self, position: &Vector3<f32>, normal: &Vector3<f32>) -> Vector3<f32> {
         self.lights.iter().filter(|l| match l.shadow_ray(*position) {
             Some(v) => self.tree.ray_intersect(&v).is_none(),
@@ -313,6 +328,15 @@ impl Scene {
         (diffuse, specular)
     }
 
+    fn get_juncture_information(&self, ray: &Ray, normal: Vector3<f32>, material: &Material) -> (f32, Vector3<f32>, f32, f32, bool) {
+        let mut cos_i = normal.dot(&ray.direction);
+        if cos_i > 0.0 {
+            (cos_i, -normal, material.optical_density, self.air_ior, true)
+        } else {
+            (-cos_i, normal, self.air_ior, material.optical_density, false)
+        }
+    }
+
     fn cast_ray(&self, ray: Ray, max_rec: u32) -> Vector3<f32> {
         if let Some((i, triangle)) = self.tree.ray_intersect(&ray) {
             let normal = (triangle.v1_normal * (1.0 - i.u - i.v)
@@ -321,94 +345,37 @@ impl Scene {
 
             let material = &self.materials[triangle.material];
 
-            let color = match material.illumination_model {
-                0 => {
-                    material.get_diffuse(&self.textures, &triangle, i.u, i.v)
+            let ka = &material.get_ambient();
+            let kd = &material.get_diffuse(&self.textures, &triangle, i.u, i.v);
+            let ks = &material.specular;
+            let kx = Vector3::new(1., 1., 1.) - ks;
+
+            if material.illumination_model == 0 {
+                return clamp_light(kd);
+            }
+
+            let position = i.position(&ray);
+            let (mut diffuse, mut specular) = self.compute_diffuse_and_specular(&position, &normal, material.shininess);
+            let mut color = Vector3::zeros();
+
+            let mut reflected_color = if material.illumination_model >= 3 {
+                let reflect_direction = reflect(&ray, &normal);
+                let reflect_ray = Ray::new(position + &reflect_direction * self.correction_bias, reflect_direction);
+                if max_rec == 0 { self.sky_color(reflect_ray) } else {
+                    self.cast_ray(reflect_ray, max_rec - 1)
                 }
-                1 => {
-                    let position = i.position(&ray);
+            } else { Vector3::zeros() };
 
-                    let ka = material.get_ambient();
-                    let kd = material.get_diffuse(&self.textures, &triangle, i.u, i.v);
-
-                    let diffuse = self.compute_diffuse(&position, &normal);
-
-                    ka.component_mul(&self.light_ambient) + kd.component_mul(&diffuse)
-                }
-                2 => {
-                    let position = i.position(&ray);
-
-                    let ka = &material.get_ambient();
-                    let kd = &material.get_diffuse(&self.textures, &triangle, i.u, i.v);
-                    let ks = &material.specular;
-
-                    let (diffuse, specular) = self.compute_diffuse_and_specular(&position, &normal, material.shininess);
-
-                    ka.component_mul(&self.light_ambient) + kd.component_mul(&diffuse) + ks.component_mul(&specular)
-                }
-                3 | 4 => {
-                    let position = i.position(&ray);
-                    let reflect_direction = reflect(&ray, &normal);
-
-                    let ka = &material.get_ambient();
-                    let kd = &material.get_diffuse(&self.textures, &triangle, i.u, i.v);
-                    let ks = &material.specular;
-
-                    let (diffuse, specular) = self.compute_diffuse_and_specular(&position, &normal, material.shininess);
-
-                    let reflect_ray = Ray::new(position + &reflect_direction * self.correction_bias, reflect_direction);
-                    let reflected_color = if max_rec == 0 { self.sky_color(reflect_ray) } else {
-                        self.cast_ray(reflect_ray, max_rec - 1)
-                    };
-
-                    ka.component_mul(&self.light_ambient) + kd.component_mul(&diffuse) + ks.component_mul(&(specular + reflected_color))
-                }
+            match material.illumination_model {
+                1 => specular = Vector3::zeros(),
+                2 => (),
+                3 | 4 => specular += reflected_color,
                 5 => {
-                    let position = i.position(&ray);
-                    let reflect_direction = reflect(&ray, &normal);
-
-                    let ka = &material.get_ambient();
-                    let kd = &material.get_diffuse(&self.textures, &triangle, i.u, i.v);
-                    let ks = &material.specular;
-
-                    let (diffuse, specular) = self.compute_diffuse_and_specular(&position, &normal, material.shininess);
-
-                    let mut cos_i = normal.dot(&ray.direction);
-                    let (n1, n2) = if cos_i > 0.0 { (material.optical_density, self.air_ior) } else {
-                        cos_i = -cos_i;
-                        (self.air_ior, material.optical_density)
-                    };
-
-                    let coeff_reflectivity = reflectivity_coeff(cos_i, n1, n2);
-
-                    let reflect_ray = Ray::new(position + &reflect_direction * self.correction_bias, reflect_direction);
-                    let reflected_color = coeff_reflectivity * if max_rec == 0 { self.sky_color(reflect_ray) } else {
-                        self.cast_ray(reflect_ray, max_rec - 1)
-                    };
-
-                    ka.component_mul(&self.light_ambient) + kd.component_mul(&diffuse) + ks.component_mul(&(specular + reflected_color))
+                    let (cos_i, _, n1, n2, _) = self.get_juncture_information(&ray, normal, &material);
+                    reflected_color *= reflectivity_coeff(cos_i, n1, n2);
                 }
                 6 => {
-                    let position = i.position(&ray);
-                    let reflect_direction = reflect(&ray, &normal);
-
-                    let ka = &material.get_ambient();
-                    let kd = &material.get_diffuse(&self.textures, &triangle, i.u, i.v);
-                    let ks = &material.specular;
-
-                    let (diffuse, specular) = self.compute_diffuse_and_specular(&position, &normal, material.shininess);
-
-
-                    let reflect_ray = Ray::new(position + &reflect_direction * self.correction_bias, reflect_direction);
-                    let reflected_color = if max_rec == 0 { self.sky_color(reflect_ray) } else {
-                        self.cast_ray(reflect_ray, max_rec - 1)
-                    };
-
-                    let mut cos_i = normal.dot(&ray.direction);
-                    let (normal, n1, n2) = if cos_i > 0.0 { (-normal, material.optical_density, self.air_ior) } else {
-                        cos_i = -cos_i;
-                        (normal, self.air_ior, material.optical_density)
-                    };
+                    let (cos_i, normal, n1, n2, _) = self.get_juncture_information(&ray, normal, &material);
 
                     let refract_color = if let Some(refract_direction) = refract_unknown_if_tir(&ray, &normal, cos_i, n1, n2) {
                         let refract_ray = Ray::new(&position + &refract_direction * self.correction_bias, refract_direction);
@@ -417,31 +384,15 @@ impl Scene {
                         }
                     } else { Vector3::zeros() };
 
-                    ka.component_mul(&self.light_ambient) + kd.component_mul(&diffuse) + ks.component_mul(&(specular + reflected_color))
-                        + (Vector3::new(1., 1., 1.) - ks).component_mul(&material.transmission.component_mul(&(refract_color)))
+                    specular += reflected_color;
+                    color += kx.component_mul(&material.transmission.component_mul(&(refract_color)));
                 }
                 7 => {
-                    let position = i.position(&ray);
-                    let reflect_direction = reflect(&ray, &normal);
-
-                    let ka = &material.get_ambient();
-                    let kd = &material.get_diffuse(&self.textures, &triangle, i.u, i.v);
-                    let ks = &material.specular;
-
-                    let (diffuse, specular) = self.compute_diffuse_and_specular(&position, &normal, material.shininess);
-
-                    let mut cos_i = normal.dot(&ray.direction);
-                    let (normal, n1, n2) = if cos_i > 0.0 { (-normal, material.optical_density, self.air_ior) } else {
-                        cos_i = -cos_i;
-                        (normal, self.air_ior, material.optical_density)
-                    };
+                    let (cos_i, normal, n1, n2, _) = self.get_juncture_information(&ray, normal, &material);
 
                     let coeff_reflectivity = reflectivity_coeff(cos_i, n1, n2);
 
-                    let reflect_ray = Ray::new(position + &reflect_direction * self.correction_bias, reflect_direction);
-                    let reflected_color = coeff_reflectivity * if max_rec == 0 { self.sky_color(reflect_ray) } else {
-                        self.cast_ray(reflect_ray, max_rec - 1)
-                    };
+                    reflected_color *= coeff_reflectivity;
 
                     let refract_color = (1.0 - coeff_reflectivity) * if coeff_reflectivity < 0.99 {
                         let refract_direction = refract(&ray, &normal, cos_i, n1, n2);
@@ -451,11 +402,12 @@ impl Scene {
                         }
                     } else { Vector3::zeros() };
 
-                    ka.component_mul(&self.light_ambient) + kd.component_mul(&diffuse) + ks.component_mul(&(specular + reflected_color))
-                        + (Vector3::new(1., 1., 1.) - ks).component_mul(&material.transmission.component_mul(&(refract_color)))
+                    color += kx.component_mul(&material.transmission.component_mul(&(refract_color)));
                 }
                 _ => panic!(format!("Unknown illum model {}", material.illumination_model))
             };
+
+            color += ka.component_mul(&self.light_ambient) + kd.component_mul(&diffuse) + ks.component_mul(&specular);
 
             clamp_light(&color)
         } else {
