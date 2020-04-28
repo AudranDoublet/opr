@@ -5,6 +5,10 @@ use sph_common::{DFSPH, Animation};
 
 use crate::{Scene, Solid};
 
+fn default_density() -> f32 {
+    2.
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type")]
 pub enum LiquidZone {
@@ -12,6 +16,8 @@ pub enum LiquidZone {
     Block {
         from: Vector3<f32>,
         to: Vector3<f32>,
+        #[serde(default = "default_density")]
+        density: f32,
     },
     #[serde(rename = "mesh")]
     Mesh {
@@ -25,6 +31,9 @@ pub enum LiquidZone {
         rotation_angle: f32,
 
         resolution: [u32; 3],
+
+        #[serde(default = "default_density")]
+        density: f32,
     },
 }
 
@@ -33,8 +42,8 @@ impl LiquidZone
     pub fn create_particles(&self, config: &Scene, scene: &mut DFSPH) -> Result<(), Box<dyn std::error::Error>>
     {
         let count = match self {
-            LiquidZone::Block { from, to } => {
-                let radius = scene.particle_radius() * 2.;
+            LiquidZone::Block { from, to, density } => {
+                let radius = scene.particle_radius() * density;
                 let step_count = (to - from) / radius;
 
                 let mut count = 0;
@@ -54,7 +63,7 @@ impl LiquidZone
 
                 count
             },
-            LiquidZone::Mesh { mesh, scale, position, rotation_axis, rotation_angle, resolution, slice } => {
+            LiquidZone::Mesh { mesh, scale, position, rotation_axis, rotation_angle, resolution, slice, density } => {
                 let solid = Solid {
                     animation: Animation::Blank,
                     mesh: mesh.to_string(),
@@ -76,7 +85,7 @@ impl LiquidZone
 
                 let mut count = 0;
 
-                for particle in &solid.to_particles(scene.particle_radius() * 2.) {
+                for particle in &solid.to_particles(scene.particle_radius() * density ) {
                     let pos = particle + position;
 
                     scene.add_particle(pos.x, pos.y, pos.z);
