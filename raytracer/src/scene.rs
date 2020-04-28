@@ -389,7 +389,11 @@ impl Scene {
                     self.cast_ray(refract_ray, max_rec - 1, 0.0)
                 };
 
-                color += (1.0 - coeff_reflectivity) * refract_color;
+                if material.illumination_model == 6 {
+                    color += (Vector3::new(1.0, 1.0, 1.0) - ks).component_mul (&refract_color);
+                } else {
+                    color += (1.0 - coeff_reflectivity) * refract_color;
+                }
             }
 
             color += ka.component_mul(&self.light_ambient) + kd.component_mul(&diffuse) + ks.component_mul(&specular);

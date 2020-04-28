@@ -1,8 +1,8 @@
 objects:
-    - path: data/objects/sphere_transparent.obj
+    - path: data/objects/box_blue.obj
       rotation: [0, 45, 15]
       position: [0, 2, 2]
-      scale: [0.05, 0.05, 0.05]
+      scale: [1.5, 1.5, 1.5]
     - path: data/objects/box_red.obj
       rotation: [0, 0, 65]
       position: [-1, 0.7, -0.5]
