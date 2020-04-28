@@ -1,15 +1,15 @@
-extern crate tobj;
 extern crate rayon;
 extern crate serde_yaml;
+extern crate tobj;
 
-use search::{BVH, Ray, BVHParameters};
-use nalgebra::{Vector3, Vector2, UnitQuaternion};
 use std::collections::HashMap;
 use std::error::Error;
-use std::path::Path;
 use std::fs::File;
+use std::path::Path;
 
+use nalgebra::{UnitQuaternion, Vector2, Vector3};
 use rayon::prelude::*;
+use search::{BVH, BVHParameters, Ray};
 
 use crate::*;
 
@@ -20,8 +20,10 @@ pub struct Scene
     materials: Vec<Material>,
     textures: Vec<Texture>,
     lights: Vec<Light>,
-
-    tree: Option<BVH<shapes::Triangle>>,
+    light_ambient: Vector3<f32>,
+    correction_bias: f32,
+    air_ior: f32,
+    tree: BVH<shapes::Triangle>,
 }
 
 fn load_texture(root: &Path, path: &Path) -> Result<Texture, Box<dyn Error>>
@@ -32,6 +34,69 @@ fn load_texture(root: &Path, path: &Path) -> Result<Texture, Box<dyn Error>>
     Ok(tex)
 }
 
+fn clamp_light(v: &Vector3<f32>) -> Vector3<f32> {
+    Vector3::new(
+        v.x.min(1.0).max(0.0),
+        v.y.min(1.0).max(0.0),
+        v.z.min(1.0).max(0.0),
+    )
+}
+
+fn reflect(ray: &Ray, normal: &Vector3<f32>) -> Vector3<f32> {
+    &ray.direction - 2.0 * normal.dot(&ray.direction) * normal
+}
+
+fn refract(ray: &Ray, normal: &Vector3<f32>, cos_i: f32, n1: f32, n2: f32) -> Vector3<f32> {
+    let n = n1 / n2;
+    let k = 1.0 - n * n * (1.0 - cos_i * cos_i);
+    assert!(k >= 0.0, "total internal reflection");
+    n * &ray.direction + (n * cos_i - k.sqrt()) * normal
+}
+
+fn refract_unknown_if_tir(ray: &Ray, normal: &Vector3<f32>, cos_i: f32, n1: f32, n2: f32) -> Option<Vector3<f32>> {
+    let n = n1 / n2;
+    let k = 1.0 - n * n * (1.0 - cos_i * cos_i);
+    if k < 0.0 {
+        None
+    } else {
+        Some(n * &ray.direction + (n * cos_i - k.sqrt()) * normal)
+    }
+}
+
+#[cfg(not(use_fresnel_approximation))]
+fn reflectivity_coeff(cos_i: f32, n1: f32, n2: f32) -> f32 {
+    // Fresnel
+    let sin_t = (n1 / n2) * (1.0 - cos_i * cos_i).sqrt();
+    if sin_t > 1.0 { return 1.0; } // total internal reflection
+    let cos_t = 1. - sin_t * sin_t;
+    let r_par = ((n1 * cos_i - n2 * cos_t) / (n1 * cos_i + n2 * cos_t)).powi(2);
+    let r_orth = ((n2 * cos_i - n1 * cos_t) / (n2 * cos_i + n1 * cos_t)).powi(2);
+
+    (r_orth + r_par) / 2.0
+}
+
+#[cfg(any(use_fresnel_approximation))]
+fn reflectivity_coeff(cos_i: f32, n1: f32, n2: f32) -> f32 {
+    // Schlick: Fresnel approximation
+    let r0 = ((n1 - n2) / (n1 + n2)).powi(2);
+    let cos_i = if n1 > n2 {
+        let n = n1 / n2;
+        let sin_t2 = n * n * (1.0 - cos_i * cos_i);
+        if sin_t2 > 1.0 { return 1.0; }
+        (1.0 - sin_t2).sqrt()
+    } else { cos_i };
+    let x = 1.0 - cos_i;
+    r0 + (1.0 - r0) * x.powi(5)
+}
+
+fn beer_attenuation(transmittance: &Vector3<f32>, distance: f32) -> Vector3<f32> {
+    Vector3::new(
+        (-transmittance.x * distance).exp(),
+        (-transmittance.y * distance).exp(),
+        (-transmittance.z * distance).exp(),
+    )
+}
+
 impl Scene {
     pub fn new() -> Scene {
         Scene {
@@ -40,7 +105,10 @@ impl Scene {
             materials: Vec::new(),
             textures: Vec::new(),
             lights: Vec::new(),
-            tree: None,
+            light_ambient: Vector3::zeros(),
+            correction_bias: 0.1,
+            air_ior: 1.,
+            tree: BVH::default(),
         }
     }
 
@@ -56,8 +124,12 @@ impl Scene {
 
         for mut light in file.lights {
             light.init();
-            scene.add_light(light);
+            match light {
+                Light::AmbientLight { color, .. } => scene.light_ambient += color,
+                _ => scene.add_light(light)
+            }
         }
+        scene.light_ambient = clamp_light(&scene.light_ambient);
 
         scene.camera = file.camera;
 
@@ -65,7 +137,7 @@ impl Scene {
     }
 
     pub fn from_file(path: &Path, default_material: &Path) -> Result<Scene, Box<dyn Error>> {
-        let file : scene_config::SceneConfig = serde_yaml::from_reader(File::open(path)?)?;
+        let file: scene_config::SceneConfig = serde_yaml::from_reader(File::open(path)?)?;
 
         Scene::from_config(file, default_material)
     }
@@ -127,7 +199,7 @@ impl Scene {
 
         for model in models.iter()
         {
-            let mesh = &model.mesh; 
+            let mesh = &model.mesh;
             let mat_id = if let Some(mat) = mesh.material_id {
                 mat + mat_id_app
             } else {
@@ -139,8 +211,8 @@ impl Scene {
             for i in (0..mesh.positions.len()).step_by(3)
             {
                 let pos = rotation * Vector3::new(mesh.positions[i + 0],
-                               mesh.positions[i + 1],
-                               mesh.positions[i + 2]).component_mul(&scale) + position;
+                                                  mesh.positions[i + 1],
+                                                  mesh.positions[i + 2]).component_mul(&scale) + position;
                 vertices.push(pos);
             }
 
@@ -149,8 +221,8 @@ impl Scene {
             for i in (0..mesh.normals.len()).step_by(3)
             {
                 vertices_normal.push(rotation * Vector3::new(mesh.normals[i + 0],
-                                           mesh.normals[i + 1],
-                                           mesh.normals[i + 2]));
+                                                             mesh.normals[i + 1],
+                                                             mesh.normals[i + 2]));
             }
 
             let mut vertices_tex = vec![Vector2::zeros(); vertices.len()];
@@ -158,7 +230,7 @@ impl Scene {
             for i in (0..mesh.texcoords.len()).step_by(2)
             {
                 vertices_tex[i / 2] = Vector2::new(mesh.texcoords[i + 0],
-                                               mesh.texcoords[i + 1]);
+                                                   mesh.texcoords[i + 1]);
             }
 
             for i in (0..mesh.indices.len()).step_by(3)
@@ -180,7 +252,7 @@ impl Scene {
                                           vertices_tex[b] - vertices_tex[a],
                                           vertices_tex[c] - vertices_tex[a],
                                           mat_id,
-                ));
+                    ));
             }
         }
 
@@ -202,56 +274,133 @@ impl Scene {
     }
 
     pub fn build(&mut self, max_depth: u32) {
-        self.tree = Some(BVH::build_params(&BVHParameters {
+        self.tree = BVH::build_params(&BVHParameters {
             max_depth: max_depth as usize,
             max_shapes_in_leaf: 1,
             bucket_count: 6,
-        }, &self.triangles))
+        }, &self.triangles)
     }
 
-    fn clamp_light(&self, v: Vector3<f32>) -> Vector3<f32> {
-        Vector3::new(
-            v.x.min(1.0).max(0.0),
-            v.y.min(1.0).max(0.0),
-            v.z.min(1.0).max(0.0),
-        )
+    fn sky_color(&self, _ray: Ray) -> Vector3<f32> {
+        _ray.direction.apply_into(|f| f.cos())
+        // Vector3::zeros()
+        // Vector3::new(0.65, 0.65, 0.65)
     }
 
-    fn cast_ray(&self, ray: Ray, max_rec: u32, apply_lights: bool) -> Option<Vector3<f32>> {
-        if let Some(tree) = &self.tree {
-            if let Some((i, triangle)) = tree.ray_intersect(&ray) {
-                let normal = (triangle.v1_normal * (1.0 - i.u - i.v)
-                          + triangle.v2_normal * i.u
-                          + triangle.v3_normal * i.v).normalize();
+    fn compute_diffuse_and_specular(&self, position: &Vector3<f32>, normal: &Vector3<f32>, shininess: f32) -> (Vector3<f32>, Vector3<f32>) {
+        let mut diffuse = Vector3::zeros();
+        let mut specular = Vector3::zeros();
+        self.lights.iter().filter(|l| match l.shadow_ray(*position) {
+            Some(v) => self.tree.ray_intersect(&v).is_none(),
+            None => true,
+        }).for_each(|l| {
+            let light_color = &l.get_color();
+            let light_direction = &l.get_direction(position);
 
-                let position = i.position(&ray);
-                let material = &self.materials[triangle.material];
+            let h = (light_direction + self.camera.get_origin() - position).normalize();
+            let specular_intensity = normal.dot(&h).max(0.0).powf(shininess);
 
-                let reflected_ray = ray.direction - 2.0 * (normal.dot(&ray.direction)) * normal;
+            diffuse += light_color * normal.dot(light_direction).max(0.);
+            specular += light_color * specular_intensity;
+        });
 
-                let mut triangle_color = material.get_diffuse(&self.textures, &triangle, i.u, i.v);
+        (diffuse, specular)
+    }
 
-                if apply_lights {
-                    triangle_color = triangle_color.component_mul(
-                        &self.clamp_light(
-                            self.lights
-                            .iter()
-                            .filter(|l| match l.shadow_ray(position) {
-                                Some(v) => !self.cast_ray(v, 0, false).is_some(),
-                                _ => true
-                            })
-                            .map(|l| l.apply_light(normal))
-                            .fold(Vector3::zeros(), |a, b| a + b)
-                        )
-                    );
-                }
-
-                Some(triangle_color)
-            } else {
-                None
-            }
+    fn get_juncture_information(&self, ray: &Ray, normal: Vector3<f32>, material: &Material, is_inside: &mut bool) -> (f32, Vector3<f32>, f32, f32) {
+        let cos_i = normal.dot(&ray.direction);
+        if cos_i > 0.0 {
+            *is_inside = true;
+            (cos_i, -normal, material.optical_density, self.air_ior)
         } else {
-            None
+            *is_inside = false;
+            (-cos_i, normal, self.air_ior, material.optical_density)
+        }
+    }
+
+    fn cast_ray(&self, ray: Ray, max_rec: u32, mut distance_inside_medium: f32) -> Vector3<f32> {
+        if let Some((i, triangle)) = self.tree.ray_intersect(&ray) {
+            let normal = (triangle.v1_normal * (1.0 - i.u - i.v)
+                + triangle.v2_normal * i.u
+                + triangle.v3_normal * i.v).normalize();
+
+            let material = &self.materials[triangle.material];
+
+            let ka = &material.get_ambient();
+            let kd = &material.get_diffuse(&self.textures, &triangle, i.u, i.v);
+            let ks = &material.specular;
+
+            if material.illumination_model == 0 {
+                return clamp_light(kd);
+            }
+
+            let position = i.position(&ray);
+            let (diffuse, mut specular) = self.compute_diffuse_and_specular(&position, &normal, material.shininess);
+            let mut color = Vector3::zeros();
+
+            distance_inside_medium += i.distance;
+
+            let reflected_color = if material.illumination_model >= 3 {
+                let reflect_direction = reflect(&ray, &normal);
+                let reflect_ray = Ray::new(position + &reflect_direction * self.correction_bias, reflect_direction);
+                if max_rec == 0 { self.sky_color(reflect_ray) } else {
+                    self.cast_ray(reflect_ray, max_rec - 1, distance_inside_medium)
+                }
+            } else { Vector3::zeros() };
+            let mut refract_direction = None;
+            let mut coeff_reflectivity = 0.0;
+            let mut is_inside = false;
+
+            match material.illumination_model {
+                1 => specular = Vector3::zeros(),
+                2 => (),
+                3 | 4 => specular += reflected_color,
+                5 => {
+                    let (cos_i, _, n1, n2) = self.get_juncture_information(&ray, normal, &material, &mut is_inside);
+                    specular += reflected_color * reflectivity_coeff(cos_i, n1, n2);
+                }
+                6 => {
+                    let (cos_i, normal, n1, n2) = self.get_juncture_information(&ray, normal, &material, &mut is_inside);
+                    refract_direction = refract_unknown_if_tir(&ray, &normal, cos_i, n1, n2);
+                    specular += reflected_color;
+                }
+                7 => {
+                    let (cos_i, normal, n1, n2) = self.get_juncture_information(&ray, normal, &material, &mut is_inside);
+
+                    coeff_reflectivity = reflectivity_coeff(cos_i, n1, n2);
+                    if coeff_reflectivity < 0.99 {
+                        refract_direction = Some(refract(&ray, &normal, cos_i, n1, n2));
+                    }
+
+                    specular += reflected_color * coeff_reflectivity;
+                }
+                _ => panic!(format!("Unknown illum model {}", material.illumination_model))
+            };
+
+            let beer = if is_inside {
+                beer_attenuation(&material.transmission, distance_inside_medium)
+            } else { Vector3::new(1., 1., 1.) };
+
+            if let Some(refract_direction) = refract_direction {
+                let refract_ray = Ray::new(&position + &refract_direction * self.correction_bias, refract_direction);
+                let refract_color = if max_rec == 0 {
+                    self.sky_color(refract_ray)
+                } else {
+                    self.cast_ray(refract_ray, max_rec - 1, 0.0)
+                };
+
+                if material.illumination_model == 6 {
+                    color += (Vector3::new(1.0, 1.0, 1.0) - ks).component_mul (&refract_color);
+                } else {
+                    color += (1.0 - coeff_reflectivity) * refract_color;
+                }
+            }
+
+            color += ka.component_mul(&self.light_ambient) + kd.component_mul(&diffuse) + ks.component_mul(&specular);
+
+            clamp_light(&color.component_mul(&beer))
+        } else {
+            self.sky_color(ray)
         }
     }
 
@@ -259,8 +408,7 @@ impl Scene {
         self.camera.set_size(width as f32, height as f32);
 
         (0..width * height).into_par_iter()
-                           .map(|i| self.cast_ray(self.camera.generate_ray((i % width) as f32, (i / width) as f32), 10, true)
-                                        .unwrap_or(Vector3::zeros()))
-                           .collect()
+            .map(|i| self.cast_ray(self.camera.generate_ray((i % width) as f32, (i / width) as f32), 10, 0.0))
+            .collect()
     }
 }

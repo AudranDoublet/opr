@@ -1,0 +1,31 @@
+objects:
+    - path: data/objects/box_blue.obj
+      rotation: [0, 45, 15]
+      position: [0, 2, 2]
+      scale: [1.5, 1.5, 1.5]
+    - path: data/objects/box_red.obj
+      rotation: [0, 0, 65]
+      position: [-1, 0.7, -0.5]
+      scale: [1, 1, 1]
+    - path: data/objects/box_green.obj
+      rotation: [25, 15, 0]
+      position: [2.5, 3.5, 1]
+      scale: [1.5, 1.5, 1.5]
+    - path: data/objects/box_green.obj
+      rotation: [10, 25, 15]
+      position: [5, 5, 25]
+      scale: [15, 15, 15]
+lights:
+    - type: ambient
+      color: [0.3, 0.3, 0.3]
+    - type: directional
+      direction: [1, -1, 1]
+      color: [1, 1, 1]
+camera:
+    origin: [0.0, 3.0, -4.0]
+    up: [0.0, 1.0, 0.0]
+    front: [0.0, 0.0, 1.0]
+    width: 512.0
+    height: 512.0
+params:
+    build_max_depth: 3

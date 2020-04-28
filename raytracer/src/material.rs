@@ -1,15 +1,21 @@
-use search::IntersectsBVHShape;
-use nalgebra::Vector3;
-use crate::vector3_from_array;
-
 extern crate tobj;
+
+use nalgebra::Vector3;
+use search::IntersectsBVHShape;
+
+use crate::vector3_from_array;
+use std::collections::HashMap;
+
 
 pub struct Material
 {
     ambient: Vector3<f32>,
     diffuse: Vector3<f32>,
+    pub transmission: Vector3<f32>,
     pub specular: Vector3<f32>,
     pub shininess: f32,
+    pub optical_density: f32,
+    pub illumination_model: u8,
     diffuse_tex: Option<usize>,
 }
 
@@ -43,20 +49,32 @@ impl Texture
     }
 }
 
+fn load_unknown_param(unknowns: &HashMap<String, String>, param: &String, default: &String) -> Vec<f32> {
+    let s= unknowns.get(param).unwrap_or(&default).split_ascii_whitespace();
+    s.map(|f| f.parse::<f32>().unwrap()).collect()
+}
+
 impl Material
 {
     pub fn new(m: &tobj::Material, texs: &std::collections::HashMap<&str, usize>) -> Material
     {
+        let tf = load_unknown_param(&m.unknown_param, &"Tf".to_string(), &"1 1 1".to_string());
+        assert_eq!(tf.len(), 3, "Tf parameter expected to have 3 channels");
+        let tf = Vector3::new(tf[0], tf[1], tf[2]);
+
         Material
         {
             ambient: vector3_from_array(&m.ambient),
             diffuse: vector3_from_array(&m.diffuse),
+            transmission: tf,
             specular: vector3_from_array(&m.specular),
             shininess: m.shininess,
+            optical_density: m.optical_density,
+            illumination_model: m.illumination_model.unwrap_or(2),
             diffuse_tex: match &m.diffuse_texture[..] {
                 "" => None,
                 v => Some(*texs.get::<str>(v).unwrap_or(&0)),
-            }
+            },
         }
     }
 
@@ -78,9 +96,7 @@ impl Material
             let pos = (x as isize) + (y as isize);
 
             texture.data[pos as usize]
-        }
-        else
-        {
+        } else {
             self.diffuse
         }
     }

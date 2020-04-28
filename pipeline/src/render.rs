@@ -1,16 +1,14 @@
-use std::path::{Path, PathBuf};
+extern crate raytracer;
+
 use std::fs;
+use std::path::{Path, PathBuf};
 
 use indicatif::{ProgressBar, ProgressStyle};
-
-use sph_scene::Scene;
-use sph_common::Camera;
-
 use nalgebra::Vector3;
-
-extern crate raytracer;
-use raytracer::{write_image, Light};
+use raytracer::{Light, write_image};
 use raytracer::scene_config::*;
+use sph_common::Camera;
+use sph_scene::Scene;
 
 fn get_obj(folder: &Path) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
     let mut files: Vec<PathBuf> = fs::read_dir(folder)?
@@ -31,7 +29,7 @@ pub fn pipeline_render(scene: &Scene, input_directory: &Path, dump_directory: &P
 
     let pb = ProgressBar::new(simulations.len() as u64);
     pb.set_style(ProgressStyle::default_bar()
-      .template("[{elapsed_precise}] [{per_sec}] [{eta_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7}"));
+        .template("[{elapsed_precise}] [{per_sec}] [{eta_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7}"));
     pb.tick();
 
     let lights = vec![

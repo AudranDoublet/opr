@@ -1,6 +1,5 @@
 use nalgebra::Vector3;
 use search::Ray;
-use crate::vector3_from_const;
 use serde_derive::*;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -15,40 +14,41 @@ pub enum Light {
 impl Light
 {
     pub fn ambient(color: Vector3<f32>) -> Light {
-        Light::AmbientLight {
-            color: color,
-        }
+        Light::AmbientLight { color }
     }
 
     pub fn directional(direction: Vector3<f32>, color: Vector3<f32>) -> Light {
         Light::DirectionalLight {
             direction: -direction.normalize(),
-            color: color,
+            color,
         }
     }
 
     pub fn init(&mut self) {
         match *self {
-            Light::DirectionalLight { ref mut direction, color: _ } => {
+            Light::DirectionalLight { ref mut direction, .. } => {
                 *direction = -direction.normalize();
-            },
+            }
             _ => (),
         }
     }
 
-    pub fn apply_light(&self, normal: Vector3<f32>) -> Vector3<f32> {
+    pub fn get_direction(&self, _target: &Vector3<f32>) -> Vector3<f32> {
         match *self {
-            Light::AmbientLight { color } => color,
-            Light::DirectionalLight { direction, color } => match normal.dot(&direction) {
-                                                                v if (v >= 0.0) => v * color,
-                                                                _ => vector3_from_const(0.0),
-                                                            }
+            Light::AmbientLight { .. } => Vector3::new(1., 1., 1.),
+            Light::DirectionalLight { direction, .. } => direction
+        }
+    }
+    pub fn get_color(&self) -> Vector3<f32> {
+        match *self {
+            Light::AmbientLight { color, .. } => color,
+            Light::DirectionalLight { color, .. } => color
         }
     }
 
     pub fn shadow_ray(&self, origin: Vector3<f32>) -> Option<Ray> {
         match *self {
-            Light::DirectionalLight { direction, color: _ } => Some(Ray::new(origin, direction)),
+            Light::DirectionalLight { direction, .. } => Some(Ray::new(origin, direction)),
             _ => None
         }
     }
