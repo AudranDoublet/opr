@@ -32,7 +32,9 @@ impl DragForce {
 }
 
 impl ExternalForce for DragForce {
-    fn compute_acceleration(&self, sim: &DFSPH, accelerations: &mut Vec<Vector3<f32>>) {
+    fn init(&mut self, _: &DFSPH) { }
+
+    fn compute_acceleration(&self, sim: &DFSPH, accelerations: &mut Vec<Vector3<f32>>) -> f32 {
         let positions = sim.positions.read().unwrap();
         let velocities = sim.velocities.read().unwrap();
 
@@ -104,5 +106,7 @@ impl ExternalForce for DragForce {
             let force = self.drag_coefficient * 0.5 * RHO_A * (vi_rel * vi_rel_norm) * c_di * a_i;
             *v += force / sim.mass(i);
         });
+
+        sim.time_step
     }
 }

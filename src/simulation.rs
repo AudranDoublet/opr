@@ -107,6 +107,8 @@ fn simulate(scene: &Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Resu
     renderer.window.set_point_size(collision_size);
 
     add_particles(0..fluid_simulation.len(), &fluid_simulation, &mut renderer);
+    fluid_simulation.init_forces();
+
     let mut meshes = add_meshes(&fluid_simulation, &scene, &mut renderer);
 
     let mut show_info: bool = true;
@@ -127,6 +129,7 @@ fn simulate(scene: &Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Resu
                         scene.recreate(&mut fluid_simulation)?;
                         renderer.clear();
                         add_particles(0..fluid_simulation.len(), &fluid_simulation, &mut renderer);
+                        fluid_simulation.init_forces();
                     }
                     render::event::Key::A => {
                         add_particles(scene.add_blocks(&mut fluid_simulation)?, &fluid_simulation, &mut renderer);

@@ -5,7 +5,8 @@ use nalgebra::Vector3;
 use std::fs::File;
 use std::path::Path;
 
-use sph_common::{Emitter, Animation, RigidObject, DFSPH, external_forces::ExternalForces, external_forces::ViscosityType, external_forces::VorticityConfig, external_forces::DragConfig};
+use sph_common::{Emitter, Animation, RigidObject, DFSPH};
+use sph_common::external_forces::{ExternalForces, ViscosityType, VorticityConfig, DragConfig, ElasticityConfig};
 
 use serde_derive::*;
 use crate::{Solid, LiquidZone, EmitterConfig};
@@ -57,6 +58,8 @@ pub struct Configuration
     pub viscosity: ViscosityType,
     #[serde(default)]
     pub vorticity: VorticityConfig,
+    #[serde(default)]
+    pub elasticity: Option<ElasticityConfig>,
     #[serde(default)]
     pub drag: DragConfig,
 }
@@ -191,7 +194,8 @@ impl Scene
               .surface_tension(self.config.kernel_radius, self.config.surface_tension, self.config.surface_adhesion)
               .viscosity(&self.config.viscosity)
               .vorticity(&self.config.vorticity)
-              .drag(&self.config.drag);
+              .drag(&self.config.drag)
+              .elasticity(&self.config.elasticity);
 
         let (emitters, emitters_animations) = self.emitters();
 

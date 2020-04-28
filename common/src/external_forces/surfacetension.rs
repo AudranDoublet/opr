@@ -24,7 +24,9 @@ impl SurfaceTensionForce {
 }
 
 impl ExternalForce for SurfaceTensionForce {
-    fn compute_acceleration(&self, sim: &DFSPH, accelerations: &mut Vec<Vector3<f32>>) {
+    fn init(&mut self, _: &DFSPH) { }
+
+    fn compute_acceleration(&self, sim: &DFSPH, accelerations: &mut Vec<Vector3<f32>>) -> f32 {
         let positions = sim.positions.read().unwrap();
         let densities = sim.density.read().unwrap();
         let h = sim.kernel_radius();
@@ -69,5 +71,7 @@ impl ExternalForce for SurfaceTensionForce {
                 })
             });
         });
+
+        sim.time_step
     }
 }

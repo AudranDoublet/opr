@@ -138,7 +138,9 @@ impl ViscosityWeiler2018Force {
 }
 
 impl ExternalForce for ViscosityWeiler2018Force {
-    fn compute_acceleration(&self, sim: &DFSPH, accelerations: &mut Vec<Vector3<f32>>) {
+    fn init(&mut self, _: &DFSPH) { }
+
+    fn compute_acceleration(&self, sim: &DFSPH, accelerations: &mut Vec<Vector3<f32>>) -> f32 {
         let mut preconditions = self.compute_preconditions(sim);
         let mut b = sim.velocities.read().unwrap().clone();
         let mut guess = self.compute_guess(sim);
@@ -153,5 +155,6 @@ impl ExternalForce for ViscosityWeiler2018Force {
 
         let difference = self.difference.read().unwrap();
         accelerations.par_iter_mut().enumerate().for_each(|(i, a)| *a += (1. / sim.time_step) * difference[i]);
+        sim.time_step
     }
 }

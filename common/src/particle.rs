@@ -70,7 +70,7 @@ pub struct DFSPH
     camera_animation: Animation,
 
     #[serde(skip_serializing, skip_deserializing)]
-    external_forces: ExternalForces,
+    external_forces: RwLock<ExternalForces>,
 
     len: usize,
 
@@ -214,7 +214,7 @@ impl DFSPH
             velocities: RwLock::new(Vec::new()),
             positions: RwLock::new(Vec::new()),
 
-            external_forces: external_forces,
+            external_forces: RwLock::new(external_forces),
 
             camera: Camera::new(camera_position),
             camera_animation: camera_animation,
@@ -317,6 +317,10 @@ impl DFSPH
         self.neighbours_struct.find_neighbours(self.len(), &self.positions.read().unwrap(), *x)
     }
 
+    pub fn neighbours(&self, i: usize) -> Vec<usize> {
+        self.neighbours[i].clone()
+    }
+
     pub fn neighbours_count(&self, i: usize) -> usize {
         self.neighbours[i].len()
     }
@@ -369,27 +373,40 @@ impl DFSPH
         self.solids_reduce(i, 0.0, f)
     }
 
+    pub fn compute_cfl(&self, velocities: &Vec<Vector3<f32>>) -> (f32, f32) {
+        let mut v_max: f32 = 0.0;
+
+        for i in 0..self.len() {
+            let n = velocities[i].norm_squared();
+            v_max = v_max.max(n);
+        }
+
+        let v_max = v_max.sqrt();
+
+        let time_step = ((self.cfl_factor * self.particle_radius) / v_max)
+            .max(self.cfl_min_time_step)
+            .min(self.cfl_max_time_step);
+
+        (v_max, time_step)
+    }
+
     fn adapt_cfl(&mut self) -> f32 {
         // Compute max velocity
-        let mut v_max: f32 = 0.0;
         let mut debug_v_mean_sq: f64 = 0.;
-
         let velocities = self.velocities.read().unwrap();
 
         for i in 0..self.len() {
             let n = velocities[i].norm_squared();
             debug_v_mean_sq += n as f64;
-            v_max = v_max.max(n);
         }
 
+        let (v_max, time_step) = self.compute_cfl(&velocities);
+
         self.debug_v_mean_sq = (debug_v_mean_sq / self.len() as f64) as f32;
-        self.debug_v_max_sq = v_max;
-        self.v_max = v_max.sqrt();
+        self.debug_v_max_sq = v_max*v_max;
+        self.v_max = v_max;
 
-        self.time_step = ((self.cfl_factor * self.particle_radius) / self.v_max)
-            .max(self.cfl_min_time_step)
-            .min(self.cfl_max_time_step);
-
+        self.time_step = time_step;
         self.time_step
     }
 
@@ -575,11 +592,11 @@ impl DFSPH
         }
     }
 
-    fn compute_non_pressure_forces(&self) {
+    fn compute_non_pressure_forces(&self) -> f32 {
         let mut accelerations = self.accelerations.write().unwrap();
 
         accelerations.par_iter_mut().for_each(|v| *v = Vector3::zeros());
-        self.external_forces.apply(self, &mut accelerations);
+        self.external_forces.read().unwrap().apply(self, &mut accelerations)
     }
 
     fn init(&mut self) {
@@ -618,13 +635,29 @@ impl DFSPH
         Vector3::new(0.0, -9.81, 0.0)
     }
 
+    pub fn init_forces(&mut self) {
+        self.init();
+        self.external_forces.write().unwrap().init(self);
+    }
+
+    pub fn compute_vmax(&self) -> f32 {
+        self.velocities.read().unwrap()
+            .par_iter()
+            .map(|v| v.norm_squared())
+            .reduce(|| 0.0, |a: f32, b: f32| a.max(b))
+            .sqrt()
+    }
+
     pub fn tick(&mut self) -> f32 {
         self.init();
 
         self.correct_divergence_error();
-        self.compute_non_pressure_forces();
 
-        let dt = self.adapt_cfl();
+        self.adapt_cfl();
+        self.time_step = self.compute_non_pressure_forces();
+
+        let dt = self.time_step;
+
 
         {
             let accelerations = self.accelerations.read().unwrap();

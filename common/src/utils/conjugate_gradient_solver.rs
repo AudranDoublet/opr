@@ -19,9 +19,13 @@ impl ConjugateGradientSolver {
     }
 
     fn solve_precond(&self, preconditions: &Vec<Matrix3<f32>>, b: &Vec<Vector3<f32>>) -> Vec<Vector3<f32>> {
-        preconditions.par_iter().zip(b.par_iter())
-                     .map(|(a, b)| a * b)
-                     .collect()
+        if preconditions.len() == 0 {
+            b.clone()
+        } else {
+            preconditions.par_iter().zip(b.par_iter())
+                         .map(|(a, b)| a * b)
+                         .collect()
+        }
     }
 
     fn dot(&self, a: &Vec<Vector3<f32>>, b: &Vec<Vector3<f32>>) -> f32 {

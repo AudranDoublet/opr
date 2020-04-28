@@ -4,6 +4,7 @@ mod basic_viscosity;
 mod high_viscosity;
 mod vorticity;
 mod drag;
+mod elasticity;
 
 use serde_derive::*;
 
@@ -68,9 +69,20 @@ impl Default for DragConfig {
     }
 }
 
+#[derive(Debug, Deserialize)]
+pub struct ElasticityConfig {
+    young_modulus: f32,
+    poisson_ratio: f32,
+    alpha: f32,
+    max_iteration: usize,
+    tolerance: f32,
+}
+
 pub trait ExternalForce
 {
-    fn compute_acceleration(&self, sim: &DFSPH, accelerations: &mut Vec<Vector3<f32>>);
+    fn compute_acceleration(&self, sim: &DFSPH, accelerations: &mut Vec<Vector3<f32>>) -> f32;
+
+    fn init(&mut self, sim: &DFSPH);
 }
 
 pub struct ExternalForces
@@ -117,15 +129,39 @@ impl ExternalForces {
         ))
     }
 
+    pub fn elasticity(&mut self, config: &Option<ElasticityConfig>) -> &mut ExternalForces {
+        if let Some(c) = config {
+            self.add(elasticity::ElasticityForce::new(
+                c.young_modulus,
+                c.poisson_ratio,
+                c.alpha,
+                c.max_iteration,
+                c.tolerance,
+            ))
+        } else {
+            self
+        }
+    }
+
     pub fn add(&mut self, force: Box<dyn ExternalForce + Sync + Send>) -> &mut ExternalForces {
         self.forces.push(force);
         self
     }
 
-    pub fn apply(&self, sim: &DFSPH, accelerations: &mut Vec<Vector3<f32>>) {
-        for v in &self.forces {
-            v.compute_acceleration(sim, accelerations);
+    pub fn init(&mut self, sim: &DFSPH) {
+        for v in &mut self.forces {
+            v.init(sim);
         }
+    }
+
+    pub fn apply(&self, sim: &DFSPH, accelerations: &mut Vec<Vector3<f32>>) -> f32 {
+        let mut dt = sim.time_step;
+
+        for v in &self.forces {
+            dt = v.compute_acceleration(sim, accelerations);
+        }
+
+        dt
     }
 }
 
