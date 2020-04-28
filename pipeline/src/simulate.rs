@@ -23,6 +23,8 @@ pub fn pipeline_simulate(scene: &Scene, dump_folder: &Path) -> Result<(), Box<dy
     let mut total_time = 0.0;
     let mut time_simulated_since_last_frame = fps;
 
+    fluid_simulation.init_forces();
+
     total_time += fluid_simulation.get_time_step();
 
     let mut idx = 0;
