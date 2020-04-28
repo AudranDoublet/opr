@@ -4,12 +4,14 @@ use nalgebra::Vector3;
 use search::IntersectsBVHShape;
 
 use crate::vector3_from_array;
+use std::collections::HashMap;
 
 
 pub struct Material
 {
     ambient: Vector3<f32>,
     diffuse: Vector3<f32>,
+    pub transmission: Vector3<f32>,
     pub specular: Vector3<f32>,
     pub shininess: f32,
     pub optical_density: f32,
@@ -47,14 +49,24 @@ impl Texture
     }
 }
 
+fn load_unknown_param(unknowns: &HashMap<String, String>, param: &String, default: &String) -> Vec<f32> {
+    let s= unknowns.get(param).unwrap_or(&default).split_ascii_whitespace();
+    s.map(|f| f.parse::<f32>().unwrap()).collect()
+}
+
 impl Material
 {
     pub fn new(m: &tobj::Material, texs: &std::collections::HashMap<&str, usize>) -> Material
     {
+        let tf = load_unknown_param(&m.unknown_param, &"Tf".to_string(), &"1 1 1".to_string());
+        assert_eq!(tf.len(), 3, "Tf parameter expected to have 3 channels");
+        let tf = Vector3::new(tf[0], tf[1], tf[2]);
+
         Material
         {
             ambient: vector3_from_array(&m.ambient),
             diffuse: vector3_from_array(&m.diffuse),
+            transmission: tf,
             specular: vector3_from_array(&m.specular),
             shininess: m.shininess,
             optical_density: m.optical_density,
