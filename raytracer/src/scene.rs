@@ -13,12 +13,6 @@ use search::{BVH, BVHParameters, Ray};
 
 use crate::*;
 
-const ILLUM_AMBIENT: u8 = 0;
-const ILLUM_AMBIENT_COLOR: u8 = 1;
-const ILLUM_HIGHLIGHT: u8 = 2;
-const ILLUM_REFLECTION: u8 = 3;
-const ILLUM_REFRACTION_REFLECTION_FRESNEL: u8 = 7;
-
 pub struct Scene
 {
     camera: Camera,
@@ -97,9 +91,9 @@ fn reflectivity_coeff(cos_i: f32, n1: f32, n2: f32) -> f32 {
 
 fn beer_attenuation(transmittance: &Vector3<f32>, distance: f32) -> Vector3<f32> {
     Vector3::new(
-        (transmittance.x * distance).exp(),
-        (transmittance.y * distance).exp(),
-        (transmittance.z * distance).exp(),
+        (-transmittance.x * distance).exp(),
+        (-transmittance.y * distance).exp(),
+        (-transmittance.z * distance).exp(),
     )
 }
 
@@ -287,25 +281,10 @@ impl Scene {
         }, &self.triangles)
     }
 
-    fn sky_color(&self, ray: Ray) -> Vector3<f32> {
-        ray.direction.apply_into(|f| f.cos() + f.sin()).normalize()
+    fn sky_color(&self, _ray: Ray) -> Vector3<f32> {
+        _ray.direction.apply_into(|f| f.cos())
         // Vector3::zeros()
-    }
-
-    fn filtering_lights(&'a self, position: &'a Vector3<f32>) -> impl Iterator<Item=&'a Light> + 'a {
-        self.lights.iter().filter(move |l| match l.shadow_ray(*position) {
-            Some(v) => self.tree.ray_intersect(&v).is_none(),
-            None => true,
-        })
-    }
-
-    fn compute_diffuse(&self, position: &Vector3<f32>, normal: &Vector3<f32>) -> Vector3<f32> {
-        self.lights.iter().filter(|l| match l.shadow_ray(*position) {
-            Some(v) => self.tree.ray_intersect(&v).is_none(),
-            None => true,
-        }).map(|l|
-            l.get_color() * normal.dot(&l.get_direction(position)).max(0.)
-        ).fold(Vector3::zeros(), |a, b| a + b)
+        // Vector3::new(0.65, 0.65, 0.65)
     }
 
     fn compute_diffuse_and_specular(&self, position: &Vector3<f32>, normal: &Vector3<f32>, shininess: f32) -> (Vector3<f32>, Vector3<f32>) {
@@ -328,16 +307,18 @@ impl Scene {
         (diffuse, specular)
     }
 
-    fn get_juncture_information(&self, ray: &Ray, normal: Vector3<f32>, material: &Material) -> (f32, Vector3<f32>, f32, f32, bool) {
-        let mut cos_i = normal.dot(&ray.direction);
+    fn get_juncture_information(&self, ray: &Ray, normal: Vector3<f32>, material: &Material, is_inside: &mut bool) -> (f32, Vector3<f32>, f32, f32) {
+        let cos_i = normal.dot(&ray.direction);
         if cos_i > 0.0 {
-            (cos_i, -normal, material.optical_density, self.air_ior, true)
+            *is_inside = true;
+            (cos_i, -normal, material.optical_density, self.air_ior)
         } else {
-            (-cos_i, normal, self.air_ior, material.optical_density, false)
+            *is_inside = false;
+            (-cos_i, normal, self.air_ior, material.optical_density)
         }
     }
 
-    fn cast_ray(&self, ray: Ray, max_rec: u32) -> Vector3<f32> {
+    fn cast_ray(&self, ray: Ray, max_rec: u32, mut distance_inside_medium: f32) -> Vector3<f32> {
         if let Some((i, triangle)) = self.tree.ray_intersect(&ray) {
             let normal = (triangle.v1_normal * (1.0 - i.u - i.v)
                 + triangle.v2_normal * i.u
@@ -348,68 +329,72 @@ impl Scene {
             let ka = &material.get_ambient();
             let kd = &material.get_diffuse(&self.textures, &triangle, i.u, i.v);
             let ks = &material.specular;
-            let kx = Vector3::new(1., 1., 1.) - ks;
 
             if material.illumination_model == 0 {
                 return clamp_light(kd);
             }
 
             let position = i.position(&ray);
-            let (mut diffuse, mut specular) = self.compute_diffuse_and_specular(&position, &normal, material.shininess);
+            let (diffuse, mut specular) = self.compute_diffuse_and_specular(&position, &normal, material.shininess);
             let mut color = Vector3::zeros();
 
-            let mut reflected_color = if material.illumination_model >= 3 {
+            distance_inside_medium += i.distance;
+
+            let reflected_color = if material.illumination_model >= 3 {
                 let reflect_direction = reflect(&ray, &normal);
                 let reflect_ray = Ray::new(position + &reflect_direction * self.correction_bias, reflect_direction);
                 if max_rec == 0 { self.sky_color(reflect_ray) } else {
-                    self.cast_ray(reflect_ray, max_rec - 1)
+                    self.cast_ray(reflect_ray, max_rec - 1, distance_inside_medium)
                 }
             } else { Vector3::zeros() };
+            let mut refract_direction = None;
+            let mut coeff_reflectivity = 0.0;
+            let mut is_inside = false;
 
             match material.illumination_model {
                 1 => specular = Vector3::zeros(),
                 2 => (),
                 3 | 4 => specular += reflected_color,
                 5 => {
-                    let (cos_i, _, n1, n2, _) = self.get_juncture_information(&ray, normal, &material);
-                    reflected_color *= reflectivity_coeff(cos_i, n1, n2);
+                    let (cos_i, _, n1, n2) = self.get_juncture_information(&ray, normal, &material, &mut is_inside);
+                    specular += reflected_color * reflectivity_coeff(cos_i, n1, n2);
                 }
                 6 => {
-                    let (cos_i, normal, n1, n2, _) = self.get_juncture_information(&ray, normal, &material);
-
-                    let refract_color = if let Some(refract_direction) = refract_unknown_if_tir(&ray, &normal, cos_i, n1, n2) {
-                        let refract_ray = Ray::new(&position + &refract_direction * self.correction_bias, refract_direction);
-                        if max_rec == 0 { self.sky_color(refract_ray) } else {
-                            self.cast_ray(refract_ray, max_rec - 1)
-                        }
-                    } else { Vector3::zeros() };
-
+                    let (cos_i, normal, n1, n2) = self.get_juncture_information(&ray, normal, &material, &mut is_inside);
+                    refract_direction = refract_unknown_if_tir(&ray, &normal, cos_i, n1, n2);
                     specular += reflected_color;
-                    color += kx.component_mul(&material.transmission.component_mul(&(refract_color)));
                 }
                 7 => {
-                    let (cos_i, normal, n1, n2, _) = self.get_juncture_information(&ray, normal, &material);
+                    let (cos_i, normal, n1, n2) = self.get_juncture_information(&ray, normal, &material, &mut is_inside);
 
-                    let coeff_reflectivity = reflectivity_coeff(cos_i, n1, n2);
+                    coeff_reflectivity = reflectivity_coeff(cos_i, n1, n2);
+                    if coeff_reflectivity < 0.99 {
+                        refract_direction = Some(refract(&ray, &normal, cos_i, n1, n2));
+                    }
 
-                    reflected_color *= coeff_reflectivity;
-
-                    let refract_color = (1.0 - coeff_reflectivity) * if coeff_reflectivity < 0.99 {
-                        let refract_direction = refract(&ray, &normal, cos_i, n1, n2);
-                        let refract_ray = Ray::new(&position + &refract_direction * self.correction_bias, refract_direction);
-                        if max_rec == 0 { self.sky_color(refract_ray) } else {
-                            self.cast_ray(refract_ray, max_rec - 1)
-                        }
-                    } else { Vector3::zeros() };
-
-                    color += kx.component_mul(&material.transmission.component_mul(&(refract_color)));
+                    specular += reflected_color * coeff_reflectivity;
                 }
                 _ => panic!(format!("Unknown illum model {}", material.illumination_model))
             };
 
+            let beer = if is_inside {
+                beer_attenuation(&material.transmission, distance_inside_medium)
+            } else { Vector3::new(1., 1., 1.) };
+
+            if let Some(refract_direction) = refract_direction {
+                let refract_ray = Ray::new(&position + &refract_direction * self.correction_bias, refract_direction);
+                let refract_color = if max_rec == 0 {
+                    self.sky_color(refract_ray)
+                } else {
+                    self.cast_ray(refract_ray, max_rec - 1, 0.0)
+                };
+
+                color += (1.0 - coeff_reflectivity) * refract_color;
+            }
+
             color += ka.component_mul(&self.light_ambient) + kd.component_mul(&diffuse) + ks.component_mul(&specular);
 
-            clamp_light(&color)
+            clamp_light(&color.component_mul(&beer))
         } else {
             self.sky_color(ray)
         }
@@ -419,7 +404,7 @@ impl Scene {
         self.camera.set_size(width as f32, height as f32);
 
         (0..width * height).into_par_iter()
-            .map(|i| self.cast_ray(self.camera.generate_ray((i % width) as f32, (i / width) as f32), 10))
+            .map(|i| self.cast_ray(self.camera.generate_ray((i % width) as f32, (i / width) as f32), 10, 0.0))
             .collect()
     }
 }
