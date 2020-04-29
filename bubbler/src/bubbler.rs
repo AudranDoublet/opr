@@ -107,7 +107,7 @@ impl Bubbler {
         // FIXME: we must ignore particles that aren't near from the surface of the fluid
         // FIXME-END;
         self.likelihood_ta.write().unwrap().par_iter_mut().enumerate().for_each(|(i, potential)| {
-            let v_diff = simulation.neighbours_reduce_f(i, &|v, i, j| {
+            let v_diff = simulation.neighbours_reduce_f(false, i, &| v, i, j| {
                 let x_ij: Vector3<f32> = &positions[i] - &positions[j];
                 let v_ij: Vector3<f32> = &velocities[i] - &velocities[j];
 
@@ -138,7 +138,7 @@ impl Bubbler {
                 // We check if the velocity follows enough the normal of the surface normal, if they aren't aiming enough at the same direction
                 // it's likely we're not at crest but just at an edge of the fluid (e.g. cube of water), so we can discard the particle
                 if velocities[i].normalize().dot(&n_i) >= self.hp.threshold_wc_normal_direction {
-                    let curvature_i = simulation.neighbours_reduce_f(i, &|acc, i, j| {
+                    let curvature_i = simulation.neighbours_reduce_f(false, i, &|acc, i, j| {
                         let x_ji: Vector3<f32> = &positions[j] - &positions[i];
                         let n_j: Vector3<f32> = (-&grad_densities[j]).normalize();
 
@@ -173,7 +173,7 @@ impl Bubbler {
         let positions = simulation.positions.read().unwrap();
 
         self.grad_densities.write().unwrap().par_iter_mut().enumerate().for_each(|(i, grad_density)| {
-            *grad_density = simulation.neighbours_reduce_v(i, &|v, i, j| {
+            *grad_density = simulation.neighbours_reduce_v(false, i, &|v, i, j| {
                 v + simulation.mass(j) * simulation.gradient(positions[i], positions[j])
             });
         });

@@ -31,8 +31,6 @@ pub struct Simulation
     pub particle_radius: f32,
     volume: f32,
 
-    pub rest_density: f32,
-
     // cfl
     cfl_min_time_step: f32,
     cfl_max_time_step: f32,
@@ -54,7 +52,8 @@ pub struct Simulation
 
     pub camera: Camera,
 
-    fluid_types: Vec<Fluid>,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub fluid_types: Vec<Fluid>,
 
     #[serde(skip_serializing, skip_deserializing)]
     debug_solid_collisions: Vec<Vector3<f32>>,
@@ -122,8 +121,6 @@ impl Simulation
             kernel: CubicSpine::new(kernel_radius),
             particle_radius: particle_radius,
             volume: volume,
-
-            rest_density: 1000.0,
 
             // time step
             cfl_min_time_step: 0.0001,
@@ -237,12 +234,28 @@ impl Simulation
         self.fluid_types[self.particles_fluid_type[i]].mass()
     }
 
+    pub fn rest_density(&self, i: usize) -> f32 {
+        self.fluid_types[self.particles_fluid_type[i]].rest_density()
+    }
+
+    pub fn debug_color(&self, i: usize) -> Vector3<f32> {
+        self.fluid_types[self.particles_fluid_type[i]].debug_color()
+    }
+
     pub fn find_neighbours(&self, x: &Vector3<f32>) -> Vec<usize> {
         self.neighbours_struct.find_neighbours(self.len(), &self.positions.read().unwrap(), *x)
     }
 
     pub fn neighbours(&self, i: usize) -> Vec<usize> {
         self.neighbours[i].clone()
+    }
+
+    pub fn neighbours_same_phase(&self, i: usize) -> Vec<usize> {
+        self.neighbours[i]
+            .iter()
+            .map(|i| *i)
+            .filter(|j| self.particles_fluid_type[i] == self.particles_fluid_type[*j])
+            .collect()
     }
 
     pub fn neighbours_count(&self, i: usize) -> usize {
@@ -257,11 +270,13 @@ impl Simulation
         })
     }
 
-    pub fn neighbours_reduce<V>(&self, i: usize, value: V, f: &dyn Fn(V, usize, usize) -> V) -> V {
+    pub fn neighbours_reduce<V>(&self, same: bool, i: usize, value: V, f: &dyn Fn(V, usize, usize) -> V) -> V {
         let mut result = value;
 
-        for j in 0..self.neighbours_count(i) {
-            result = f(result, i, self.neighbours[i][j]);
+        for &j in &self.neighbours[i] {
+            if !same || self.particles_fluid_type[i] == self.particles_fluid_type[j] {
+                result = f(result, i, j);
+            }
         }
 
         result
@@ -281,12 +296,12 @@ impl Simulation
         result
     }
 
-    pub fn neighbours_reduce_v(&self, i: usize, f: &dyn Fn(Vector3<f32>, usize, usize) -> Vector3<f32>) -> Vector3<f32> {
-        self.neighbours_reduce(i, Vector3::zeros(), f)
+    pub fn neighbours_reduce_v(&self, same: bool, i: usize, f: &dyn Fn(Vector3<f32>, usize, usize) -> Vector3<f32>) -> Vector3<f32> {
+        self.neighbours_reduce(same, i, Vector3::zeros(), f)
     }
 
-    pub fn neighbours_reduce_f(&self, i: usize, f: &dyn Fn(f32, usize, usize) -> f32) -> f32 {
-        self.neighbours_reduce(i, 0.0, f)
+    pub fn neighbours_reduce_f(&self, same: bool, i: usize, f: &dyn Fn(f32, usize, usize) -> f32) -> f32 {
+        self.neighbours_reduce(same, i, 0.0, f)
     }
 
     pub fn solids_reduce_v(&self, i: usize, f: &dyn Fn(&RigidObject, Vector3<f32>, f32, Vector3<f32>) -> Vector3<f32>) -> Vector3<f32> {
@@ -300,8 +315,8 @@ impl Simulation
     pub fn compute_cfl(&self, velocities: &Vec<Vector3<f32>>) -> (f32, f32) {
         let mut v_max: f32 = 0.0;
 
-        for i in 0..self.len() {
-            let n = velocities[i].norm_squared();
+        for v in velocities {
+            let n = v.norm_squared();
             v_max = v_max.max(n);
         }
 
@@ -328,13 +343,13 @@ impl Simulation
 
         let self_dens = self.volume(i) * self.kernel_apply(pos, positions[i]);
 
-        let neighbour_dens = self.neighbours_reduce_f(i, &|density, _, j| {
+        let neighbour_dens = self.neighbours_reduce_f(false, i, &|density, _, j| {
             density + self.volume(j) * self.kernel_apply(pos, positions[j])
         });
 
         let solids_dens = self.solids_reduce_f(i, &|_, r, v, x| r + v * self.kernel_apply(pos, x));
 
-        (self_dens + neighbour_dens + solids_dens) * self.rest_density
+        (self_dens + neighbour_dens + solids_dens) * self.rest_density(i)
     }
 
     pub fn compute_non_pressure_forces(&self) -> f32 {
@@ -356,6 +371,10 @@ impl Simulation
     }
 
     fn init(&mut self) {
+        for f in &mut self.fluid_types {
+            f.compute_correspondance_table(&self.particles_fluid_type);
+        }
+
         self.solids.iter_mut().for_each(|v| v.reset_force_and_torque());
         self.neighbours = self.neighbours_struct.find_all_neighbours(&self.positions.read().unwrap());
 

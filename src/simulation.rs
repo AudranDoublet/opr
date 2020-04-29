@@ -216,11 +216,14 @@ fn simulate(scene: &Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Resu
                     pause = true;
                 }
 
+                let color = fluid_simulation.debug_color(i);
+
                 particle.visible = !display_high_speed_only || particle_speed_ratio > 0.5;
+
                 if show_velocity {
                     particle.color = (particle_speed_ratio.min(1.), 0., (1. - particle_speed_ratio).max(0.));
                 } else {
-                    particle.color = (0., 0., 1.);
+                    particle.color = (color.x, color.y, color.z)
                 }
 
                 let pos = positions[i];

@@ -46,8 +46,8 @@ impl DFSPH {
             .for_each(|(i, v)| *v = {
                 let pos = positions[i];
 
-                let sum_a = sim.neighbours_reduce_v(i, &|r, _, j| r + sim.volume(j) * sim.gradient(pos, positions[j]));
-                let sum_b = sim.neighbours_reduce_f(i, &|r, _, j| {
+                let sum_a = sim.neighbours_reduce_v(false, i, &|r, _, j| r + sim.volume(j) * sim.gradient(pos, positions[j]));
+                let sum_b = sim.neighbours_reduce_f(false, i, &|r, _, j| {
                     r + (sim.volume(j) * sim.gradient(pos, positions[j])).norm_squared()
                 });
 
@@ -72,7 +72,7 @@ impl DFSPH {
             let density_adv = if sim.neighbours_count(i) < 20 {
                 0.0
             } else {
-                let mut delta = sim.neighbours_reduce_f(i, &|r, i, j| r + sim.volume(j) * (velocities[i] - velocities[j]).dot(&sim.gradient(pos, positions[j])));
+                let mut delta = sim.neighbours_reduce_f(false, i, &|r, i, j| r + sim.volume(j) * (velocities[i] - velocities[j]).dot(&sim.gradient(pos, positions[j])));
                 delta += sim.solids_reduce_f(i, &|volume, r, v, x| {
                     let vj = volume.point_velocity(x);
                     r + v * (velocities[i] - vj).dot(&sim.gradient(pos, x))
@@ -95,13 +95,13 @@ impl DFSPH {
         self.density_prediction.write().unwrap().par_iter_mut().enumerate().for_each(|(i, p)| {
             let pos = positions[i];
 
-            let mut delta = sim.neighbours_reduce_f(i, &|r, i, j| r + sim.volume(j) * (velocities[i] - velocities[j]).dot(&sim.gradient(pos, positions[j])));
+            let mut delta = sim.neighbours_reduce_f(false, i, &|r, i, j| r + sim.volume(j) * (velocities[i] - velocities[j]).dot(&sim.gradient(pos, positions[j])));
             delta += sim.solids_reduce_f(i, &|volume, r, v, x| {
                 let vj = volume.point_velocity(x);
                 r + v * (velocities[i] - vj).dot(&sim.gradient(pos, x))
             });
 
-            *p = (densities[i] / sim.rest_density + dt * delta).max(1.0);
+            *p = (densities[i] / sim.rest_density(i) + dt * delta).max(1.0);
         });
     }
 
@@ -122,8 +122,9 @@ impl DFSPH {
                 sim.velocities.write().unwrap().par_iter_mut().enumerate().for_each(|(i, v)| {
                     let ki = density_adv[i] * stiffness[i] * step;
 
-                    let diff = sim.neighbours_reduce_v(i, &|r, i, j| {
-                        let sum = ki + density_adv[j] * stiffness[j] * step;
+                    let diff = sim.neighbours_reduce_v(false, i, &|r, i, j| {
+                        let kj = density_adv[j] * stiffness[j] * step;
+                        let sum = ki + kj * (sim.rest_density(j) / sim.rest_density(i));
 
                         if sum.abs() <= EPSILON {
                             return r;
@@ -147,13 +148,21 @@ impl DFSPH {
 
             self.compute_density_variation(sim);
 
-            let density_div_avg: f32 = self.density_prediction.read().unwrap().par_iter()
-                .map(|v| v * sim.rest_density - sim.rest_density)
-                .sum::<f32>() / sim.len() as f32;
+            chk = true;
 
-            let eta = 1. / time_step * self.correct_divergence_max_error * 0.01 * sim.rest_density;
+            for m in &sim.fluid_types {
+                let density_div_avg: f32 = self.density_prediction.read()
+                    .unwrap().par_iter()
+                    .enumerate()
+                    .filter(|(i, _)| sim.particles_fluid_type[*i] == m.idx())
+                    .map(|(i, v)| v * sim.rest_density(i) - sim.rest_density(i))
+                    .sum::<f32>() / sim.len() as f32;
 
-            chk |= density_div_avg < eta;
+                let eta = 1. / time_step * self.correct_divergence_max_error * 0.01 * m.rest_density();
+
+                chk &= density_div_avg < eta;
+            }
+
             iter_count += 1;
         }
     }
@@ -175,8 +184,9 @@ impl DFSPH {
                 sim.velocities.write().unwrap().par_iter_mut().enumerate().for_each(|(i, v)| {
                     let ki = (density_adv[i] - 1.) * stiffness[i] * step;
 
-                    let diff = sim.neighbours_reduce_v(i, &|r, i, j| {
-                        let sum = ki + (density_adv[j] - 1.) * stiffness[j] * step;
+                    let diff = sim.neighbours_reduce_v(false, i, &|r, i, j| {
+                        let kj = (density_adv[j] - 1.) * stiffness[j] * step;
+                        let sum = ki + kj * (sim.rest_density(j) / sim.rest_density(i));
 
                         if sum.abs() <= EPSILON {
                             return r;
@@ -205,13 +215,21 @@ impl DFSPH {
 
             self.compute_density_advection(sim);
 
-            let density_avg: f32 = self.density_prediction.read().unwrap().par_iter()
-                .map(|v| v * sim.rest_density - sim.rest_density)
-                .sum::<f32>() / sim.len() as f32;
+            chk = true;
 
-            let eta = self.correct_density_max_error * 0.01 * sim.rest_density;
+            for m in &sim.fluid_types {
+                let density_avg: f32 = self.density_prediction.read()
+                    .unwrap().par_iter()
+                    .enumerate()
+                    .filter(|(i, _)| sim.particles_fluid_type[*i] == m.idx())
+                    .map(|(i, v)| v * sim.rest_density(i) - sim.rest_density(i))
+                    .sum::<f32>() / sim.len() as f32;
 
-            chk |= density_avg < eta;
+                let eta = self.correct_density_max_error * 0.01 * m.rest_density();
+
+                chk &= density_avg < eta;
+            }
+
             iter_count += 1;
         }
     }

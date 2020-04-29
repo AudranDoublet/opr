@@ -3,6 +3,7 @@ use rayon::prelude::*;
 
 use utils::kernels::{Kernel, AdhesionKernel, CohesionKernel};
 
+use crate::Fluid;
 use crate::{Simulation, external_forces::ExternalForce};
 
 pub struct SurfaceTensionForce {
@@ -24,53 +25,55 @@ impl SurfaceTensionForce {
 }
 
 impl ExternalForce for SurfaceTensionForce {
-    fn init(&mut self, _: &Simulation) { }
+    fn init(&mut self, _: &Fluid, _: &Simulation) { }
 
-    fn compute_acceleration(&self, sim: &Simulation, accelerations: &mut Vec<Vector3<f32>>) -> Option<f32> {
+    fn compute_acceleration(&self, fluid: &Fluid, sim: &Simulation, accelerations: &mut Vec<Vector3<f32>>) -> Option<f32> {
         let positions = sim.positions.read().unwrap();
         let densities = sim.density.read().unwrap();
         let h = sim.kernel_radius();
 
         let mut normals = vec![Vector3::zeros(); positions.len()];
-        normals.par_iter_mut().enumerate().for_each(|(i, v)| {
-            *v = h * sim.neighbours_reduce_v(i, &|r, i, j| {
-                r + sim.mass(j) / densities[j] * sim.gradient(positions[i], positions[j])
-            });
-        });
-
-        accelerations.par_iter_mut().enumerate().for_each(|(i, v)| {
-            // cohesion & curvature
-            *v += sim.neighbours_reduce_v(i, &|r, i, j| {
-                let kij = 2. * sim.rest_density / (densities[i] + densities[j]);
-                let xij = positions[i] - positions[j];
-                let normsq = xij.norm_squared();
-
-                let mut accel = Vector3::zeros();
-
-                if normsq > 1e-9 {
-                    let norm = normsq.sqrt();
-                    accel -= self.surface_tension * sim.mass(j) * (xij / norm) * self.cohesion_kernel.apply_on_norm(norm);
-                }
-
-                accel -= (normals[i] - normals[j]) * self.surface_tension;
-
-                r + accel * kij
+        fluid.filter_m(sim, normals.par_iter_mut())
+             .for_each(|(i, v)| {
+                *v = h * sim.neighbours_reduce_v(true, i, &|r, i, j| {
+                    r + sim.mass(j) / densities[j] * sim.gradient(positions[i], positions[j])
+                });
             });
 
-            // adhesion
-            *v += sim.solids_reduce_v(i, &|_, total, v, p| {
-                let xij = positions[i] - p;
+        fluid.filter_m(sim, accelerations.par_iter_mut())
+             .for_each(|(i, v)| {
+                // cohesion & curvature
+                *v += sim.neighbours_reduce_v(true, i, &|r, i, j| {
+                    let kij = 2. * sim.rest_density(i) / (densities[i] + densities[j]);
+                    let xij = positions[i] - positions[j];
+                    let normsq = xij.norm_squared();
 
-                let normsq = xij.norm_squared();
+                    let mut accel = Vector3::zeros();
 
-                total - self.surface_adhesion * (if normsq > 1e-9 {
-                    let norm = normsq.sqrt();
-                    v * sim.rest_density * (xij / norm) * self.adhesion_kernel.apply_on_norm(norm)
-                } else {
-                    Vector3::zeros()
-                })
+                    if normsq > 1e-9 {
+                        let norm = normsq.sqrt();
+                        accel -= self.surface_tension * sim.mass(j) * (xij / norm) * self.cohesion_kernel.apply_on_norm(norm);
+                    }
+
+                    accel -= (normals[i] - normals[j]) * self.surface_tension;
+
+                    r + accel * kij
+                });
+
+                // adhesion
+                *v += sim.solids_reduce_v(i, &|_, total, v, p| {
+                    let xij = positions[i] - p;
+
+                    let normsq = xij.norm_squared();
+
+                    total - self.surface_adhesion * (if normsq > 1e-9 {
+                        let norm = normsq.sqrt();
+                        v * sim.rest_density(i) * (xij / norm) * self.adhesion_kernel.apply_on_norm(norm)
+                    } else {
+                        Vector3::zeros()
+                    })
+                });
             });
-        });
 
         None
     }

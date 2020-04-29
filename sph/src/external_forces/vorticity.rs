@@ -3,6 +3,7 @@ use std::sync::RwLock;
 use nalgebra::Vector3;
 use rayon::prelude::*;
 
+use crate::Fluid;
 use crate::{Simulation, external_forces::ExternalForce};
 
 /*
@@ -31,9 +32,9 @@ impl VorticityForce {
 }
 
 impl ExternalForce for VorticityForce {
-    fn init(&mut self, _: &Simulation) { }
+    fn init(&mut self, _: &Fluid, _: &Simulation) { }
 
-    fn compute_acceleration(&self, sim: &Simulation, accelerations: &mut Vec<Vector3<f32>>) -> Option<f32> {
+    fn compute_acceleration(&self, fluid: &Fluid, sim: &Simulation, accelerations: &mut Vec<Vector3<f32>>) -> Option<f32> {
         let densities = sim.density.read().unwrap();
         let positions = sim.positions.read().unwrap();
         let velocities = sim.velocities.read().unwrap();
@@ -44,17 +45,16 @@ impl ExternalForce for VorticityForce {
         let mut ang_velocity = self.ang_velocity.write().unwrap();
         *ang_velocity = vec![Vector3::zeros(); sim.len()];
 
-        accelerations.par_iter_mut()
-          .zip(ang_velocity.par_iter_mut())
-          .enumerate().for_each(|(i, (a, ang_vel))| {
-            *a += sim.neighbours_reduce_v(i, &|r, _, j| {
+        fluid.filter_mt(sim, accelerations.par_iter_mut().zip(ang_velocity.par_iter_mut()))
+          .for_each(|(i, (a, ang_vel))| {
+            *a += sim.neighbours_reduce_v(true, i, &|r, _, j| {
                 let omegaij = omegas.get(i).unwrap_or(&Vector3::zeros()) - omegas.get(j).unwrap_or(&Vector3::zeros());
                 let grad = sim.gradient(positions[i], positions[j]);
 
                 r + (1./densities[i]) * self.vorticity_coefficient * sim.mass(j) * omegaij.cross(&grad)
             });
 
-            *ang_vel += sim.neighbours_reduce_v(i, &|r, _, j| {
+            *ang_vel += sim.neighbours_reduce_v(true, i, &|r, _, j| {
                 let vij = velocities[i] - velocities[j];
                 let omegaij = omegas.get(i).unwrap_or(&Vector3::zeros()) - omegas.get(j).unwrap_or(&Vector3::zeros());
                 let grad = sim.gradient(positions[i], positions[j]);
@@ -70,7 +70,7 @@ impl ExternalForce for VorticityForce {
                 let omegaij = *omegas.get(i).unwrap_or(&Vector3::zeros());
                 let grad = sim.gradient(positions[i], p);
 
-                let a = self.vorticity_coefficient * 1. / densities[i] * sim.rest_density * v * omegaij.cross(&grad);
+                let a = self.vorticity_coefficient * 1. / densities[i] * sim.rest_density(i) * v * omegaij.cross(&grad);
                 solid.add_force(p, -sim.mass(i) * a);
 
                 total + a
@@ -80,7 +80,7 @@ impl ExternalForce for VorticityForce {
                 let vij = velocities[i] - solid.point_velocity(p);
                 let grad = sim.gradient(positions[i], p);
 
-                total + self.vorticity_coefficient * (1. / densities[i]) * self.inertia_inverse * (sim.rest_density * v * vij.cross(&grad))
+                total + self.vorticity_coefficient * (1. / densities[i]) * self.inertia_inverse * (sim.rest_density(i) * v * vij.cross(&grad))
             });
 
             *ang_vel -= 2. * self.inertia_inverse * self.vorticity_coefficient * omegas.get(i).unwrap_or(&Vector3::zeros());
