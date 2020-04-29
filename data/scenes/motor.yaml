@@ -1,6 +1,9 @@
 config:
     kernel_radius: 0.08
     particle_radius: 0.02
+fluids:
+    water:
+        density: 1000.
 bubbler_config:
     lifetime: [0.6, 2.4]
     k_b: 1.4

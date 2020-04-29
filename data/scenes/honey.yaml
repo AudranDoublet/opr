@@ -1,12 +1,15 @@
 config:
     kernel_radius: 0.04
     particle_radius: 0.01
-    viscosity:
-        type: weiler2018
-        coefficient: 1000.0
-        surface_coefficient: 1000.0
-        max_iteration: 100
-        tolerance: 0.01
+fluids:
+    honey:
+        density: 1000.
+        viscosity:
+            type: weiler2018
+            coefficient: 1000.0
+            surface_coefficient: 1000.0
+            max_iteration: 100
+            tolerance: 0.01
 solids:
     - mesh: objects/box.obj
       density: 1000

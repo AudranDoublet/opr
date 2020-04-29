@@ -1,12 +1,15 @@
 config:
     kernel_radius: 0.08
     particle_radius: 0.02
-    viscosity:
-        type: weiler2018
-        coefficient: 2000.0
-        surface_coefficient: 1000.0
-        max_iteration: 100
-        tolerance: 0.01
+fluids:
+    chocolate:
+        density: 1000.
+        viscosity:
+            type: weiler2018
+            coefficient: 2000.0
+            surface_coefficient: 1000.0
+            max_iteration: 100
+            tolerance: 0.01
 simulation_config:
     fps: 48
     max_time: 4.0
