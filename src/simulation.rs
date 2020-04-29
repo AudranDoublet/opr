@@ -201,8 +201,8 @@ fn simulate(scene: &Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Resu
             }
             */
 
-            let d_v_mean_sq = fluid_simulation.debug_get_v_mean_sq();
-            let d_v_max_sq_deviation = fluid_simulation.debug_get_v_max_sq() / d_v_mean_sq;
+            let d_v_mean_sq = fluid_simulation.compute_vmean();
+            let d_v_max_sq_deviation = fluid_simulation.compute_vmax().powi(2) / d_v_mean_sq;
 
             // particles position sync in 3d rendering
             let velocities = fluid_simulation.velocities.read().unwrap();
@@ -266,7 +266,7 @@ fn simulate(scene: &Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Resu
                 nb_solid_collisions: {}\n\
                 fps: {:.3} frame/s\n\
                 eye: {}\
-                ", frame_idx, fluid_simulation.get_time_step(), total_time, fluid_simulation.len(), fluid_simulation.get_v_max(),
+                ", frame_idx, fluid_simulation.get_time_step(), total_time, fluid_simulation.len(), fluid_simulation.compute_vmax(),
                                          !hide_solids,
                                          show_collisions,
                                          collision_size,

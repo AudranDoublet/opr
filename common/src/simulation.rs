@@ -43,10 +43,6 @@ pub struct Simulation
     // iteration data
     pub time_step: RwLock<f32>,
 
-    v_max: f32,
-    debug_v_max_sq: f32,
-    debug_v_mean_sq: f32,
-
     solids: Vec<RigidObject>,
     #[serde(skip_serializing, skip_deserializing)]
     debug_solid_collisions: Vec<Vector3<f32>>,
@@ -195,10 +191,6 @@ impl Simulation
             cfl_factor: 1.0,
             time_step: RwLock::new(0.0001),
 
-            v_max: 0.0,
-            debug_v_max_sq: 0.0,
-            debug_v_mean_sq: 0.0,
-
             solids,
             debug_solid_collisions: vec![],
 
@@ -253,18 +245,6 @@ impl Simulation
 
     pub fn debug_get_solid_collisions (&self) -> &Vec<Vector3<f32>> {
         self.debug_solid_collisions.as_ref()
-    }
-
-    pub fn debug_get_v_mean_sq(&self) -> f32 {
-        self.debug_v_mean_sq
-    }
-
-    pub fn debug_get_v_max_sq(&self) -> f32 {
-        self.debug_v_max_sq
-    }
-
-    pub fn get_v_max(&self) -> f32 {
-        self.v_max
     }
 
     pub fn get_time_step(&self) -> f32 {
@@ -395,7 +375,7 @@ impl Simulation
     pub fn adapt_cfl(&self) -> f32 {
         let velocities = self.velocities.read().unwrap();
 
-        let (v_max, time_step) = self.compute_cfl(&velocities);
+        let (_, time_step) = self.compute_cfl(&velocities);
 
         *self.time_step.write().unwrap() = time_step;
         time_step
@@ -474,6 +454,13 @@ impl Simulation
             .map(|v| v.norm_squared())
             .reduce(|| 0.0, |a: f32, b: f32| a.max(b))
             .sqrt()
+    }
+
+    pub fn compute_vmean(&self) -> f32 {
+        self.velocities.read().unwrap()
+            .par_iter()
+            .map(|v| v.norm())
+            .reduce(|| 0.0, |a: f32, b: f32| a + b) / self.len() as f32
     }
 
     pub fn update_positions(&mut self) {
