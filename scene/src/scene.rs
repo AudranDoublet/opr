@@ -40,7 +40,6 @@ pub struct Configuration
 {
     #[serde(default = "default_gravity")]
     pub gravity: [f32; 3],
-    pub kernel_radius: f32, //FIXME mark as default ?
     pub particle_radius: f32,
 }
 
@@ -154,6 +153,10 @@ impl Scene
         4. * std::f32::consts::PI * self.config.particle_radius.powi(3) / 3.
     }
 
+    pub fn kernel_radius(&self) -> f32 {
+        4. * self.config.particle_radius
+    }
+
     pub fn load_solids(&self) -> Result<Vec<RigidObject>, Box<dyn std::error::Error>>
     {
         self.create_cache_dir()?;
@@ -173,7 +176,7 @@ impl Scene
         let mut idx = 0;
 
         for (_, v) in self.fluids.iter() {
-            fluids.push(v.create(idx, self.volume(), self.gravity(), self.config.kernel_radius));
+            fluids.push(v.create(idx, self.volume(), self.gravity(), self.kernel_radius()));
             idx += 1;
         }
 
@@ -201,7 +204,7 @@ impl Scene
         let (emitters, emitters_animations) = self.emitters();
 
         let mut result = Simulation::new(
-            self.config.kernel_radius,
+            self.kernel_radius(),
             self.config.particle_radius,
             solids,
             fluids,

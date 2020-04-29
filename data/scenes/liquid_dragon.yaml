@@ -1,5 +1,4 @@
 config:
-    kernel_radius: 0.08
     particle_radius: 0.02
 fluids:
     water:

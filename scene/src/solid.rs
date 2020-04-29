@@ -127,7 +127,7 @@ impl Solid {
     }
 
     pub fn load(&self, scene: &Scene) -> Result<RigidObject, Box<dyn std::error::Error>> {
-        let kradius = scene.config.kernel_radius;
+        let kradius = scene.kernel_radius();
 
         let cache_file = self.cache_file(Path::new(&scene.global_config.cache_path), kradius);
         let mesh_file = self.file(Path::new(&scene.global_config.data_path));

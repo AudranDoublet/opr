@@ -1,5 +1,4 @@
 config:
-    kernel_radius: 0.04
     particle_radius: 0.01
 fluids:
     honey:
