@@ -1,8 +1,9 @@
 extern crate serde_yaml;
 
-use crate::*;
-use serde_derive::*;
 use nalgebra::Vector3;
+use serde_derive::*;
+
+use crate::*;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ObjectConfig
@@ -14,24 +15,8 @@ pub struct ObjectConfig
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct ParamsConfig
-{
-    #[serde(default)]
-    pub build_max_depth: u32,
-}
-
-impl Default for ParamsConfig {
-    fn default() -> Self {
-        ParamsConfig {
-            build_max_depth: 13,
-        }
-    }
-}
-
-#[derive(Debug, Deserialize, Serialize)]
 pub struct SceneConfig
 {
-    pub params: ParamsConfig,
     pub objects: Vec<ObjectConfig>,
     pub lights: Vec<Light>,
     pub camera: Camera,

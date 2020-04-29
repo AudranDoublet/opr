@@ -83,7 +83,6 @@ pub fn pipeline_polygonize(scene: &Scene, input_directory: &Path, dump_directory
 
         let config = scene_config::SceneConfig {
             objects: objects,
-            params: scene_config::ParamsConfig::default(),
             lights: Vec::new(),
             camera: Camera::new(camera.position(), camera.up(), camera.forward(), 512., 512.),
         };

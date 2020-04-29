@@ -1,16 +1,15 @@
 extern crate serde_yaml;
 
-use nalgebra::Vector3;
-
+use std::collections::HashMap;
 use std::fs::File;
 use std::path::Path;
-use std::collections::HashMap;
 
-use sph::{Fluid, Emitter, Animation, RigidObject, Simulation};
-
-use serde_derive::*;
-use crate::{Solid, LiquidZone, EmitterConfig, FluidConfiguration};
 use bubbler::config::BubblerConfig;
+use nalgebra::Vector3;
+use serde_derive::*;
+use sph::{Animation, Emitter, Fluid, RigidObject, Simulation};
+
+use crate::{EmitterConfig, FluidConfiguration, LiquidZone, Solid};
 
 fn default_gravity() -> [f32; 3] {
     [0.0, -9.81, 0.0]
@@ -40,6 +39,7 @@ pub struct Configuration
 {
     #[serde(default = "default_gravity")]
     pub gravity: [f32; 3],
+    pub kernel_radius: f32,
     pub particle_radius: f32,
 }
 
@@ -60,17 +60,33 @@ impl Default for SimulationConfig {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct RenderConfig
-{
+pub struct RenderConfig {
+    #[serde(default = "render_conf_default_fps")]
     pub fps: f32,
+    #[serde(default = "render_conf_default_resolution")]
     pub resolution: (usize, usize),
+    #[serde(default = "render_conf_default_build_max_def")]
+    pub build_max_depth: u32,
+    #[serde(default = "render_conf_default_max_rec")]
+    pub max_rec: u8,
+    #[serde(default = "render_conf_default_aa_max_sample")]
+    pub aa_max_sample: usize,
 }
+
+fn render_conf_default_fps() -> f32 { -1. }
+fn render_conf_default_resolution() -> (usize, usize) { (512, 512) }
+fn render_conf_default_build_max_def() -> u32 { 12 }
+fn render_conf_default_max_rec() -> u8 { 10 }
+fn render_conf_default_aa_max_sample() -> usize { 16 }
 
 impl Default for RenderConfig {
     fn default() -> RenderConfig {
         RenderConfig {
-            fps: -1.,
-            resolution: (512, 512),
+            fps: render_conf_default_fps(),
+            resolution: render_conf_default_resolution(),
+            build_max_depth: render_conf_default_build_max_def(),
+            max_rec: render_conf_default_max_rec(),
+            aa_max_sample: render_conf_default_aa_max_sample(),
         }
     }
 }
