@@ -418,7 +418,7 @@ impl Scene {
         let grad_map = self.grad_map(image, width, height);
         let threshold = 1. / (max_sample + 1.0);
 
-        image.iter_mut().enumerate()
+        image.par_iter_mut().enumerate()
             .filter(|(i, _)| grad_map[*i] > threshold)
             .for_each(|(i, p)| {
                 let mut rng = rand::thread_rng();
