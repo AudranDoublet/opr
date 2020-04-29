@@ -9,6 +9,8 @@ mod elasticity;
 use serde_derive::*;
 
 use nalgebra::Vector3;
+
+use crate::Fluid;
 use crate::Simulation;
 
 #[derive(Debug, Deserialize)]
@@ -80,9 +82,9 @@ pub struct ElasticityConfig {
 
 pub trait ExternalForce
 {
-    fn compute_acceleration(&self, sim: &Simulation, accelerations: &mut Vec<Vector3<f32>>) -> Option<f32>;
+    fn compute_acceleration(&self, fluid: &Fluid, sim: &Simulation, accelerations: &mut Vec<Vector3<f32>>) -> Option<f32>;
 
-    fn init(&mut self, sim: &Simulation);
+    fn init(&mut self, fluid: &Fluid, sim: &Simulation);
 }
 
 pub struct ExternalForces
@@ -148,17 +150,17 @@ impl ExternalForces {
         self
     }
 
-    pub fn init(&mut self, sim: &Simulation) {
+    pub fn init(&mut self, fluid: &Fluid, sim: &Simulation) {
         for v in &mut self.forces {
-            v.init(sim);
+            v.init(fluid, sim);
         }
     }
 
-    pub fn apply(&self, sim: &Simulation, accelerations: &mut Vec<Vector3<f32>>) -> f32 {
+    pub fn apply(&self, fluid: &Fluid, sim: &Simulation, accelerations: &mut Vec<Vector3<f32>>) -> f32 {
         let mut dt = sim.time_step();
 
         for v in &self.forces {
-            if let Some(v) = v.compute_acceleration(sim, accelerations) {
+            if let Some(v) = v.compute_acceleration(fluid, sim, accelerations) {
                 dt = v;
             }
         }
