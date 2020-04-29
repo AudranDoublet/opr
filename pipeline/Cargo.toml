@@ -10,8 +10,9 @@ edition = "2018"
 nalgebra = { version = "0.20.0", features = ["serde-serialize"] }
 
 sph_scene = { path = "../scene" }
-sph_common = { path = "../common" }
+sph = { path = "../sph" }
 raytracer = { path = "../raytracer" }
+mesher = { path = "../mesher" }
 
 rayon = "1.3.0"
 

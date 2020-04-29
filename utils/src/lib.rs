@@ -1,10 +1,17 @@
+#![feature(clamp)]
+
+pub mod kernels;
+pub mod mesh;
+
 mod gausslegendre;
 mod conjugate_gradient_solver;
 mod curves;
+mod discretegrid;
 
 pub use gausslegendre::*;
 pub use conjugate_gradient_solver::*;
 pub use curves::*;
+pub use discretegrid::*;
 
 use nalgebra::Vector3;
 

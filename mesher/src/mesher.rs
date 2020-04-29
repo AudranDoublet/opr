@@ -2,12 +2,12 @@ use std::collections::HashMap;
 
 use nalgebra::Vector3;
 
-use crate::mesher::anisotropication::Anisotropicator;
-use crate::mesher::constants;
-use crate::mesher::constants::MC_CONFIGS_EDGES;
-use crate::mesher::interpolation::{interpolate, InterpolationAlgorithms};
-use crate::mesher::mesh::Mesh;
-use crate::mesher::types::*;
+use crate::anisotropication::Anisotropicator;
+use crate::constants;
+use crate::constants::MC_CONFIGS_EDGES;
+use crate::interpolation::{interpolate, InterpolationAlgorithms};
+use crate::mesh::Mesh;
+use crate::types::*;
 
 #[derive(Clone)]
 pub struct Mesher {
@@ -111,7 +111,7 @@ impl Mesher {
     }
 
     fn compute_mesh(&mut self, snapshot: &Box<dyn FluidSnapshot>) -> Mesh {
-        let (borders, cell_discretization) = snapshot.get_grid().get_borders();
+        let (borders, cell_discretization) = snapshot.get_borders();
 
         let iso_value = self.iso_value;
         let interpolation_algorithm = self.interpolation_algorithm;

@@ -5,8 +5,7 @@ use nalgebra::{RealField, Vector3};
 use rand::*;
 use rand::distributions::Uniform;
 use rayon::prelude::*;
-use sph_common::Simulation;
-use sph_common::mesher::types::VertexWorld;
+use sph::Simulation;
 
 use crate::config::BubblerConfig;
 use crate::diffuse_particle::{DiffuseParticle, DiffuseParticleType};
@@ -244,7 +243,7 @@ impl Bubbler {
         let velocities = simulation.velocities.read().unwrap();
         let gravity = simulation.gravity();
 
-        let compute_avg_local_fluid_velocity = |x: &VertexWorld, neighbours: Vec<usize>| {
+        let compute_avg_local_fluid_velocity = |x: &Vector3<f32>, neighbours: Vec<usize>| {
             let mut w_sum = 0.;
             let mut weighted_velocities = Vector3::zeros();
             for j in neighbours {

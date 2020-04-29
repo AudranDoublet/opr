@@ -3,7 +3,7 @@ use std::fs;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::path::Path;
 
-use sph_common::Simulation;
+use sph::Simulation;
 use sph_scene::Scene;
 
 fn dump_simulation(simulation: &Simulation, dump_folder: &Path, idx: usize) -> Result<(), Box<dyn std::error::Error>> {

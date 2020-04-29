@@ -5,10 +5,10 @@ use std::sync::Mutex;
 use nalgebra::{Matrix3, Quaternion, UnitQuaternion, Vector3};
 use serde::{Deserialize, Serialize};
 
-use crate::{DiscreteGrid, mesh::MassProperties, Animation, VariableType, AnimationHandler};
-use search::*;
+use utils::{DiscreteGrid, mesh::MassProperties};
+use crate::{Animation, VariableType, AnimationHandler};
 
-use crate::mesher::types::{VertexWorld};
+use search::*;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RigidObject
@@ -96,7 +96,7 @@ impl RigidObject
         res
     }
 
-    pub fn to_particles(&self, radius: f32) -> Vec<VertexWorld> {
+    pub fn to_particles(&self, radius: f32) -> Vec<Vector3<f32>> {
         let (min, max) = self.grid.get_domain_definition();
         let step = (max - min) / radius;
 
@@ -104,7 +104,7 @@ impl RigidObject
         for z in 0..step.z as u32 {
             for y in 0..step.y as u32 {
                 for x in 0..step.x as u32 {
-                    let pos = min + VertexWorld::new(x as f32, y as f32, z as f32) * radius;
+                    let pos = min + Vector3::new(x as f32, y as f32, z as f32) * radius;
                     let v = self.grid.interpolate(0, pos, false);
 
                     if let Some((d, _)) = v {

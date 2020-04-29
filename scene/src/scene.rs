@@ -6,7 +6,7 @@ use std::fs::File;
 use std::path::Path;
 use std::collections::HashMap;
 
-use sph_common::{Fluid, Emitter, Animation, RigidObject, Simulation};
+use sph::{Fluid, Emitter, Animation, RigidObject, Simulation};
 
 use serde_derive::*;
 use crate::{Solid, LiquidZone, EmitterConfig, FluidConfiguration};

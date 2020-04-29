@@ -1,7 +1,7 @@
 use nalgebra::Vector3;
 use rayon::prelude::*;
 
-use crate::kernels::{Kernel, AdhesionKernel, CohesionKernel};
+use utils::kernels::{Kernel, AdhesionKernel, CohesionKernel};
 
 use crate::{Simulation, external_forces::ExternalForce};
 

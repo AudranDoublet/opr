@@ -1,5 +1,5 @@
 [package]
-name = "search"
+name = "mesher"
 version = "0.1.0"
 authors = ["Audran Doublet <audran.doublet@epita.fr>"]
 edition = "2018"
@@ -10,5 +10,4 @@ edition = "2018"
 
 nalgebra = { version = "0.20.0", features = ["serde-serialize"] }
 
-rayon = "1.3.0"
-dashmap = "3.10.0"
+utils = { path = "../utils" }

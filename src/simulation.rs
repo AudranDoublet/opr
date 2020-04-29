@@ -9,7 +9,7 @@ use bubbler::diffuse_particle::DiffuseParticleType;
 use clap::ArgMatches;
 use kiss3d::{camera::camera::Camera, scene::SceneNode};
 use nalgebra::{Point3, Translation3};
-use sph_common::Simulation;
+use sph::Simulation;
 use sph_scene::Scene;
 
 pub fn add_particles(range: std::ops::Range<usize>, dfsph: &Simulation, scene: &mut render::scene::Scene) {

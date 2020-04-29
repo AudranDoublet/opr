@@ -7,7 +7,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use nalgebra::Vector3;
 use raytracer::{Light};
 use raytracer::scene_config::*;
-use sph_common::Camera;
+use sph::Camera;
 use sph_scene::Scene;
 
 fn get_obj(folder: &Path) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {

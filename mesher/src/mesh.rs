@@ -1,7 +1,7 @@
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 
-use crate::mesher::types::*;
+use crate::types::*;
 
 pub struct Mesh {
     edge_map: HashMap<EdgeLocalExtremes, usize>, // map an edge to its vertex index

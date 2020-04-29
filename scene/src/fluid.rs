@@ -2,8 +2,8 @@ use nalgebra::Vector3;
 
 use serde_derive::*;
 
-use sph_common::external_forces::{ExternalForces, ViscosityType, VorticityConfig, DragConfig, ElasticityConfig};
-use sph_common::Fluid;
+use sph::external_forces::{ExternalForces, ViscosityType, VorticityConfig, DragConfig, ElasticityConfig};
+use sph::Fluid;
 
 fn default_surface_tension() -> f32 {
     0.05

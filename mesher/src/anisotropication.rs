@@ -1,6 +1,6 @@
 use nalgebra::{Matrix3, SVD, U3, Vector3};
 
-use crate::mesher::types::{FluidSnapshot, VertexWorld};
+use crate::types::{FluidSnapshot, VertexWorld};
 
 #[derive(Clone)]
 pub struct Anisotropicator {

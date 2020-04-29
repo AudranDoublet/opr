@@ -2,7 +2,7 @@ use nalgebra::Vector3;
 use rayon::prelude::*;
 
 use crate::{Simulation, external_forces::ExternalForce};
-use crate::utils::orthogonal_vectors;
+use utils::orthogonal_vectors;
 
 pub struct BasicViscosityForce {
     viscosity_coeffcient: f32,

@@ -1,7 +1,7 @@
 use serde_derive::*;
 use nalgebra::Vector3;
 
-use sph_common::{Simulation, Animation};
+use sph::{Simulation, Animation};
 
 use crate::{Scene, Solid};
 

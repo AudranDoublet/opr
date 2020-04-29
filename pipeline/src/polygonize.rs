@@ -7,10 +7,10 @@ use indicatif::{ProgressBar, ProgressStyle};
 
 use sph_scene::Scene;
 
-use sph_common::Simulation;
-use sph_common::mesher::interpolation::InterpolationAlgorithms;
-use sph_common::mesher::Mesher;
-use sph_common::mesher::anisotropication::Anisotropicator;
+use sph::Simulation;
+use mesher::interpolation::InterpolationAlgorithms;
+use mesher::Mesher;
+use mesher::anisotropication::Anisotropicator;
 
 use raytracer::{scene_config, Camera};
 

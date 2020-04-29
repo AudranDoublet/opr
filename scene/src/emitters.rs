@@ -1,4 +1,4 @@
-use sph_common::{Emitter, EmitterShape, Animation};
+use sph::{Emitter, EmitterShape, Animation};
 use crate::Scene;
 
 use serde_derive::*;

@@ -14,14 +14,16 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::{Animation, Camera, Emitter};
-use crate::{HashGrid, RigidObject};
-use crate::kernels::{Kernel, CubicSpine};
-use crate::mesher::types::{FluidSnapshot, FluidSnapshotProvider, VertexWorld};
+use crate::RigidObject;
+use utils::kernels::{Kernel, CubicSpine};
+use mesher::types::{FluidSnapshot, FluidSnapshotProvider};
 
 use crate::SimulationFluidSnapshot;
 
 use crate::Fluid;
 use crate::pressure_solver::*;
+
+use search::HashGrid;
 
 fn default_pressure_solver() -> RwLock<Box<dyn PressureSolver + Send + Sync>> {
     RwLock::new(DFSPH::new())
@@ -78,6 +80,7 @@ pub struct Simulation
 
     len: usize,
 
+    #[serde(skip_serializing, skip_deserializing)]
     neighbours_struct: HashGrid,
 }
 
@@ -241,7 +244,7 @@ impl Simulation
         self.fluid_types[self.particles_fluid_type[i]].mass()
     }
 
-    pub fn find_neighbours(&self, x: &VertexWorld) -> Vec<usize> {
+    pub fn find_neighbours(&self, x: &Vector3<f32>) -> Vec<usize> {
         self.neighbours_struct.find_neighbours(self.len(), &self.positions.read().unwrap(), *x)
     }
 

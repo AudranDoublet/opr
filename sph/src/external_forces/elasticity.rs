@@ -8,7 +8,7 @@ use nalgebra::{Vector3, Vector6, Matrix3, UnitQuaternion};
 use rayon::prelude::*;
 
 use crate::{Simulation, external_forces::ExternalForce};
-use crate::utils::ConjugateGradientSolver;
+use utils::ConjugateGradientSolver;
 
 pub struct ElasticityForce {
     solver: ConjugateGradientSolver,

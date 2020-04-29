@@ -1,4 +1,4 @@
-use crate::mesher::types::EdgeIndices;
+use crate::types::EdgeIndices;
 
 pub static MC_CONFIGS_EDGES: [EdgeIndices; 12] = [
     (0, 1),

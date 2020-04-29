@@ -49,7 +49,7 @@ dependencies = [
  "nalgebra",
  "rand",
  "rayon",
- "sph_common",
+ "sph",
 ]
 
 [[package]]
@@ -534,7 +534,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sph_common"
+name = "sph"
 version = "0.1.0"
 dependencies = [
  "dashmap",

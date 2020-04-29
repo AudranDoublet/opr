@@ -1,8 +1,9 @@
 use nalgebra::Vector3;
-use crate::kernels::{Kernel, CubicSpine};
+use utils::kernels::{Kernel, CubicSpine};
 
-use crate::{HashGrid};
-use crate::mesher::types::{FluidSnapshot, VertexWorld};
+use mesher::types::{FluidSnapshot, VertexWorld};
+
+use search::HashGrid;
 
 pub struct SimulationFluidSnapshot
 {
@@ -47,7 +48,7 @@ impl FluidSnapshot for SimulationFluidSnapshot {
         &self.kernel
     }
 
-    fn get_grid(&self) -> &HashGrid {
-        &self.neighbours_struct
+    fn get_borders(&self) -> (Vec<Vector3<f32>>, f32) {
+        self.neighbours_struct.get_borders()
     }
 }

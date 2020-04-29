@@ -1,11 +1,8 @@
 use dashmap::DashMap;
 
-use derivative::*;
 use nalgebra::Vector3;
 use rayon::prelude::*;
-use serde_derive::*;
 
-use crate::mesher::types::{VertexLocal, VertexWorld};
 use std::collections::HashMap;
 
 #[derive(Hash, Debug, Copy, Clone, PartialEq, Eq)]
@@ -44,15 +41,17 @@ enum LakeState {
     INTERNAL = 1,
 }
 
-#[derive(Serialize, Deserialize, Derivative)]
-#[derivative(Debug)]
 pub struct HashGrid
 {
     cell_size: f32,
     cell_size_sq: f32,
-    #[serde(skip_serializing, skip_deserializing)]
-    #[derivative(Debug = "ignore")]
     map: DashMap<HashGridKey, Vec<usize>>,
+}
+
+impl Default for HashGrid {
+    fn default() -> HashGrid {
+        HashGrid::new(0.02)
+    }
 }
 
 impl HashGrid
@@ -103,7 +102,7 @@ impl HashGrid
         }).collect()
     }
 
-    pub fn update_particles(&mut self, old_positions: &Vec<VertexWorld>, new_positions: &Vec<VertexWorld>) {
+    pub fn update_particles(&mut self, old_positions: &Vec<Vector3<f32>>, new_positions: &Vec<Vector3<f32>>) {
         let cell_size= self.cell_size;
         old_positions.par_iter().zip(new_positions.par_iter()).enumerate()
             .filter(|(_, (old, new))| *old != *new)
@@ -160,15 +159,15 @@ impl HashGrid
         }
     }
 
-    pub fn cell_to_world(&self, v: &HashGridKey) -> VertexWorld {
-        (VertexWorld::new(v.x as f32, v.y as f32, v.z as f32)) * self.cell_size
+    pub fn cell_to_world(&self, v: &HashGridKey) -> Vector3<f32> {
+        (Vector3::new(v.x as f32, v.y as f32, v.z as f32)) * self.cell_size
     }
 
-    pub fn coord_to_world(&self, v: &VertexLocal) -> VertexWorld {
-        (VertexWorld::new(v.x as f32, v.y as f32, v.z as f32)) * self.cell_size
+    pub fn coord_to_world(&self, v: &Vector3<i64>) -> Vector3<f32> {
+        (Vector3::new(v.x as f32, v.y as f32, v.z as f32)) * self.cell_size
     }
 
-    pub fn get_borders(&self) -> (Vec<VertexWorld>, f32) {
+    pub fn get_borders(&self) -> (Vec<Vector3<f32>>, f32) {
         let mut result = vec![];
 
         let mut grid: HashMap<HashGridKey, LakeState> = HashMap::new();

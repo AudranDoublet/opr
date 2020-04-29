@@ -5,7 +5,7 @@ authors = ["Audran Doublet <audran@datakeen.co>"]
 edition = "2018"
 
 [dependencies]
-sph_common = { path = "common" }
+sph = { path = "sph" }
 sph_scene = { path = "scene" }
 render = { path = "render" }
 raytracer = { path = "raytracer" }

@@ -8,7 +8,7 @@ edition = "2018"
 
 [dependencies]
 
-sph_common = { path = "../common" }
+sph = { path = "../sph" }
 
 nalgebra = "0.20.0"
 rand = "0.7.3"

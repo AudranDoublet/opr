@@ -1,4 +1,4 @@
-use crate::mesher::types::*;
+use crate::types::*;
 
 pub trait Interpolator {
     fn interpolate(value: f32, cube_vertices: &CubeVertices, cube_edge: &(usize, usize)) -> VertexWorld;

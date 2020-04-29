@@ -1,6 +1,8 @@
 extern crate image;
 
-use sph_common::{DiscreteGrid, RigidObject, mesh::Mesh, kernels::CubicSpine, Animation};
+use utils::{DiscreteGrid, mesh::Mesh};
+use sph::{RigidObject, Animation};
+use utils::kernels::CubicSpine;
 
 use crate::Scene;
 

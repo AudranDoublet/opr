@@ -1,7 +1,7 @@
 use nalgebra::Vector3;
 use serde_derive::*;
 
-use crate::utils::Curve;
+use utils::Curve;
 
 #[derive(Deserialize, Debug, Clone)]
 pub enum VariableType {

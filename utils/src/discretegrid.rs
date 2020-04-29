@@ -7,7 +7,6 @@ use nalgebra::Vector3;
 use rayon::prelude::*;
 
 use std::fs::File;
-use crate::mesher::types::VertexWorld;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DiscreteGridFunction {
@@ -52,7 +51,7 @@ impl Default for DiscreteGrid {
 }
 
 impl DiscreteGrid {
-    pub fn get_domain_definition(&self) -> (&VertexWorld, &VertexWorld) {
+    pub fn get_domain_definition(&self) -> (&Vector3<f32>, &Vector3<f32>) {
         (&self.domain_min, &self.domain_max)
     }
 

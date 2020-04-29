@@ -2,7 +2,9 @@ use std::error::Error;
 use std::path::Path;
 
 use crate::mesh::{Triangle, BoundingSphereHierarchy, tobj};
-use crate::{utils, kernels, kernels::Kernel, DiscreteGrid};
+use crate::{kernels, kernels::Kernel, GaussLegendre};
+use crate::DiscreteGrid;
+
 use nalgebra::{Vector3, Matrix3};
 
 pub struct Mesh
@@ -142,7 +144,7 @@ impl Mesh
      * Compute volume field from signed distance field
      */
     pub fn compute_volume(&self, grid: &mut DiscreteGrid, kernel: &kernels::CubicSpine) {
-        let legendre = utils::GaussLegendre::init(16);
+        let legendre = GaussLegendre::init(16);
         let min = Vector3::new(-kernel.radius(), -kernel.radius(), -kernel.radius()); 
         let max = -min;
 
