@@ -1,8 +1,9 @@
-extern crate sph_scene;
 extern crate pipeline;
+extern crate sph_scene;
+
+use std::path::Path;
 
 use clap::ArgMatches;
-use std::path::Path;
 
 pub fn main_polygonization(args: &ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
     let output_directory = match args.value_of("output_directory") {
@@ -19,10 +20,10 @@ pub fn main_polygonization(args: &ArgMatches) -> Result<(), Box<dyn std::error::
 
     let mut scene_c = sph_scene::load_scene(scene_file)?;
 
-    scene_c.meshing_config.enable_anisotropication  = !disable_anisotropication;
-    scene_c.meshing_config.enable_interpolation     = !disable_interpolation;
-    scene_c.meshing_config.iso_value                = cst_meshing_iso_value;
-    scene_c.meshing_config.cube_size                = cst_meshing_cube_size;
+    scene_c.meshing_config.fluid.enable_anisotropication = !disable_anisotropication;
+    scene_c.meshing_config.fluid.enable_interpolation = !disable_interpolation;
+    scene_c.meshing_config.fluid.iso_value = cst_meshing_iso_value;
+    scene_c.meshing_config.fluid.cube_size = cst_meshing_cube_size;
 
     pipeline::polygonize::pipeline_polygonize(&scene_c, dump_directory, output_directory)
 }

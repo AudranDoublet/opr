@@ -6,11 +6,11 @@ use nalgebra::Vector3;
 use rayon::prelude::*;
 use raytracer::{Camera, scene_config};
 use sph_scene::Scene;
+use sph_scene::simulation_loader::load;
 
 use mesher::anisotropication::Anisotropicator;
 use mesher::interpolation::InterpolationAlgorithms;
 use mesher::Mesher;
-use sph_scene::simulation_loader::load;
 
 fn get_simulation_dumps_paths(folder: &Path) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
     let mut files: Vec<PathBuf> = fs::read_dir(folder)?
@@ -25,17 +25,20 @@ fn get_simulation_dumps_paths(folder: &Path) -> Result<Vec<PathBuf>, Box<dyn std
 }
 
 pub fn pipeline_polygonize(scene: &Scene, input_directory: &Path, dump_directory: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let interpolation_algorithm = match !scene.meshing_config.enable_interpolation {
+    let interpolation_algorithm = match !scene.meshing_config.fluid.enable_interpolation {
         true => InterpolationAlgorithms::None,
         false => InterpolationAlgorithms::Linear,
     };
 
-    let anisotropicator = match scene.meshing_config.enable_anisotropication {
-        true => Some(Anisotropicator::new(0.9, 5, 8., 1400., 0.5)),
+    let anisotropicator = match scene.meshing_config.fluid.enable_anisotropication {
+        true => {
+            let conf = &scene.meshing_config.fluid.anisotropication_config;
+            Some(Anisotropicator::new(conf.smoothness, conf.min_nb_neighbours, conf.kr, conf.ks, conf.kn))
+        },
         false => None
     };
 
-    let mesher = Mesher::new(scene.meshing_config.iso_value, scene.meshing_config.cube_size, interpolation_algorithm, anisotropicator);
+    let mesher = Mesher::new(scene.meshing_config.fluid.iso_value, scene.meshing_config.fluid.cube_size, interpolation_algorithm, anisotropicator);
 
     fs::create_dir_all(dump_directory)?;
 
@@ -47,7 +50,7 @@ pub fn pipeline_polygonize(scene: &Scene, input_directory: &Path, dump_directory
     pb.tick();
 
     simulations.par_iter().enumerate().for_each(|(idx, path)| {
-        let (simulation, _bubbler)= load(&path).unwrap();
+        let (simulation, _bubbler) = load(&path).unwrap();
         let path = &dump_directory.join(format!("{:08}.obj", idx));
         let path_yaml = dump_directory.join(format!("{:08}.yaml", idx));
         let buffer = &mut fs::File::create(path).unwrap();

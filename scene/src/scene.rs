@@ -95,23 +95,60 @@ impl Default for RenderConfig {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct MeshingConfig
+pub struct MeshingConfigAnisotropication {
+    pub smoothness: f32,
+    pub min_nb_neighbours: usize,
+    pub kr: f32,
+    pub ks: f32,
+    pub kn: f32,
+}
+
+impl Default for MeshingConfigAnisotropication {
+    fn default() -> Self {
+        MeshingConfigAnisotropication {
+            smoothness: 0.9,
+            min_nb_neighbours: 5,
+            kr: 8.,
+            ks: 1400.,
+            kn: 0.5,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct MeshingConfigParameters
 {
     pub iso_value: f32,
     pub cube_size: f32,
     pub enable_interpolation: bool,
     pub enable_anisotropication: bool,
+    #[serde(default)]
+    pub anisotropication_config: MeshingConfigAnisotropication,
 }
 
-impl Default for MeshingConfig {
-    fn default() -> MeshingConfig {
-        MeshingConfig {
+impl Default for MeshingConfigParameters {
+    fn default() -> Self {
+        MeshingConfigParameters {
             iso_value: 0.05,
             cube_size: 0.04,
             enable_interpolation: true,
             enable_anisotropication: true,
+            anisotropication_config: Default::default(),
         }
     }
+}
+
+#[derive(Debug, Deserialize, Default)]
+pub struct MeshingConfig
+{
+    #[serde(default)]
+    pub fluid: MeshingConfigParameters,
+    #[serde(default)]
+    pub foam: MeshingConfigParameters,
+    #[serde(default)]
+    pub bubble: MeshingConfigParameters,
+    #[serde(default)]
+    pub spray: MeshingConfigParameters,
 }
 
 #[derive(Debug)]
