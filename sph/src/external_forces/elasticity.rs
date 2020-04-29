@@ -67,7 +67,7 @@ impl ElasticityForce {
                     let mut f = Matrix3::zeros();
 
                     // equation 18
-                    for &j in &self.neighbours_0[i] {
+                    for &j in &self.neighbours_0[ci] {
                         let cj = fluid.correspondance(j);
                         let vji = vec[cj] - vec[ci];
                         let grad = (rotations[ci] * self.l_matrices[ci]) * sim.gradient(self.positions_0[ci], self.positions_0[cj]);
@@ -101,7 +101,7 @@ impl ElasticityForce {
                 let mut force = Vector3::zeros();
                 let ci = fluid.correspondance(i);
 
-                for &j in &self.neighbours_0[i] {
+                for &j in &self.neighbours_0[ci] {
                     let cj = fluid.correspondance(j);
 
                     let grad = sim.gradient(self.positions_0[ci], self.positions_0[cj]);
@@ -134,7 +134,7 @@ impl ElasticityForce {
                 let mut result = Matrix3::zeros();
                 let ci = fluid.correspondance(i);
 
-                for &j in &self.neighbours_0[i] {
+                for &j in &self.neighbours_0[ci] {
                     let cj = fluid.correspondance(j);
 
                     let xji0 = self.positions_0[cj] - self.positions_0[ci];
@@ -160,7 +160,7 @@ impl ElasticityForce {
                 let mut result = Matrix3::zeros();
                 let ci = fluid.correspondance(i);
 
-                for &j in &self.neighbours_0[i] {
+                for &j in &self.neighbours_0[ci] {
                     let cj = fluid.correspondance(j);
                     let xji = positions[j] - positions[i];
                     let grad = self.l_matrices[ci] * sim.gradient(self.positions_0[ci], self.positions_0[cj]);
@@ -237,7 +237,7 @@ impl ElasticityForce {
                 let ci = fluid.correspondance(i);
                 let mut force = Vector3::zeros();
 
-                for &j in &self.neighbours_0[i] {
+                for &j in &self.neighbours_0[ci] {
                     let cj = fluid.correspondance(j);
                     let grad = sim.gradient(self.positions_0[ci], self.positions_0[cj]);
 
@@ -252,7 +252,7 @@ impl ElasticityForce {
                 if self.alpha != 0.0 {
                     let mut fi_hg = Vector3::zeros();
 
-                    for &j in &self.neighbours_0[i] {
+                    for &j in &self.neighbours_0[ci] {
                         let cj = fluid.correspondance(j);
                         let xij = positions[j] - positions[i];
                         let dist = xij.norm();
@@ -275,7 +275,7 @@ impl ElasticityForce {
                         fi_hg -= self.rest_volumes[cj] * w / dist0 * (delta_i + delta_j) * (xij / dist);
                     }
 
-                    fi_hg *= self.alpha * self.youngs_modulus * self.rest_volumes[i];
+                    fi_hg *= self.alpha * self.youngs_modulus * self.rest_volumes[ci];
                     *acc += fi_hg / sim.mass(i);
                 }
 

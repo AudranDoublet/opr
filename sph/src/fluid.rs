@@ -15,16 +15,19 @@ pub struct Fluid {
 
     correspondances: Vec<usize>,
     external_forces: RwLock<ExternalForces>,
+
+    debug_color: Vector3<f32>,
 }
 
 impl Fluid {
-    pub fn new(id: usize, volume: f32, density: f32, forces: ExternalForces) -> Fluid {
+    pub fn new(id: usize, volume: f32, density: f32, forces: ExternalForces, debug_color: Vector3<f32>) -> Fluid {
         Fluid {
             fluid_type: id,
             rest_density: density,
             mass: volume * density,
             external_forces: RwLock::new(forces),
             correspondances: Vec::new(),
+            debug_color: debug_color,
         }
     }
 
@@ -41,6 +44,11 @@ impl Fluid {
     #[inline]
     pub fn mass(&self) -> f32 {
         self.mass
+    }
+
+    #[inline]
+    pub fn debug_color(&self) -> Vector3<f32> {
+        self.debug_color
     }
 
     pub fn correspondance(&self, i: usize) -> usize {

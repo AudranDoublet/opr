@@ -36,7 +36,7 @@ impl ViscosityWeiler2018Force {
         let h = sim.kernel_radius();
         let h2 = sim.kernel_radius().powi(2) / 100.;
 
-        fluid.filter(sim, vec.par_iter()).map(|(i, v)| {
+        fluid.filter_range(sim).map(|i| {
             let mut result = sim.neighbours_reduce_v(true, i, &|r, i, j| {
                 let xij = positions[i] - positions[j];
                 let vij = vec[fluid.correspondance(i)] - vec[fluid.correspondance(j)];
@@ -78,7 +78,7 @@ impl ViscosityWeiler2018Force {
                 });
             }
 
-            v - (dt / densities[i]) * result
+            vec[fluid.correspondance(i)] - (dt / densities[i]) * result
         }).collect()
     }
 
@@ -144,7 +144,7 @@ impl ExternalForce for ViscosityWeiler2018Force {
 
     fn compute_acceleration(&self, fluid: &Fluid, sim: &Simulation, accelerations: &mut Vec<Vector3<f32>>) -> Option<f32> {
         let mut preconditions = self.compute_preconditions(fluid, sim);
-        let mut b = sim.velocities.read().unwrap().clone();
+        let mut b = fluid.filter(sim, sim.velocities.read().unwrap().par_iter()).map(|(_, v)| *v).collect();
         let mut guess = self.compute_guess(fluid, sim);
 
         let dt = sim.time_step();

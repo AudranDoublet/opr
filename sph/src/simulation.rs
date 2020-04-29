@@ -244,6 +244,10 @@ impl Simulation
         self.fluid_types[self.particles_fluid_type[i]].rest_density()
     }
 
+    pub fn debug_color(&self, i: usize) -> Vector3<f32> {
+        self.fluid_types[self.particles_fluid_type[i]].debug_color()
+    }
+
     pub fn find_neighbours(&self, x: &Vector3<f32>) -> Vec<usize> {
         self.neighbours_struct.find_neighbours(self.len(), &self.positions.read().unwrap(), *x)
     }
@@ -275,9 +279,9 @@ impl Simulation
     pub fn neighbours_reduce<V>(&self, same: bool, i: usize, value: V, f: &dyn Fn(V, usize, usize) -> V) -> V {
         let mut result = value;
 
-        for j in 0..self.neighbours_count(i) {
+        for &j in &self.neighbours[i] {
             if !same || self.particles_fluid_type[i] == self.particles_fluid_type[j] {
-                result = f(result, i, self.neighbours[i][j]);
+                result = f(result, i, j);
             }
         }
 
@@ -317,8 +321,8 @@ impl Simulation
     pub fn compute_cfl(&self, velocities: &Vec<Vector3<f32>>) -> (f32, f32) {
         let mut v_max: f32 = 0.0;
 
-        for i in 0..self.len() {
-            let n = velocities[i].norm_squared();
+        for v in velocities {
+            let n = v.norm_squared();
             v_max = v_max.max(n);
         }
 
