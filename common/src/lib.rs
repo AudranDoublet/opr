@@ -1,6 +1,7 @@
 #![feature(clamp)]
 
 mod simulation;
+mod simulation_snapshot;
 mod discretegrid;
 mod rigid_object;
 mod hashgrid;
@@ -16,6 +17,7 @@ pub mod external_forces;
 pub mod pressure_solver;
 
 pub use simulation::*;
+pub use simulation_snapshot::*;
 pub use discretegrid::*;
 pub use rigid_object::*;
 pub use hashgrid::*;

@@ -19,6 +19,8 @@ use crate::kernels::{Kernel, CubicSpine};
 use crate::mesher::types::{FluidSnapshot, FluidSnapshotProvider, VertexWorld};
 use crate::external_forces::ExternalForces;
 
+use crate::SimulationFluidSnapshot;
+
 use crate::pressure_solver::*;
 
 fn default_pressure_solver() -> RwLock<Box<dyn PressureSolver + Send + Sync>> {
@@ -74,69 +76,6 @@ pub struct Simulation
     len: usize,
 
     neighbours_struct: HashGrid,
-}
-
-/*
-use std::time::Instant;
-
-macro_rules! timeit {
-    ($name:expr, $code:expr) => ({
-        let now = Instant::now();
-        let result = $code;
-
-        println!("{} : {}ms", $name, now.elapsed().as_micros() as f32 / 1000.);
-
-        result
-    })
-}
-*/
-
-pub struct SimulationFluidSnapshot
-{
-    particles: Vec<Vector3<f32>>,
-    densities: Vec<f32>,
-    neighbours_struct: HashGrid,
-    anisotropic_neighbours: Vec<Vec<usize>>,
-    kernel: CubicSpine,
-    mass: f32,
-}
-
-impl FluidSnapshot for SimulationFluidSnapshot {
-    fn particles(&self) -> Vec<Vector3<f32>> {
-        self.particles.clone()
-    }
-
-    fn len(&self) -> usize {
-        self.particles.len()
-    }
-
-    fn position(&self, i: usize) -> VertexWorld {
-        self.particles[i]
-    }
-
-    fn neighbours_anisotropic_kernel(&self, i: usize) -> &Vec<usize> {
-        self.anisotropic_neighbours[i].as_ref()
-    }
-
-    fn neighbours_kernel(&self, x: &VertexWorld) -> Vec<usize> {
-        self.neighbours_struct.find_neighbours(self.len(), &self.particles, *x)
-    }
-
-    fn mass(&self, _i: usize) -> f32 {
-        self.mass
-    }
-
-    fn density(&self, i: usize) -> f32 {
-        self.densities[i]
-    }
-
-    fn get_kernel(&self) -> &dyn Kernel {
-        &self.kernel
-    }
-
-    fn get_grid(&self) -> &HashGrid {
-        &self.neighbours_struct
-    }
 }
 
 impl FluidSnapshotProvider for Simulation {
