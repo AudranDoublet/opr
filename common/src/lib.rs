@@ -8,6 +8,7 @@ mod hashgrid;
 mod animation;
 mod camera;
 mod emitter;
+mod fluid;
 
 pub mod kernels;
 pub mod utils;
@@ -24,3 +25,4 @@ pub use hashgrid::*;
 pub use animation::*;
 pub use camera::*;
 pub use emitter::*;
+pub use fluid::*;

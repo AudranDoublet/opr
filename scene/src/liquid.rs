@@ -18,6 +18,9 @@ pub enum LiquidZone {
         to: Vector3<f32>,
         #[serde(default = "default_density")]
         density: f32,
+
+        #[serde(default)]
+        fluid_type: Option<String>,
     },
     #[serde(rename = "mesh")]
     Mesh {
@@ -34,15 +37,35 @@ pub enum LiquidZone {
 
         #[serde(default = "default_density")]
         density: f32,
+
+        #[serde(default)]
+        fluid_type: Option<String>,
     },
 }
 
 impl LiquidZone
 {
+    fn fluid_type(&self, config: &Scene) -> usize {
+        let map = config.load_fluids_map();
+
+        let name = match self {
+            LiquidZone::Block { fluid_type, .. } => fluid_type,
+            LiquidZone::Mesh  { fluid_type, .. } => fluid_type,
+        };
+
+        if let Some(n) = &name {
+            map[n]
+        } else {
+            0
+        }
+    }
+
     pub fn create_particles(&self, config: &Scene, scene: &mut Simulation) -> Result<(), Box<dyn std::error::Error>>
     {
+        let fluid_type = self.fluid_type(config);
+
         let count = match self {
-            LiquidZone::Block { from, to, density } => {
+            LiquidZone::Block { from, to, density, .. } => {
                 let radius = scene.particle_radius() * density;
                 let step_count = (to - from) / radius;
 
@@ -54,7 +77,7 @@ impl LiquidZone
                         let y = y as f32 * radius;
                         for x in 0..step_count.x as usize {
                             let x = x as f32 * radius;
-                            scene.add_particle(from.x + x, from.y + y, from.z + z);
+                            scene.add_particle(fluid_type, from.x + x, from.y + y, from.z + z);
 
                             count += 1;
                         }
@@ -63,7 +86,7 @@ impl LiquidZone
 
                 count
             },
-            LiquidZone::Mesh { mesh, scale, position, rotation_axis, rotation_angle, resolution, slice, density } => {
+            LiquidZone::Mesh { mesh, scale, position, rotation_axis, rotation_angle, resolution, slice, density, .. } => {
                 let solid = Solid {
                     animation: Animation::Blank,
                     mesh: mesh.to_string(),
@@ -88,7 +111,7 @@ impl LiquidZone
                 for particle in &solid.to_particles(scene.particle_radius() * density ) {
                     let pos = particle + position;
 
-                    scene.add_particle(pos.x, pos.y, pos.z);
+                    scene.add_particle(fluid_type, pos.x, pos.y, pos.z);
                     count += 1;
                 }
 

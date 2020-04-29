@@ -17,10 +17,10 @@ use crate::{Animation, Camera, Emitter};
 use crate::{HashGrid, RigidObject};
 use crate::kernels::{Kernel, CubicSpine};
 use crate::mesher::types::{FluidSnapshot, FluidSnapshotProvider, VertexWorld};
-use crate::external_forces::ExternalForces;
 
 use crate::SimulationFluidSnapshot;
 
+use crate::Fluid;
 use crate::pressure_solver::*;
 
 fn default_pressure_solver() -> RwLock<Box<dyn PressureSolver + Send + Sync>> {
@@ -46,8 +46,6 @@ pub struct Simulation
     pub time_step: RwLock<f32>,
 
     solids: Vec<RigidObject>,
-    #[serde(skip_serializing, skip_deserializing)]
-    debug_solid_collisions: Vec<Vector3<f32>>,
 
     // Particle data
     pub density: RwLock<Vec<f32>>,
@@ -56,7 +54,15 @@ pub struct Simulation
     pub positions: RwLock<Vec<Vector3<f32>>>,
     pub accelerations: RwLock<Vec<Vector3<f32>>>,
 
+    pub particles_fluid_type: Vec<usize>,
+
     pub camera: Camera,
+
+    #[serde(skip_serializing, skip_deserializing)]
+    fluid_types: Vec<Fluid>,
+
+    #[serde(skip_serializing, skip_deserializing)]
+    debug_solid_collisions: Vec<Vector3<f32>>,
 
     #[serde(skip_serializing, skip_deserializing)]
     #[serde(default = "default_pressure_solver")]
@@ -69,9 +75,6 @@ pub struct Simulation
 
     #[serde(skip_serializing, skip_deserializing)]
     camera_animation: Animation,
-
-    #[serde(skip_serializing, skip_deserializing)]
-    external_forces: RwLock<ExternalForces>,
 
     len: usize,
 
@@ -111,16 +114,18 @@ impl Simulation
     pub fn new(
         kernel_radius: f32, particle_radius: f32,
         solids: Vec<RigidObject>,
-        external_forces: ExternalForces,
+        fluids: Vec<Fluid>,
         camera_position: Vector3<f32>,
         camera_animation: Animation,
         emitters: Vec<Emitter>,
         emitters_animations: Vec<Animation>) -> Simulation
     {
+        let volume = 4. * std::f32::consts::PI * particle_radius.powi(3) / 3.;
+
         Simulation {
             kernel: CubicSpine::new(kernel_radius),
-            particle_radius,
-            volume: 4. * std::f32::consts::PI * particle_radius.powi(3) / 3., // FIXME how to compute it ? 5.12e-5
+            particle_radius: particle_radius,
+            volume: volume,
 
             rest_density: 1000.0,
 
@@ -143,8 +148,8 @@ impl Simulation
             accelerations: RwLock::new(Vec::new()),
             velocities: RwLock::new(Vec::new()),
             positions: RwLock::new(Vec::new()),
-
-            external_forces: RwLock::new(external_forces),
+            particles_fluid_type: Vec::new(),
+            fluid_types: fluids,
 
             camera: Camera::new(camera_position),
             camera_animation: camera_animation,
@@ -194,13 +199,15 @@ impl Simulation
         *self.time_step.read().unwrap()
     }
 
-    pub fn add_particle_with_velocity(&mut self, position: Vector3<f32>, velocity: Vector3<f32>)
+    pub fn add_particle_with_velocity(&mut self, fluid_type: usize, position: Vector3<f32>, velocity: Vector3<f32>)
     {
         for solid in &self.solids {
             if solid.is_particle_inside(&position, self.particle_radius) {
                 return;
             }
         }
+
+        self.particles_fluid_type.push(fluid_type);
 
         self.positions.write().unwrap().push(position);
         self.velocities.write().unwrap().push(velocity);
@@ -209,9 +216,9 @@ impl Simulation
         self.len += 1;
     }
 
-    pub fn add_particle(&mut self, x: f32, y: f32, z: f32)
+    pub fn add_particle(&mut self, fluid_type: usize, x: f32, y: f32, z: f32)
     {
-        self.add_particle_with_velocity(Vector3::new(x, y, z), Vector3::zeros());
+        self.add_particle_with_velocity(fluid_type, Vector3::new(x, y, z), Vector3::zeros());
     }
 
     pub fn gradient(&self, i: Vector3<f32>, j: Vector3<f32>) -> Vector3<f32> {
@@ -230,8 +237,8 @@ impl Simulation
         self.volume
     }
 
-    pub fn mass(&self, _i: usize) -> f32 {
-        self.volume * self.rest_density
+    pub fn mass(&self, i: usize) -> f32 {
+        self.fluid_types[self.particles_fluid_type[i]].mass()
     }
 
     pub fn find_neighbours(&self, x: &VertexWorld) -> Vec<usize> {
@@ -338,7 +345,12 @@ impl Simulation
         let mut accelerations = self.accelerations.write().unwrap();
 
         accelerations.par_iter_mut().for_each(|v| *v = Vector3::zeros());
-        let dt = self.external_forces.read().unwrap().apply(self, &mut accelerations);
+
+        let mut dt = self.time_step();
+
+        for fluid in &self.fluid_types {
+            dt = dt.min(fluid.apply_non_pressure_forces(self, &mut accelerations));
+        }
 
         // update velocities with acceleration & dt
         self.velocities.write().unwrap().par_iter_mut().enumerate().for_each(|(i, v)| *v += accelerations[i] * dt);
@@ -384,7 +396,7 @@ impl Simulation
 
     pub fn init_forces(&mut self) {
         self.init();
-        self.external_forces.write().unwrap().init(self);
+        self.fluid_types.par_iter().for_each(|t| t.init_forces(self));
     }
 
     pub fn compute_vmax(&self) -> f32 {
@@ -439,13 +451,13 @@ impl Simulation
         self.camera.tick(dt, &mut self.camera_animation);
 
         // emit new particles
-        let particles: Vec<(Vector3<f32>, Vector3<f32>)> = self.emitters.par_iter_mut()
+        let particles: Vec<(usize, Vector3<f32>, Vector3<f32>)> = self.emitters.par_iter_mut()
             .zip(self.emitters_animations.par_iter_mut())
             .map(|(e, a)| e.tick(dt, a))
             .flatten().collect();
 
-        for (p, v) in particles {
-            self.add_particle_with_velocity(p, v);
+        for (t, p, v) in particles {
+            self.add_particle_with_velocity(t, p, v);
         }
 
         self.debug_solid_collisions = collisions;

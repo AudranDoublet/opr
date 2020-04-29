@@ -4,24 +4,16 @@ use nalgebra::Vector3;
 
 use std::fs::File;
 use std::path::Path;
+use std::collections::HashMap;
 
-use sph_common::{Emitter, Animation, RigidObject, Simulation};
-use sph_common::external_forces::{ExternalForces, ViscosityType, VorticityConfig, DragConfig, ElasticityConfig};
+use sph_common::{Fluid, Emitter, Animation, RigidObject, Simulation};
 
 use serde_derive::*;
-use crate::{Solid, LiquidZone, EmitterConfig};
+use crate::{Solid, LiquidZone, EmitterConfig, FluidConfiguration};
 use bubbler::config::BubblerConfig;
 
 fn default_gravity() -> [f32; 3] {
     [0.0, -9.81, 0.0]
-}
-
-fn default_surface_tension() -> f32 {
-    0.05
-}
-
-fn default_surface_adhesion() -> f32 {
-    0.01
 }
 
 #[derive(Debug, Deserialize)]
@@ -50,18 +42,6 @@ pub struct Configuration
     pub gravity: [f32; 3],
     pub kernel_radius: f32, //FIXME mark as default ?
     pub particle_radius: f32,
-    #[serde(default = "default_surface_tension")]
-    pub surface_tension: f32,
-    #[serde(default = "default_surface_adhesion")]
-    pub surface_adhesion: f32,
-    #[serde(default)]
-    pub viscosity: ViscosityType,
-    #[serde(default)]
-    pub vorticity: VorticityConfig,
-    #[serde(default)]
-    pub elasticity: Option<ElasticityConfig>,
-    #[serde(default)]
-    pub drag: DragConfig,
 }
 
 #[derive(Debug, Deserialize)]
@@ -150,6 +130,7 @@ pub struct Scene
     #[serde(default)]
     pub bubbler_config: BubblerConfig,
     pub config: Configuration,
+    pub fluids: HashMap<String, FluidConfiguration>,
     pub solids: Vec<Solid>,
     pub liquids_blocks: Vec<LiquidZone>,
     pub liquids_add_blocks: Vec<LiquidZone>,
@@ -169,6 +150,9 @@ impl Scene
         Vector3::new(g[0], g[1], g[2])
     }
 
+    pub fn volume(&self) -> f32 {
+        4. * std::f32::consts::PI * self.config.particle_radius.powi(3) / 3.
+    }
 
     pub fn load_solids(&self) -> Result<Vec<RigidObject>, Box<dyn std::error::Error>>
     {
@@ -184,18 +168,35 @@ impl Scene
         Ok(solids)
     }
 
+    pub fn load_fluids(&self) -> Vec<Fluid> {
+        let mut fluids = Vec::new();
+        let mut idx = 0;
+
+        for (_, v) in self.fluids.iter() {
+            fluids.push(v.create(idx, self.volume(), self.gravity(), self.config.kernel_radius));
+            idx += 1;
+        }
+
+        fluids
+    }
+
+    pub fn load_fluids_map(&self) -> HashMap<String, usize> {
+        let mut idx = 0;
+        let mut map = HashMap::new();
+
+        for (k, _) in self.fluids.iter() {
+            map.insert(k.clone(), idx);
+            idx += 1;
+        }
+
+        map
+    }
+
     pub fn load(&self) -> Result<Simulation, Box<dyn std::error::Error>> {
         self.create_cache_dir()?;
 
         let solids = self.load_solids()?;
-        let mut forces = ExternalForces::new();
-
-        forces.gravity(self.gravity())
-              .surface_tension(self.config.kernel_radius, self.config.surface_tension, self.config.surface_adhesion)
-              .viscosity(&self.config.viscosity)
-              .vorticity(&self.config.vorticity)
-              .drag(&self.config.drag)
-              .elasticity(&self.config.elasticity);
+        let fluids = self.load_fluids();
 
         let (emitters, emitters_animations) = self.emitters();
 
@@ -203,7 +204,7 @@ impl Scene
             self.config.kernel_radius,
             self.config.particle_radius,
             solids,
-            forces,
+            fluids,
             self.camera.position,
             self.camera.animation.clone(),
             emitters,

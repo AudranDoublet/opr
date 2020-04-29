@@ -1,6 +1,9 @@
 config:
     kernel_radius: 0.08
     particle_radius: 0.02
+fluids:
+    water:
+        density: 1000.0
 solids:
     - mesh: objects/box.obj
       density: 1000

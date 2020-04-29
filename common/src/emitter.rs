@@ -59,6 +59,7 @@ impl EmitterShape {
 }
 
 pub struct Emitter {
+    fluid_type: usize,
     particle_velocity: f32,
 
     position: Vector3<f32>,
@@ -75,9 +76,10 @@ pub struct Emitter {
 }
 
 impl Emitter {
-    pub fn new(position: Vector3<f32>, particle_velocity: f32,
+    pub fn new(fluid_type: usize, position: Vector3<f32>, particle_velocity: f32,
                 particle_radius: f32, shape: &EmitterShape) -> Emitter {
         Emitter {
+            fluid_type: fluid_type,
             particle_velocity: particle_velocity,
             position: position,
             velocity: Vector3::zeros(),
@@ -92,7 +94,7 @@ impl Emitter {
         }
     }
 
-    pub fn emit(&self) -> Vec<(Vector3<f32>, Vector3<f32>)> {
+    pub fn emit(&self) -> Vec<(usize, Vector3<f32>, Vector3<f32>)> {
         let rotation = UnitQuaternion::from_quaternion(self.rotation);
         let pvelocity = (rotation * Vector3::z()) * self.particle_velocity;
 
@@ -100,6 +102,7 @@ impl Emitter {
 
         for particle in &self.particles {
             res.push((
+                self.fluid_type,
                 rotation * particle + self.position,
                 pvelocity,
             ));
@@ -108,7 +111,7 @@ impl Emitter {
         res
     }
 
-    pub fn tick(&mut self, dt: f32, animation: &mut Animation) -> Vec<(Vector3<f32>, Vector3<f32>)> {
+    pub fn tick(&mut self, dt: f32, animation: &mut Animation) -> Vec<(usize, Vector3<f32>, Vector3<f32>)> {
         animation.animate(self, dt, false);
 
         self.velocity += self.acceleration * dt;
