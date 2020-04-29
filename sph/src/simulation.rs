@@ -60,7 +60,6 @@ pub struct Simulation
 
     pub camera: Camera,
 
-    #[serde(skip_serializing, skip_deserializing)]
     fluid_types: Vec<Fluid>,
 
     #[serde(skip_serializing, skip_deserializing)]
