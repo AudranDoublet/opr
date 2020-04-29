@@ -1,11 +1,11 @@
 extern crate image;
 
-use rayon::prelude::*;
+use std::path::Path;
 
 use nalgebra::Vector3;
+use rayon::prelude::*;
 
 use crate::*;
-use std::path::Path;
 
 #[derive(Copy, Clone, Debug)]
 pub enum ImageMode
@@ -18,7 +18,7 @@ pub enum ImageMode
 pub struct Image
 {
     mode: ImageMode,
-    pixels: Vec<u16>,
+    pub pixels: Vec<u16>,
     width: usize,
     height: usize,
 }
@@ -52,7 +52,7 @@ pub fn ipix_clamp(pix: i16, min: i16, max: i16) -> i16
 #[inline]
 pub fn fpix_clamp(pix: f32) -> u16
 {
-    (pix.max(0.0) as u16).min(255)
+    ((u8::max_value() as f32 * pix.max(0.0)) as u16).min(u8::max_value() as u16)
 }
 
 impl Image
@@ -82,7 +82,7 @@ impl Image
 
     pub fn from_vectors(pixels: &Vec<Vector3<f32>>, width: usize, height: usize) -> Image
     {
-        assert!(width * height == pixels.len());
+        assert_eq!(width * height, pixels.len());
 
         let mut result = vec![0; pixels.len() * 3];
 
@@ -117,7 +117,7 @@ impl Image
                 ImageMode::Grayscale => image::ColorType::L8,
                 ImageMode::RGB => image::ColorType::Rgb8,
                 _ => panic!("can only save RGB & Grayscale images"),
-            }
+            },
         ) {
             Ok(_) => (),
             Err(x) => panic!("can't save image: {:?}", x),
@@ -140,7 +140,7 @@ impl Image
     {
         let mut result = Vec::new();
 
-        self.foreach_rgb(&mut |r, g, b| result.push(pix_to_gray(r, g , b) / 3));
+        self.foreach_rgb(&mut |r, g, b| result.push(pix_to_gray(r, g, b) / 3));
 
         Image {
             mode: ImageMode::Grayscale,
@@ -165,16 +165,13 @@ impl Image
             if vr > vg && vr > vb {
                 vmax = vr;
                 t = (60. * (vg - vb) / (vmax - vmin) + 360.) % 360.;
-            }
-            else if vg > vr && vg > vb {
+            } else if vg > vr && vg > vb {
                 vmax = vb;
                 t = (60. * (vb - vr) / (vmax - vmin) + 120.) % 360.;
-            }
-            else if vb > vg && vb > vr {
+            } else if vb > vg && vb > vr {
                 vmax = vb;
                 t = (60. * (vr - vg) / (vmax - vmin) + 240.) % 360.;
-            }
-            else {
+            } else {
                 t = 0.0;
                 vmax = -1.0;
             }
@@ -185,7 +182,6 @@ impl Image
                 _ => 1. - vmin / vmax
             } * 255.) as u16);
             result.push((vmax * 255.) as u16);
-
         });
 
         Image {
@@ -275,7 +271,7 @@ impl Image
 
         for i in (0..self.pixels.len()).step_by(step)
         {
-            let v = &self.pixels[i..i+step];
+            let v = &self.pixels[i..i + step];
             f(v[0], v[1], v[2]);
         }
     }
@@ -286,7 +282,7 @@ impl Image
 
         for i in (0..self.pixels.len()).step_by(step)
         {
-            let v = &self.pixels[i..i+step];
+            let v = &self.pixels[i..i + step];
             f(v[0] as f32 / 255., v[1] as f32 / 255., v[2] as f32 / 255.);
         }
     }
@@ -309,7 +305,6 @@ impl Image
 
         self.apply_channel(channel,
                            &mut |v| (pix_clamp(v, min, max) - min) * 255 / (max - min));
-
     }
 
     pub fn hist_balance(&mut self, channel: usize)
@@ -341,8 +336,8 @@ impl Image
 
         let mut slice = vec![0.; 9];
 
-        for x in 1..self.width-1 {
-            for y in 1..self.height-1 {
+        for x in 1..self.width - 1 {
+            for y in 1..self.height - 1 {
                 slice[0] = self.channel_at(x - 1, y - 1, channel) as f32;
                 slice[1] = self.channel_at(x + 0, y - 1, channel) as f32;
                 slice[2] = self.channel_at(x + 1, y - 1, channel) as f32;
@@ -407,19 +402,24 @@ impl Image
         }
     }
 
-    pub fn sobel(&self, threshold: u16) -> Image {
-        let gx = ConvMatrix::new_3x3(vec![-1., 0. , 1. , -2., 0., 2., -1., 0., 1.]);
-        let gy = ConvMatrix::new_3x3(vec![-1., -2., -1., 0. , 0., 0., 1. , 2., 1.]);
+    pub fn sobel(&self) -> Image {
+        let gx = ConvMatrix::new_3x3(vec![-1., 0., 1., -2., 0., 2., -1., 0., 1.]);
+        let gy = ConvMatrix::new_3x3(vec![-1., -2., -1., 0., 0., 0., 1., 2., 1.]);
 
-        let c = ConvMatrix::new_combined_3x3(gx, gy);
+        let c1 = self.convolute_all_channels(&gx).pixels;
+        let c2 = self.convolute_all_channels(&gy).pixels;
 
-        let mut result = self.convolute_all_channels(&c);
+        let mut pixels = vec![0; self.pixels.len()];
 
-        result.pixels.par_iter_mut()
-            .for_each(|p| if *p < threshold {
-                *p = 0
-            });
+        pixels.par_iter_mut().enumerate().for_each(|(i, p)| {
+            *p = ((c1[i].pow(2) + c2[i].pow(2)) as f32).sqrt() as u16;
+        });
 
-        result
+        Image {
+            pixels: pixels,
+            width: self.width,
+            height: self.height,
+            mode: self.mode,
+        }
     }
 }
