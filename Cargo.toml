@@ -7,7 +7,7 @@ edition = "2018"
 [dependencies]
 sph = { path = "sph" }
 sph_scene = { path = "scene" }
-render = { path = "render" }
+debug_renderer = { path = "debug_renderer" }
 raytracer = { path = "raytracer" }
 pipeline = { path = "pipeline" }
 bubbler = { path = "bubbler" }

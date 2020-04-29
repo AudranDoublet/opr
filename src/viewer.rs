@@ -21,7 +21,7 @@ fn get_meshes_paths(folder: &Path) -> Result<Vec<PathBuf>, Box<dyn std::error::E
 fn view_meshes(meshes_folder: &Path, back_face_culling: bool, mut time_step: f32) -> Result<(), Box<dyn std::error::Error>> {
     let scale = Vector3::new(1., 1., 1.);
 
-    let mut renderer = render::scene::Scene::new(1.);
+    let mut renderer = debug_renderer::scene::Scene::new(1.);
     renderer.camera.look_at(Point3::new(0.0, 1., -2.), Point3::new(0., 0., 5.)); //FIXME make camera configurable
 
     let meshes = get_meshes_paths(meshes_folder)?;
@@ -54,29 +54,29 @@ fn view_meshes(meshes_folder: &Path, back_face_culling: bool, mut time_step: f32
 
         for event in renderer.window.events().iter() {
             match event.value {
-                render::event::WindowEvent::Key(key, render::event::Action::Release, _) => {
+                debug_renderer::event::WindowEvent::Key(key, debug_renderer::event::Action::Release, _) => {
                     match key {
-                        render::event::Key::I => {
+                        debug_renderer::event::Key::I => {
                             show_info = !show_info;
                         }
-                        render::event::Key::Space => {
+                        debug_renderer::event::Key::Space => {
                             pause = !pause;
                         }
-                        render::event::Key::PageUp => {
+                        debug_renderer::event::Key::PageUp => {
                             time_step = (time_step + 0.01).min(3.);
                         }
-                        render::event::Key::PageDown => {
+                        debug_renderer::event::Key::PageDown => {
                             time_step = (time_step - 0.01).max(0.);
                         }
                         _ => {}
                     }
                 }
-                render::event::WindowEvent::Key(key, render::event::Action::Press, _) => {
+                debug_renderer::event::WindowEvent::Key(key, debug_renderer::event::Action::Press, _) => {
                     match key {
-                        render::event::Key::F => {
+                        debug_renderer::event::Key::F => {
                             dt_i_obj = 1;
                         }
-                        render::event::Key::S => {
+                        debug_renderer::event::Key::S => {
                             dt_i_obj = -1;
                         }
                         _ => {}

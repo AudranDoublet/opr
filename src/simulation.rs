@@ -12,13 +12,13 @@ use nalgebra::{Point3, Translation3};
 use sph::Simulation;
 use sph_scene::Scene;
 
-pub fn add_particles(range: std::ops::Range<usize>, dfsph: &Simulation, scene: &mut render::scene::Scene) {
+pub fn add_particles(range: std::ops::Range<usize>, dfsph: &Simulation, scene: &mut debug_renderer::scene::Scene) {
     let particles = &dfsph.positions.read().unwrap();
 
     for i in range {
         let pos = particles[i];
 
-        scene.push_particle(render::particle::Particle {
+        scene.push_particle(debug_renderer::particle::Particle {
             visible: true,
             position: (pos.x, pos.y, pos.z),
             color: (0., 0., 1.),
@@ -26,7 +26,7 @@ pub fn add_particles(range: std::ops::Range<usize>, dfsph: &Simulation, scene: &
     }
 }
 
-fn add_meshes(dfsph: &Simulation, config: &sph_scene::Scene, scene: &mut render::scene::Scene) -> Vec<Option<SceneNode>> {
+fn add_meshes(dfsph: &Simulation, config: &sph_scene::Scene, scene: &mut debug_renderer::scene::Scene) -> Vec<Option<SceneNode>> {
     let mut result = Vec::new();
 
     for i in 0..config.solids.len() {
@@ -67,7 +67,7 @@ fn dump_simulation(simulation: &Simulation, dump_folder: &Path, idx: usize, verb
     Ok(())
 }
 
-fn update_diffuse(renderer: &mut render::scene::Scene, bubbler: &Bubbler) {
+fn update_diffuse(renderer: &mut debug_renderer::scene::Scene, bubbler: &Bubbler) {
     renderer.window.remove_node(&mut renderer.diffuse);
     renderer.diffuse = renderer.window.add_group();
 
@@ -102,7 +102,7 @@ fn simulate(scene: &Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Resu
 
     let mut collision_size = 5.;
 
-    let mut renderer = render::scene::Scene::new(fluid_simulation.particle_radius());
+    let mut renderer = debug_renderer::scene::Scene::new(fluid_simulation.particle_radius());
     renderer.camera.look_at(Point3::new(0.0, 1., -2.), Point3::new(0., 0., 5.)); //FIXME make camera configurable
     renderer.window.set_point_size(collision_size);
 
@@ -123,26 +123,26 @@ fn simulate(scene: &Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Resu
 
         for event in renderer.window.events().iter() {
             match event.value {
-                render::event::WindowEvent::Key(key, render::event::Action::Release, _) => match key {
-                    render::event::Key::R => {
+                debug_renderer::event::WindowEvent::Key(key, debug_renderer::event::Action::Release, _) => match key {
+                    debug_renderer::event::Key::R => {
                         total_time = 0.0;
                         scene.recreate(&mut fluid_simulation)?;
                         renderer.clear();
                         add_particles(0..fluid_simulation.len(), &fluid_simulation, &mut renderer);
                         fluid_simulation.init_forces();
                     }
-                    render::event::Key::A => {
+                    debug_renderer::event::Key::A => {
                         add_particles(scene.add_blocks(&mut fluid_simulation)?, &fluid_simulation, &mut renderer);
                     }
-                    render::event::Key::D => {
+                    debug_renderer::event::Key::D => {
                         if !dump_all {
                             dump_simulation(&fluid_simulation, dump_folder, frame_idx, true)?;
                         }
                     }
-                    render::event::Key::Y => {
+                    debug_renderer::event::Key::Y => {
                         show_collisions = !show_collisions;
                     }
-                    render::event::Key::H => {
+                    debug_renderer::event::Key::H => {
                         hide_solids = !hide_solids;
                         for i in 0..fluid_simulation.solid_count() {
                             if let Some(mesh) = &mut meshes[i] {
@@ -150,29 +150,29 @@ fn simulate(scene: &Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Resu
                             }
                         }
                     }
-                    render::event::Key::C => {
+                    debug_renderer::event::Key::C => {
                         show_velocity = !show_velocity;
                     }
-                    render::event::Key::S => {
+                    debug_renderer::event::Key::S => {
                         display_high_speed_only = !display_high_speed_only;
                     }
-                    render::event::Key::P => {
+                    debug_renderer::event::Key::P => {
                         pause_on_speed_explosion = !pause_on_speed_explosion;
                     }
-                    render::event::Key::I => {
+                    debug_renderer::event::Key::I => {
                         show_info = !show_info;
                     }
-                    render::event::Key::Space => {
+                    debug_renderer::event::Key::Space => {
                         pause = !pause;
                     }
                     _ => {}
                 }
-                render::event::WindowEvent::Key(key, render::event::Action::Press, render::event::Modifiers::Shift) => match key {
-                    render::event::Key::PageDown => {
+                debug_renderer::event::WindowEvent::Key(key, debug_renderer::event::Action::Press, debug_renderer::event::Modifiers::Shift) => match key {
+                    debug_renderer::event::Key::PageDown => {
                         collision_size = (collision_size - 0.25).max(1.);
                         renderer.window.set_point_size(collision_size);
                     }
-                    render::event::Key::PageUp => {
+                    debug_renderer::event::Key::PageUp => {
                         collision_size = (collision_size + 0.25).min(10.);
                         renderer.window.set_point_size(collision_size);
                     }

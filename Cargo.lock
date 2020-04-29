@@ -385,6 +385,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "debug_renderer"
+version = "0.1.0"
+dependencies = [
+ "kiss3d",
+ "nalgebra",
+]
+
+[[package]]
 name = "deflate"
 version = "0.7.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1005,6 +1013,7 @@ version = "0.1.0"
 dependencies = [
  "bubbler",
  "clap",
+ "debug_renderer",
  "image 0.23.2",
  "indicatif",
  "kiss3d",
@@ -1013,7 +1022,6 @@ dependencies = [
  "rand 0.7.3",
  "rayon",
  "raytracer",
- "render",
  "sph",
  "sph_scene",
 ]
@@ -1401,14 +1409,6 @@ name = "regex-syntax"
 version = "0.6.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7fe5bd57d1d7414c6b5ed48563a2c855d995ff777729dcd91c369ec7fea395ae"
-
-[[package]]
-name = "render"
-version = "0.1.0"
-dependencies = [
- "kiss3d",
- "nalgebra",
-]
 
 [[package]]
 name = "rustc-demangle"

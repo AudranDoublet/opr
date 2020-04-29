@@ -1,6 +1,6 @@
 #[macro_use]
 extern crate clap;
-extern crate render;
+extern crate debug_renderer;
 extern crate sph_scene;
 
 use clap::App;

@@ -1,5 +1,5 @@
 [package]
-name = "render"
+name = "debug_renderer"
 version = "0.1.0"
 authors = ["Issaadi Sami <sami.issaadi@epita.fr>"]
 edition = "2018"
