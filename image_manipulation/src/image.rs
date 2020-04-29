@@ -52,7 +52,7 @@ pub fn ipix_clamp(pix: i16, min: i16, max: i16) -> i16
 #[inline]
 pub fn fpix_clamp(pix: f32) -> u16
 {
-    ((u8::max_value() as f32 * pix.max(0.0)) as u16).min(u8::max_value() as u16)
+    (pix.max(0.0) as u16).min(255)
 }
 
 impl Image
@@ -88,7 +88,7 @@ impl Image
 
         for i in 0..pixels.len()
         {
-            let data = pixels[i];
+            let data = 255.0 * pixels[i];
 
             result[i * 3 + 0] = fpix_clamp(data.x);
             result[i * 3 + 1] = fpix_clamp(data.y);
@@ -140,7 +140,7 @@ impl Image
     {
         let mut result = Vec::new();
 
-        self.foreach_rgb(&mut |r, g, b| result.push(pix_to_gray(r, g, b) / 3));
+        self.foreach_rgb(&mut |r, g, b| result.push(pix_to_gray(r, g, b)));
 
         Image {
             mode: ImageMode::Grayscale,
@@ -406,20 +406,17 @@ impl Image
         let gx = ConvMatrix::new_3x3(vec![-1., 0., 1., -2., 0., 2., -1., 0., 1.]);
         let gy = ConvMatrix::new_3x3(vec![-1., -2., -1., 0., 0., 0., 1., 2., 1.]);
 
-        let c1 = self.convolute_all_channels(&gx).pixels;
-        let c2 = self.convolute_all_channels(&gy).pixels;
+        let c = ConvMatrix::new_combined_3x3(gx, gy);
 
-        let mut pixels = vec![0; self.pixels.len()];
+        self.convolute_all_channels(&c)
+    }
 
-        pixels.par_iter_mut().enumerate().for_each(|(i, p)| {
-            *p = ((c1[i].pow(2) + c2[i].pow(2)) as f32).sqrt() as u16;
-        });
+    pub fn schnarr(&self) -> Image {
+        let gx = ConvMatrix::new_3x3(vec![3., 0., -3., 10., 0., -10., 3., 0., -3.]);
+        let gy = ConvMatrix::new_3x3(vec![3., 10., 3., 0., 0., 0., -3., -10., -3.]);
 
-        Image {
-            pixels: pixels,
-            width: self.width,
-            height: self.height,
-            mode: self.mode,
-        }
+        let c = ConvMatrix::new_combined_3x3(gx, gy);
+
+        self.convolute_all_channels(&c)
     }
 }

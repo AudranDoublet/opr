@@ -407,19 +407,22 @@ impl Scene {
         }
     }
 
-    fn grad_map(&self, image: &Vec<Vector3<f32>>) -> Vec<f32> {
-        vec![1.0; image.len()]
+    fn grad_map(&self, image: &Vec<Vector3<f32>>, width: usize, height: usize) -> Vec<f32> {
+        image_manipulation::Image::from_vectors(&image, width, height)
+            .schnarr()
+            .to_grayscale()
+            .pixels.into_par_iter().map(|p| p as f32 / 255.0).collect()
     }
 
-    fn apply_anti_aliasing(&self, image: &mut Vec<Vector3<f32>>, width: usize, max_rec: u8, max_sample: f32) {
-        let grad_map = self.grad_map(image);
-        let threshold = (1. / (max_sample + 1.0));
+    fn apply_anti_aliasing(&self, image: &mut Vec<Vector3<f32>>, width: usize, height: usize, max_rec: u8, max_sample: f32) {
+        let grad_map = self.grad_map(image, width, height);
+        let threshold = 1. / (max_sample + 1.0);
 
         image.iter_mut().enumerate()
             .filter(|(i, _)| grad_map[*i] > threshold)
             .for_each(|(i, p)| {
                 let mut rng = rand::thread_rng();
-                let distribution = Uniform::new_inclusive(0.0, 1.0);
+                let distribution = Uniform::new_inclusive(-0.5, 0.5);
 
                 let (x, y) = ((i % width) as f32, (i / width) as f32);
                 let nb_sample = (grad_map[i] * max_sample) as usize;
@@ -441,19 +444,9 @@ impl Scene {
             .collect();
 
         if anti_aliasing_max_sample > 0 {
-            self.apply_anti_aliasing(&mut pixels, width, max_rec, anti_aliasing_max_sample as f32);
+            self.apply_anti_aliasing(&mut pixels, width, height, max_rec, anti_aliasing_max_sample as f32);
         }
 
-        // let mut sobel = image_manipulation::Image::from_vectors(&pixels, width, height).to_grayscale();//.sobel(128);
-
         image_manipulation::Image::from_vectors(&pixels, width, height)
-
-        // sobel.sobel()
-        //
-        // if anti_aliasing_max_sample > 0 {
-        //     self.apply_anti_aliasing(&image, anti_aliasing_max_sample as f32)
-        // } else {
-        //     image
-        // }
     }
 }
