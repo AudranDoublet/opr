@@ -5,11 +5,15 @@ use nalgebra::Vector3;
 use crate::Simulation;
 use crate::external_forces::ExternalForces;
 
+use serde_derive::*;
+
+#[derive(Serialize, Deserialize)]
 pub struct Fluid {
     fluid_type: usize,
     rest_density: f32,
     mass: f32,
 
+    #[serde(skip_serializing, skip_deserializing)]
     external_forces: RwLock<ExternalForces>,
 }
 
