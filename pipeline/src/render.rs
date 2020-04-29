@@ -53,9 +53,9 @@ pub fn pipeline_render(scene: &Scene, input_directory: &Path, dump_directory: &P
             render_scene.setup_camera(camera.position(), camera.up(), camera.forward());
         }
 
-        render_scene.build(12);
+        render_scene.build(scene.render_config.build_max_depth);
 
-        render_scene.render(width, height, 10, 16)
+        render_scene.render(width, height, scene.render_config.max_rec, scene.render_config.aa_max_sample)
                     .save(&dump_directory.join(format!("{:08}.png", idx)));
 
         pb.inc(1);

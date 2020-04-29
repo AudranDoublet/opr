@@ -321,7 +321,7 @@ impl Scene {
         }
     }
 
-    fn cast_ray(&self, ray: Ray, max_rec: u32, mut distance_inside_medium: f32) -> Vector3<f32> {
+    fn cast_ray(&self, ray: Ray, max_rec: u8, mut distance_inside_medium: f32) -> Vector3<f32> {
         if let Some((i, triangle)) = self.tree.ray_intersect(&ray) {
             let normal = (triangle.v1_normal * (1.0 - i.u - i.v)
                 + triangle.v2_normal * i.u
@@ -411,7 +411,7 @@ impl Scene {
         vec![1.0; image.len()]
     }
 
-    fn apply_anti_aliasing(&self, image: &mut Vec<Vector3<f32>>, width: usize, max_rec: u32, max_sample: f32) {
+    fn apply_anti_aliasing(&self, image: &mut Vec<Vector3<f32>>, width: usize, max_rec: u8, max_sample: f32) {
         let grad_map = self.grad_map(image);
         let threshold = (1. / (max_sample + 1.0));
 
@@ -433,7 +433,7 @@ impl Scene {
             });
     }
 
-    pub fn render(&mut self, width: usize, height: usize, max_rec: u32, anti_aliasing_max_sample: usize) -> image_manipulation::Image {
+    pub fn render(&mut self, width: usize, height: usize, max_rec: u8, anti_aliasing_max_sample: usize) -> image_manipulation::Image {
         self.camera.set_size(width as f32, height as f32);
 
         let mut pixels = (0..width * height).into_par_iter()
