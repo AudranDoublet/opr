@@ -169,7 +169,7 @@ impl RigidObject
     }
 
     pub fn final_position(&self) -> Vector3<f32> {
-        self.position + self.center_of_mass
+        self.position - self.center_of_mass
     }
 
     /**

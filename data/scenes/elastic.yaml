@@ -17,24 +17,11 @@ render_config:
     fps: 24
     resolution: [1024, 1024]
 camera:
-    position: [0.0, 0.0, -2.0]
+    position: [0.0, 1.0, -2.0]
     generate_at_render: true
     animation:
       type: group
       elements:
-          - type: curve
-            time: 3
-            variable: Position
-            smoothing:
-                begin: 0.20
-                end: 0.80
-            curve:
-                type: bezier
-                control_points:
-                  - [0.0, 0.0, -2.0]
-                  - [2.0, -2.0, -2.0]
-                  - [2.0, -2.0, 2.0]
-                  - [0.0, 0.0, 2.0]
           - type: lookat
             position: [0.0, 0.3, 0.0]
 solids:
