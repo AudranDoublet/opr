@@ -1,7 +1,7 @@
 use nalgebra::Vector3;
 use rayon::prelude::*;
 
-use crate::{DFSPH, external_forces::ExternalForce};
+use crate::{Simulation, external_forces::ExternalForce};
 use crate::utils::orthogonal_vectors;
 
 pub struct BasicViscosityForce {
@@ -19,9 +19,9 @@ impl BasicViscosityForce {
 }
 
 impl ExternalForce for BasicViscosityForce {
-    fn init(&mut self, _: &DFSPH) { }
+    fn init(&mut self, _: &Simulation) { }
 
-    fn compute_acceleration(&self, sim: &DFSPH, accelerations: &mut Vec<Vector3<f32>>) -> f32 {
+    fn compute_acceleration(&self, sim: &Simulation, accelerations: &mut Vec<Vector3<f32>>) -> Option<f32> {
         let densities = sim.density.read().unwrap();
         let positions = sim.positions.read().unwrap();
         let velocities = sim.velocities.read().unwrap();
@@ -72,6 +72,6 @@ impl ExternalForce for BasicViscosityForce {
             }
         });
 
-        sim.time_step
+        None
     }
 }

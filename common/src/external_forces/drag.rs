@@ -1,7 +1,7 @@
 use nalgebra::Vector3;
 use rayon::prelude::*;
 
-use crate::{DFSPH, external_forces::ExternalForce};
+use crate::{Simulation, external_forces::ExternalForce};
 
 const PI: f32 = std::f32::consts::PI;
 const RHO_A: f32 = 1.2041;
@@ -32,9 +32,9 @@ impl DragForce {
 }
 
 impl ExternalForce for DragForce {
-    fn init(&mut self, _: &DFSPH) { }
+    fn init(&mut self, _: &Simulation) { }
 
-    fn compute_acceleration(&self, sim: &DFSPH, accelerations: &mut Vec<Vector3<f32>>) -> f32 {
+    fn compute_acceleration(&self, sim: &Simulation, accelerations: &mut Vec<Vector3<f32>>) -> Option<f32> {
         let positions = sim.positions.read().unwrap();
         let velocities = sim.velocities.read().unwrap();
 
@@ -107,6 +107,6 @@ impl ExternalForce for DragForce {
             *v += force / sim.mass(i);
         });
 
-        sim.time_step
+        None
     }
 }

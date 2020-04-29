@@ -7,7 +7,7 @@ use std::sync::RwLock;
 use nalgebra::{Vector3, Vector6, Matrix3, UnitQuaternion};
 use rayon::prelude::*;
 
-use crate::{DFSPH, external_forces::ExternalForce};
+use crate::{Simulation, external_forces::ExternalForce};
 use crate::utils::ConjugateGradientSolver;
 
 pub struct ElasticityForce {
@@ -52,7 +52,8 @@ impl ElasticityForce {
         })
     }
 
-    fn matrix_vec_prod(&self, sim: &DFSPH, vec: &Vec<Vector3<f32>>) -> Vec<Vector3<f32>> {
+    fn matrix_vec_prod(&self, sim: &Simulation, vec: &Vec<Vector3<f32>>) -> Vec<Vector3<f32>> {
+        let dt = sim.time_step();
         let rotations = self.rotations.read().unwrap();
 
         let mu = self.youngs_modulus / (2.0 * (1.0 + self.poisson_ratio));
@@ -70,7 +71,7 @@ impl ElasticityForce {
 
                         f += self.rest_volumes[j] * vji * grad.transpose();
                     }
-                    f *= sim.time_step;
+                    f *= dt;
 
                     // cauchy strain
                     let strain = Vector6::new(
@@ -107,20 +108,22 @@ impl ElasticityForce {
                     force += self.rest_volumes[i] * self.rest_volumes[j] * (pwi - pwj);
                 }
 
-                vec[i] - sim.time_step * force / sim.mass(i)
+                vec[i] - dt * force / sim.mass(i)
             })
             .collect()
     }
 
-    fn compute_guess(&self, sim: &DFSPH, accelerations: &Vec<Vector3<f32>>) -> Vec<Vector3<f32>> {
+    fn compute_guess(&self, sim: &Simulation, accelerations: &Vec<Vector3<f32>>) -> Vec<Vector3<f32>> {
+        let dt = sim.time_step();
+
         sim.velocities.read().unwrap().par_iter()
             .enumerate()
-            .map(|(i, v)| v + sim.time_step * accelerations[i])
+            .map(|(i, v)| v + dt * accelerations[i])
             .collect()
     }
 
     // equation 1
-    fn compute_l(&self, sim: &DFSPH) -> Vec<Matrix3<f32>> {
+    fn compute_l(&self, sim: &Simulation) -> Vec<Matrix3<f32>> {
         (0..sim.len())
             .into_par_iter()
             .map(|i| {
@@ -141,7 +144,7 @@ impl ElasticityForce {
             .collect()
     }
 
-    fn compute_rotation(&self, sim: &DFSPH) {
+    fn compute_rotation(&self, sim: &Simulation) {
         let positions = sim.positions.read().unwrap();
         let mut rotations = self.rotations.write().unwrap();
 
@@ -163,7 +166,7 @@ impl ElasticityForce {
                  });
     }
 
-    fn compute_particle_density(&self, positions: &Vec<Vector3<f32>>, sim: &DFSPH, i: usize) -> f32 {
+    fn compute_particle_density(&self, positions: &Vec<Vector3<f32>>, sim: &Simulation, i: usize) -> f32 {
         let xi = positions[i];
         let mut result = sim.mass(i) * sim.kernel_apply(xi, xi);
 
@@ -174,10 +177,12 @@ impl ElasticityForce {
         result
     }
 
-    fn compute_rhs(&self, sim: &DFSPH, accelerations: &mut Vec<Vector3<f32>>) -> Vec<Vector3<f32>> {
+    fn compute_rhs(&self, sim: &Simulation, accelerations: &mut Vec<Vector3<f32>>) -> Vec<Vector3<f32>> {
         let rotations = self.rotations.read().unwrap();
         let positions = sim.positions.read().unwrap();
         let velocities = sim.velocities.read().unwrap();
+
+        let dt = sim.time_step();
 
         let mu = self.youngs_modulus / (2.0 * (1.0 + self.poisson_ratio));
         let lambda = self.youngs_modulus * self.poisson_ratio
@@ -260,14 +265,14 @@ impl ElasticityForce {
                     *acc += fi_hg / sim.mass(i);
                 }
 
-                velocities[i] + sim.time_step * (*acc + force / sim.mass(i))
+                velocities[i] + dt * (*acc + force / sim.mass(i))
             })
             .collect()
     }
 }
 
 impl ExternalForce for ElasticityForce {
-    fn init(&mut self, sim: &DFSPH) {
+    fn init(&mut self, sim: &Simulation) {
         let positions = sim.positions.read().unwrap();
 
         // compute initial fluid neighbours
@@ -285,12 +290,14 @@ impl ExternalForce for ElasticityForce {
         self.l_matrices = self.compute_l(sim);
     }
 
-    fn compute_acceleration(&self, sim: &DFSPH, accelerations: &mut Vec<Vector3<f32>>) -> f32 {
+    fn compute_acceleration(&self, sim: &Simulation, accelerations: &mut Vec<Vector3<f32>>) -> Option<f32> {
         self.compute_rotation(sim);
 
         let mut preconditions = Vec::new();
         let mut b = self.compute_rhs(sim, accelerations);
         let mut guess = self.compute_guess(sim, accelerations);
+
+        let dt = sim.time_step();
 
         let result = self.solver.solve(
             &|v| self.matrix_vec_prod(sim, v), &mut b, &mut guess, &mut preconditions
@@ -300,8 +307,8 @@ impl ExternalForce for ElasticityForce {
         accelerations
             .par_iter_mut()
             .enumerate()
-            .for_each(|(i, a)| *a += (result[i] - velocities[i]) / sim.time_step);
+            .for_each(|(i, a)| *a += (result[i] - velocities[i]) / dt);
 
-        sim.compute_cfl(&result).1
+        Some(sim.compute_cfl(&result).1)
     }
 }

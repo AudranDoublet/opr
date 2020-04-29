@@ -1,6 +1,6 @@
 #![feature(clamp)]
 
-mod particle;
+mod simulation;
 mod discretegrid;
 mod rigid_object;
 mod hashgrid;
@@ -13,8 +13,9 @@ pub mod utils;
 pub mod mesh;
 pub mod mesher;
 pub mod external_forces;
+pub mod pressure_solver;
 
-pub use particle::*;
+pub use simulation::*;
 pub use discretegrid::*;
 pub use rigid_object::*;
 pub use hashgrid::*;

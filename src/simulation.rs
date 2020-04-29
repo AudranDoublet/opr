@@ -9,10 +9,10 @@ use bubbler::diffuse_particle::DiffuseParticleType;
 use clap::ArgMatches;
 use kiss3d::{camera::camera::Camera, scene::SceneNode};
 use nalgebra::{Point3, Translation3};
-use sph_common::DFSPH;
+use sph_common::Simulation;
 use sph_scene::Scene;
 
-pub fn add_particles(range: std::ops::Range<usize>, dfsph: &DFSPH, scene: &mut render::scene::Scene) {
+pub fn add_particles(range: std::ops::Range<usize>, dfsph: &Simulation, scene: &mut render::scene::Scene) {
     let particles = &dfsph.positions.read().unwrap();
 
     for i in range {
@@ -26,7 +26,7 @@ pub fn add_particles(range: std::ops::Range<usize>, dfsph: &DFSPH, scene: &mut r
     }
 }
 
-fn add_meshes(dfsph: &DFSPH, config: &sph_scene::Scene, scene: &mut render::scene::Scene) -> Vec<Option<SceneNode>> {
+fn add_meshes(dfsph: &Simulation, config: &sph_scene::Scene, scene: &mut render::scene::Scene) -> Vec<Option<SceneNode>> {
     let mut result = Vec::new();
 
     for i in 0..config.solids.len() {
@@ -54,7 +54,7 @@ fn add_meshes(dfsph: &DFSPH, config: &sph_scene::Scene, scene: &mut render::scen
     result
 }
 
-fn dump_simulation(simulation: &DFSPH, dump_folder: &Path, idx: usize, verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
+fn dump_simulation(simulation: &Simulation, dump_folder: &Path, idx: usize, verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
     let path = dump_folder.join(format!("{:08}.sim.bin", idx));
     if verbose {
         println!("Dumping scene as `{:?}`", &path);
@@ -195,9 +195,11 @@ fn simulate(scene: &Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Resu
             let prev = fluid_simulation.len();
             time_simulated_since_last_frame += fluid_simulation.tick();
             add_particles(prev..fluid_simulation.len(), &fluid_simulation, &mut renderer);
+            /*
             if bubbler.tick(&fluid_simulation) {
                 update_diffuse(&mut renderer, &bubbler);
             }
+            */
 
             let d_v_mean_sq = fluid_simulation.debug_get_v_mean_sq();
             let d_v_max_sq_deviation = fluid_simulation.debug_get_v_max_sq() / d_v_mean_sq;

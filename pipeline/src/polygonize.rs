@@ -7,7 +7,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 
 use sph_scene::Scene;
 
-use sph_common::DFSPH;
+use sph_common::Simulation;
 use sph_common::mesher::interpolation::InterpolationAlgorithms;
 use sph_common::mesher::Mesher;
 use sph_common::mesher::anisotropication::Anisotropicator;
@@ -51,7 +51,7 @@ pub fn pipeline_polygonize(scene: &Scene, input_directory: &Path, dump_directory
     pb.tick();
 
     simulations.par_iter().enumerate().for_each(|(idx, path)| {
-        let simulation  = DFSPH::load(&path).unwrap();
+        let simulation  = Simulation::load(&path).unwrap();
         let path        = &dump_directory.join(format!("{:08}.obj", idx));
         let path_yaml   = dump_directory.join(format!("{:08}.yaml", idx));
         let buffer      = &mut fs::File::create(path).unwrap();

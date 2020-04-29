@@ -1,7 +1,7 @@
 use serde_derive::*;
 use nalgebra::Vector3;
 
-use sph_common::{DFSPH, Animation};
+use sph_common::{Simulation, Animation};
 
 use crate::{Scene, Solid};
 
@@ -39,7 +39,7 @@ pub enum LiquidZone {
 
 impl LiquidZone
 {
-    pub fn create_particles(&self, config: &Scene, scene: &mut DFSPH) -> Result<(), Box<dyn std::error::Error>>
+    pub fn create_particles(&self, config: &Scene, scene: &mut Simulation) -> Result<(), Box<dyn std::error::Error>>
     {
         let count = match self {
             LiquidZone::Block { from, to, density } => {

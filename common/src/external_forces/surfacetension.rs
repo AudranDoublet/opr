@@ -3,7 +3,7 @@ use rayon::prelude::*;
 
 use crate::kernels::{Kernel, AdhesionKernel, CohesionKernel};
 
-use crate::{DFSPH, external_forces::ExternalForce};
+use crate::{Simulation, external_forces::ExternalForce};
 
 pub struct SurfaceTensionForce {
     adhesion_kernel: AdhesionKernel,
@@ -24,9 +24,9 @@ impl SurfaceTensionForce {
 }
 
 impl ExternalForce for SurfaceTensionForce {
-    fn init(&mut self, _: &DFSPH) { }
+    fn init(&mut self, _: &Simulation) { }
 
-    fn compute_acceleration(&self, sim: &DFSPH, accelerations: &mut Vec<Vector3<f32>>) -> f32 {
+    fn compute_acceleration(&self, sim: &Simulation, accelerations: &mut Vec<Vector3<f32>>) -> Option<f32> {
         let positions = sim.positions.read().unwrap();
         let densities = sim.density.read().unwrap();
         let h = sim.kernel_radius();
@@ -72,6 +72,6 @@ impl ExternalForce for SurfaceTensionForce {
             });
         });
 
-        sim.time_step
+        None
     }
 }

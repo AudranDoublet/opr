@@ -19,10 +19,14 @@ use crate::kernels::{Kernel, CubicSpine};
 use crate::mesher::types::{FluidSnapshot, FluidSnapshotProvider, VertexWorld};
 use crate::external_forces::ExternalForces;
 
-const EPSILON: f32 = 1e-5;
+use crate::pressure_solver::*;
+
+fn default_pressure_solver() -> RwLock<Box<dyn PressureSolver + Send + Sync>> {
+    RwLock::new(DFSPH::new())
+}
 
 #[derive(Serialize, Deserialize)]
-pub struct DFSPH
+pub struct Simulation
 {
     // parameters
     kernel: CubicSpine,
@@ -31,16 +35,13 @@ pub struct DFSPH
 
     pub rest_density: f32,
 
-    correct_density_max_error: f32,
-    correct_divergence_max_error: f32,
-
     // cfl
     cfl_min_time_step: f32,
     cfl_max_time_step: f32,
     cfl_factor: f32,
 
     // iteration data
-    pub time_step: f32,
+    pub time_step: RwLock<f32>,
 
     v_max: f32,
     debug_v_max_sq: f32,
@@ -52,14 +53,16 @@ pub struct DFSPH
 
     // Particle data
     pub density: RwLock<Vec<f32>>,
-    stiffness: RwLock<Vec<f32>>,
     neighbours: Vec<Vec<usize>>,
-    density_prediction: RwLock<Vec<f32>>,
     pub velocities: RwLock<Vec<Vector3<f32>>>,
     pub positions: RwLock<Vec<Vector3<f32>>>,
     pub accelerations: RwLock<Vec<Vector3<f32>>>,
 
     pub camera: Camera,
+
+    #[serde(skip_serializing, skip_deserializing)]
+    #[serde(default = "default_pressure_solver")]
+    pressure_solver: RwLock<Box<dyn PressureSolver + Send + Sync>>,
 
     #[serde(skip_serializing, skip_deserializing)]
     pub emitters: Vec<Emitter>,
@@ -92,7 +95,7 @@ macro_rules! timeit {
 }
 */
 
-pub struct DFSPHFluidSnapshot
+pub struct SimulationFluidSnapshot
 {
     particles: Vec<Vector3<f32>>,
     densities: Vec<f32>,
@@ -102,7 +105,7 @@ pub struct DFSPHFluidSnapshot
     mass: f32,
 }
 
-impl FluidSnapshot for DFSPHFluidSnapshot {
+impl FluidSnapshot for SimulationFluidSnapshot {
     fn particles(&self) -> Vec<Vector3<f32>> {
         self.particles.clone()
     }
@@ -140,7 +143,7 @@ impl FluidSnapshot for DFSPHFluidSnapshot {
     }
 }
 
-impl FluidSnapshotProvider for DFSPH {
+impl FluidSnapshotProvider for Simulation {
     fn radius(&self) -> f32 {
         self.kernel.radius()
     }
@@ -157,7 +160,7 @@ impl FluidSnapshotProvider for DFSPH {
             an_grid.find_all_neighbours(&particles)
         } else { vec![] };
 
-        Box::new(DFSPHFluidSnapshot {
+        Box::new(SimulationFluidSnapshot {
             particles,
             densities,
             neighbours_struct,
@@ -168,7 +171,7 @@ impl FluidSnapshotProvider for DFSPH {
     }
 }
 
-impl DFSPH
+impl Simulation
 {
     pub fn new(
         kernel_radius: f32, particle_radius: f32,
@@ -177,23 +180,20 @@ impl DFSPH
         camera_position: Vector3<f32>,
         camera_animation: Animation,
         emitters: Vec<Emitter>,
-        emitters_animations: Vec<Animation>) -> DFSPH
+        emitters_animations: Vec<Animation>) -> Simulation
     {
-        DFSPH {
+        Simulation {
             kernel: CubicSpine::new(kernel_radius),
             particle_radius,
             volume: 4. * std::f32::consts::PI * particle_radius.powi(3) / 3., // FIXME how to compute it ? 5.12e-5
 
             rest_density: 1000.0,
 
-            correct_density_max_error: 0.01,
-            correct_divergence_max_error: 0.1,
-
             // time step
             cfl_min_time_step: 0.0001,
             cfl_max_time_step: 0.005,
             cfl_factor: 1.0,
-            time_step: 0.0001,
+            time_step: RwLock::new(0.0001),
 
             v_max: 0.0,
             debug_v_max_sq: 0.0,
@@ -203,13 +203,12 @@ impl DFSPH
             debug_solid_collisions: vec![],
 
             neighbours: Vec::new(),
+
             density: RwLock::new(Vec::new()),
-            stiffness: RwLock::new(Vec::new()),
 
             len: 0,
 
             neighbours_struct: HashGrid::new(kernel_radius),
-            density_prediction: RwLock::new(Vec::new()),
             accelerations: RwLock::new(Vec::new()),
             velocities: RwLock::new(Vec::new()),
             positions: RwLock::new(Vec::new()),
@@ -221,6 +220,8 @@ impl DFSPH
 
             emitters: emitters,
             emitters_animations: emitters_animations,
+
+            pressure_solver: default_pressure_solver(),
         }
     }
 
@@ -232,10 +233,9 @@ impl DFSPH
         self.accelerations.write().unwrap().clear();
         self.velocities.write().unwrap().clear();
         self.positions.write().unwrap().clear();
-        self.density_prediction.write().unwrap().clear();
-        self.stiffness.write().unwrap().clear();
         self.density.write().unwrap().clear();
 
+        // clear pressure & force
         self.len = 0;
     }
 
@@ -268,7 +268,11 @@ impl DFSPH
     }
 
     pub fn get_time_step(&self) -> f32 {
-        self.time_step
+        *self.time_step.read().unwrap()
+    }
+
+    pub fn time_step(&self) -> f32 {
+        *self.time_step.read().unwrap()
     }
 
     pub fn add_particle_with_velocity(&mut self, position: Vector3<f32>, velocity: Vector3<f32>)
@@ -279,11 +283,9 @@ impl DFSPH
             }
         }
 
-        self.density_prediction.write().unwrap().push(0.0);
         self.positions.write().unwrap().push(position);
         self.velocities.write().unwrap().push(velocity);
         self.accelerations.write().unwrap().push(Vector3::zeros());
-        self.stiffness.write().unwrap().push(0.0);
         self.density.write().unwrap().push(0.0);
         self.len += 1;
     }
@@ -390,24 +392,13 @@ impl DFSPH
         (v_max, time_step)
     }
 
-    fn adapt_cfl(&mut self) -> f32 {
-        // Compute max velocity
-        let mut debug_v_mean_sq: f64 = 0.;
+    pub fn adapt_cfl(&self) -> f32 {
         let velocities = self.velocities.read().unwrap();
-
-        for i in 0..self.len() {
-            let n = velocities[i].norm_squared();
-            debug_v_mean_sq += n as f64;
-        }
 
         let (v_max, time_step) = self.compute_cfl(&velocities);
 
-        self.debug_v_mean_sq = (debug_v_mean_sq / self.len() as f64) as f32;
-        self.debug_v_max_sq = v_max*v_max;
-        self.v_max = v_max;
-
-        self.time_step = time_step;
-        self.time_step
+        *self.time_step.write().unwrap() = time_step;
+        time_step
     }
 
     fn compute_density(&self, i: usize, positions: &Vec<Vector3<f32>>) -> f32 {
@@ -424,179 +415,17 @@ impl DFSPH
         (self_dens + neighbour_dens + solids_dens) * self.rest_density
     }
 
-    fn compute_stiffness(&self, i: usize, positions: &Vec<Vector3<f32>>) -> f32 {
-        let pos = positions[i];
-
-        let sum_a = self.neighbours_reduce_v(i, &|r, _, j| r + self.volume(j) * self.gradient(pos, positions[j]));
-        let sum_b = self.neighbours_reduce_f(i, &|r, _, j| {
-            r + (self.volume(j) * self.gradient(pos, positions[j])).norm_squared()
-        });
-
-        // boundaries
-        let sum_a = sum_a + self.solids_reduce_v(i, &|_, total, v, p| total + v * self.gradient(pos, p));
-        let sum = sum_a.norm_squared() + sum_b;
-
-        match sum {
-            sum if sum > EPSILON => -1.0 / sum,
-            _ => 0.0,
-        }
-    }
-
-    fn compute_density_variation(&mut self) {
-        let velocities = self.velocities.read().unwrap();
-        let positions = self.positions.read().unwrap();
-
-        self.density_prediction.write().unwrap().par_iter_mut().enumerate().for_each(|(i, p)| {
-            let pos = positions[i];
-
-            let density_adv = if self.neighbours_count(i) < 20 {
-                0.0
-            } else {
-                let mut delta = self.neighbours_reduce_f(i, &|r, i, j| r + self.volume(j) * (velocities[i] - velocities[j]).dot(&self.gradient(pos, positions[j])));
-                delta += self.solids_reduce_f(i, &|volume, r, v, x| {
-                    let vj = volume.point_velocity(x);
-                    r + v * (velocities[i] - vj).dot(&self.gradient(pos, x))
-                });
-
-                delta.max(0.0)
-            };
-
-            *p = density_adv;
-        });
-    }
-
-    fn compute_density_advection(&mut self) {
-        let velocities = self.velocities.read().unwrap();
-        let positions = self.positions.read().unwrap();
-        let densities = self.density.read().unwrap();
-
-        self.density_prediction.write().unwrap().par_iter_mut().enumerate().for_each(|(i, p)| {
-            let pos = positions[i];
-
-            let mut delta = self.neighbours_reduce_f(i, &|r, i, j| r + self.volume(j) * (velocities[i] - velocities[j]).dot(&self.gradient(pos, positions[j])));
-            delta += self.solids_reduce_f(i, &|volume, r, v, x| {
-                let vj = volume.point_velocity(x);
-                r + v * (velocities[i] - vj).dot(&self.gradient(pos, x))
-            });
-
-            *p = (densities[i] / self.rest_density + self.time_step * delta).max(1.0);
-        });
-    }
-
-    fn correct_density_error(&mut self) {
-        self.compute_density_advection();
-
-        let mut iter_count = 0;
-        let mut chk = false;
-        let step = 1. / self.time_step.powi(2);
-
-        while (!chk || iter_count <= 1) && iter_count < 1000 {
-            {
-                let positions = self.positions.read().unwrap();
-                let density_adv = self.density_prediction.read().unwrap();
-                let stiffness = self.stiffness.read().unwrap();
-
-                self.velocities.write().unwrap().par_iter_mut().enumerate().for_each(|(i, v)| {
-                    let ki = (density_adv[i] - 1.) * stiffness[i] * step;
-
-                    let diff = self.neighbours_reduce_v(i, &|r, i, j| {
-                        let sum = ki + (density_adv[j] - 1.) * stiffness[j] * step;
-
-                        if sum.abs() <= EPSILON {
-                            return r;
-                        }
-
-                        let grad = -self.volume(j) * self.gradient(positions[i], positions[j]);
-
-                        r - self.time_step * sum * grad
-                    });
-
-                    let boundary_diff = match ki.abs() {
-                        v if v > EPSILON => self.solids_reduce_v(i, &|solid, r, v, x| {
-                            let grad = -v * self.gradient(positions[i], x);
-                            let change = 1.0 * ki * grad;
-
-                            solid.add_force(x, change * self.mass(i));
-
-                            r + (-self.time_step * change)
-                        }),
-                        _ => Vector3::zeros(),
-                    };
-
-                    *v += diff + boundary_diff;
-                });
-            }
-
-            self.compute_density_advection();
-
-            let density_avg: f32 = self.density_prediction.read().unwrap().par_iter()
-                .map(|v| v * self.rest_density - self.rest_density)
-                .sum::<f32>() / self.len() as f32;
-
-            let eta = self.correct_density_max_error * 0.01 * self.rest_density;
-
-            chk |= density_avg < eta;
-            iter_count += 1;
-        }
-    }
-
-    fn correct_divergence_error(&mut self) {
-        self.compute_density_variation();
-
-        let mut iter_count = 0;
-        let mut chk = false;
-        let step = 1. / self.time_step;
-
-        while (!chk || iter_count <= 1) && iter_count < 100 {
-            {
-                let positions = self.positions.read().unwrap();
-                let density_adv = self.density_prediction.read().unwrap();
-                let stiffness = self.stiffness.read().unwrap();
-
-                self.velocities.write().unwrap().par_iter_mut().enumerate().for_each(|(i, v)| {
-                    let ki = density_adv[i] * stiffness[i] * step;
-
-                    let diff = self.neighbours_reduce_v(i, &|r, i, j| {
-                        let sum = ki + density_adv[j] * stiffness[j] * step;
-
-                        if sum.abs() <= EPSILON {
-                            return r;
-                        }
-
-                        let grad = -self.volume(j) * self.gradient(positions[i], positions[j]);
-                        r - self.time_step * sum * grad
-                    });
-
-                    let boundary_diff = self.solids_reduce_v(i, &|solid, r, v, x| {
-                        let grad = -v * self.gradient(positions[i], x);
-                        let change = 1.0 * ki * grad;
-
-                        solid.add_force(x, change * self.mass(i));
-                        r + (-self.time_step * change)
-                    });
-
-                    *v += diff + boundary_diff;
-                });
-            }
-
-            self.compute_density_variation();
-
-            let density_div_avg: f32 = self.density_prediction.read().unwrap().par_iter()
-                .map(|v| v * self.rest_density - self.rest_density)
-                .sum::<f32>() / self.len() as f32;
-
-            let eta = 1. / self.time_step * self.correct_divergence_max_error * 0.01 * self.rest_density;
-
-            chk |= density_div_avg < eta;
-            iter_count += 1;
-        }
-    }
-
-    fn compute_non_pressure_forces(&self) -> f32 {
+    pub fn compute_non_pressure_forces(&self) -> f32 {
         let mut accelerations = self.accelerations.write().unwrap();
 
         accelerations.par_iter_mut().for_each(|v| *v = Vector3::zeros());
-        self.external_forces.read().unwrap().apply(self, &mut accelerations)
+        let dt = self.external_forces.read().unwrap().apply(self, &mut accelerations);
+
+        // update velocities with acceleration & dt
+        self.velocities.write().unwrap().par_iter_mut().enumerate().for_each(|(i, v)| *v += accelerations[i] * dt);
+
+        *self.time_step.write().unwrap() = dt;
+        dt
     }
 
     fn init(&mut self) {
@@ -608,13 +437,12 @@ impl DFSPH
         let positions = &*self.positions.read().unwrap();
 
         self.density.write().unwrap().par_iter_mut().enumerate().for_each(|(i, v)| *v = self.compute_density(i, positions));
-        self.stiffness.write().unwrap().par_iter_mut().enumerate().for_each(|(i, v)| *v = self.compute_stiffness(i, positions));
     }
 
     fn init_boundaries(&mut self) {
         let pr = self.particle_radius;
         let kr = self.kernel.radius();
-        let dt = self.time_step;
+        let dt = self.time_step();
 
         for solid in &mut self.solids {
             let (volume, boundary_x): (Vec<f32>, Vec<Vector3<f32>>) =
@@ -648,28 +476,23 @@ impl DFSPH
             .sqrt()
     }
 
-    pub fn tick(&mut self) -> f32 {
-        self.init();
+    pub fn update_positions(&mut self) {
+        let dt = self.time_step();
 
-        self.correct_divergence_error();
-
-        self.adapt_cfl();
-        self.time_step = self.compute_non_pressure_forces();
-
-        let dt = self.time_step;
-
-
-        {
-            let accelerations = self.accelerations.read().unwrap();
-            self.velocities.write().unwrap().par_iter_mut().enumerate().for_each(|(i, v)| *v += accelerations[i] * dt);
-        }
-
-        let velocities_copy = self.velocities.read().unwrap().clone();
-
-        self.correct_density_error();
         let old = self.positions.read().unwrap().clone();
         self.positions.write().unwrap().par_iter_mut().zip(self.velocities.read().unwrap().par_iter()).for_each(|(p, v)| *p += dt * v);
         self.neighbours_struct.update_particles(&old, &self.positions.read().unwrap());
+    }
+
+    pub fn tick(&mut self) -> f32 {
+        self.init();
+
+        // fluid handling
+        self.pressure_solver.read().unwrap().time_step(self);
+        self.update_positions();
+
+        // solids handling
+        let dt = self.time_step();
 
         let gravity = self.gravity();
         self.solids.iter_mut().for_each(|v| v.update(gravity, dt));
@@ -686,16 +509,10 @@ impl DFSPH
             self.solids[i].update_vel(dt);
         }
 
-        // add pressure to accelerations for next simulation steps (foam & bubble generation)
-        {
-            let velocities = self.velocities.read().unwrap();
-            self.accelerations.write().unwrap().par_iter_mut()
-                .enumerate()
-                .for_each(|(i, a)| *a += (velocities[i] - velocities_copy[i]) / self.time_step);
-        }
-
+        // update camera
         self.camera.tick(dt, &mut self.camera_animation);
 
+        // emit new particles
         let particles: Vec<(Vector3<f32>, Vector3<f32>)> = self.emitters.par_iter_mut()
             .zip(self.emitters_animations.par_iter_mut())
             .map(|(e, a)| e.tick(dt, a))
@@ -706,7 +523,7 @@ impl DFSPH
         }
 
         self.debug_solid_collisions = collisions;
-        self.time_step
+        dt
     }
 
     pub fn dump(&self, path: &Path) -> Result<(), std::io::Error> {
@@ -717,10 +534,10 @@ impl DFSPH
         Ok(())
     }
 
-    pub fn load(path: &Path) -> Result<DFSPH, std::io::Error> {
+    pub fn load(path: &Path) -> Result<Simulation, std::io::Error> {
         let buffer = BufReader::new(File::open(path)?);
         let decoder = ZlibDecoder::new(buffer);
-        let mut r: DFSPH = serde_json::from_reader(decoder)?;
+        let mut r: Simulation = serde_json::from_reader(decoder)?;
 
         r.sync();
 

@@ -5,7 +5,7 @@ use nalgebra::{RealField, Vector3};
 use rand::*;
 use rand::distributions::Uniform;
 use rayon::prelude::*;
-use sph_common::DFSPH;
+use sph_common::Simulation;
 use sph_common::mesher::types::VertexWorld;
 
 use crate::config::BubblerConfig;
@@ -84,7 +84,7 @@ impl Bubbler {
         &self.particles
     }
 
-    fn update_containers_capacities(&mut self, simulation: &DFSPH) {
+    fn update_containers_capacities(&mut self, simulation: &Simulation) {
         let new_size = simulation.len();
 
         self.likelihood_ta.write().unwrap().resize(new_size, 0.);
@@ -93,7 +93,7 @@ impl Bubbler {
         self.grad_densities.write().unwrap().resize(new_size, Vector3::zeros());
     }
 
-    fn compute_likelihood_ta(&mut self, simulation: &DFSPH) {
+    fn compute_likelihood_ta(&mut self, simulation: &Simulation) {
         let velocities = simulation.velocities.read().unwrap();
         let positions = simulation.positions.read().unwrap();
 
@@ -115,7 +115,7 @@ impl Bubbler {
         });
     }
 
-    fn compute_likelihood_wc(&mut self, simulation: &DFSPH) {
+    fn compute_likelihood_wc(&mut self, simulation: &Simulation) {
         let velocities = simulation.velocities.read().unwrap();
         let positions = simulation.positions.read().unwrap();
         let grad_densities = self.grad_densities.read().unwrap();
@@ -151,7 +151,7 @@ impl Bubbler {
         });
     }
 
-    fn compute_likelihood_k(&mut self, simulation: &DFSPH) {
+    fn compute_likelihood_k(&mut self, simulation: &Simulation) {
         let velocities = simulation.velocities.read().unwrap();
 
         // FIXME: we must ignore particles that aren't near from the surface of the fluid
@@ -162,7 +162,7 @@ impl Bubbler {
         });
     }
 
-    fn compute_grad_densities(&mut self, simulation: &DFSPH) {
+    fn compute_grad_densities(&mut self, simulation: &Simulation) {
         let positions = simulation.positions.read().unwrap();
 
         self.grad_densities.write().unwrap().par_iter_mut().enumerate().for_each(|(i, grad_density)| {
@@ -172,7 +172,7 @@ impl Bubbler {
         });
     }
 
-    fn generate_diffuse_particles(&mut self, simulation: &DFSPH) {
+    fn generate_diffuse_particles(&mut self, simulation: &Simulation) {
         let likelihood_ta = self.likelihood_ta.read().unwrap();
         let likelihood_wc = self.likelihood_wc.read().unwrap();
         let likelihood_k = self.likelihood_k.read().unwrap();
@@ -191,7 +191,7 @@ impl Bubbler {
                 for _ in 0..nb_diffuse {
                     let r = particle_radius * rng.sample(dist_r).sqrt();
                     let theta = rng.sample(dist_theta) * 2.0 * f32::pi();
-                    // FIXME: we use the delta time of the Bubbler, but shouldn't it rather be the delta time of the DFSPH?
+                    // FIXME: we use the delta time of the Bubbler, but shouldn't it rather be the delta time of the Simulation?
                     let h = rng.sample(dist_h) * (self.dt * &velocities[i]).norm();
                     // FIXME-END;
                     let v_normalized = &velocities[i].normalize();
@@ -239,7 +239,7 @@ impl Bubbler {
         }
     }
 
-    fn update_diffuse_particles(&mut self, simulation: &DFSPH) {
+    fn update_diffuse_particles(&mut self, simulation: &Simulation) {
         let positions = simulation.positions.read().unwrap();
         let velocities = simulation.velocities.read().unwrap();
         let gravity = simulation.gravity();
@@ -290,7 +290,7 @@ impl Bubbler {
             });
     }
 
-    pub fn tick(&mut self, simulation: &DFSPH) -> bool {
+    pub fn tick(&mut self, simulation: &Simulation) -> bool {
         self.dt += simulation.get_time_step();
 
         if self.dt < self.hp.dt_min {

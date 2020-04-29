@@ -3,7 +3,7 @@ use std::sync::RwLock;
 use nalgebra::{Vector3, Matrix3};
 use rayon::prelude::*;
 
-use crate::{DFSPH, external_forces::ExternalForce};
+use crate::{Simulation, external_forces::ExternalForce};
 use crate::utils::ConjugateGradientSolver;
 
 use crate::utils::orthogonal_vectors;
@@ -27,9 +27,10 @@ impl ViscosityWeiler2018Force {
         })
     }
 
-    fn matrix_vec_prod(&self, sim: &DFSPH, vec: &Vec<Vector3<f32>>) -> Vec<Vector3<f32>> {
+    fn matrix_vec_prod(&self, sim: &Simulation, vec: &Vec<Vector3<f32>>) -> Vec<Vector3<f32>> {
         let densities = sim.density.read().unwrap();
         let positions = sim.positions.read().unwrap();
+        let dt = sim.time_step();
 
         let h = sim.kernel_radius();
         let h2 = sim.kernel_radius().powi(2) / 100.;
@@ -76,13 +77,14 @@ impl ViscosityWeiler2018Force {
                 });
             }
 
-            v - (sim.time_step / densities[i]) * result
+            v - (dt / densities[i]) * result
         }).collect()
     }
 
-    fn compute_preconditions(&self, sim: &DFSPH) -> Vec<Matrix3<f32>> {
+    fn compute_preconditions(&self, sim: &Simulation) -> Vec<Matrix3<f32>> {
         let densities = sim.density.read().unwrap();
         let positions = sim.positions.read().unwrap();
+        let dt = sim.time_step();
 
         let h = sim.kernel_radius();
         let h2 = sim.kernel_radius().powi(2) / 100.;
@@ -123,11 +125,11 @@ impl ViscosityWeiler2018Force {
                 });
             }
 
-            Matrix3::identity() - (sim.time_step / densities[i]) * result
+            Matrix3::identity() - (dt / densities[i]) * result
         }).collect()
     }
 
-    fn compute_guess(&self, sim: &DFSPH) -> Vec<Vector3<f32>> {
+    fn compute_guess(&self, sim: &Simulation) -> Vec<Vector3<f32>> {
         let difference = self.difference.read().unwrap();
 
         sim.velocities.read().unwrap().par_iter()
@@ -138,12 +140,14 @@ impl ViscosityWeiler2018Force {
 }
 
 impl ExternalForce for ViscosityWeiler2018Force {
-    fn init(&mut self, _: &DFSPH) { }
+    fn init(&mut self, _: &Simulation) { }
 
-    fn compute_acceleration(&self, sim: &DFSPH, accelerations: &mut Vec<Vector3<f32>>) -> f32 {
+    fn compute_acceleration(&self, sim: &Simulation, accelerations: &mut Vec<Vector3<f32>>) -> Option<f32> {
         let mut preconditions = self.compute_preconditions(sim);
         let mut b = sim.velocities.read().unwrap().clone();
         let mut guess = self.compute_guess(sim);
+
+        let dt = sim.time_step();
 
         let result = self.solver.solve(
             &|v| self.matrix_vec_prod(sim, v), &mut b, &mut guess, &mut preconditions
@@ -154,7 +158,7 @@ impl ExternalForce for ViscosityWeiler2018Force {
         *self.difference.write().unwrap() = result.par_iter().enumerate().map(|(i, v)| v - velocities[i]).collect();
 
         let difference = self.difference.read().unwrap();
-        accelerations.par_iter_mut().enumerate().for_each(|(i, a)| *a += (1. / sim.time_step) * difference[i]);
-        sim.time_step
+        accelerations.par_iter_mut().enumerate().for_each(|(i, a)| *a += (1. / dt) * difference[i]);
+        None
     }
 }

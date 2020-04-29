@@ -5,7 +5,7 @@ use nalgebra::Vector3;
 use std::fs::File;
 use std::path::Path;
 
-use sph_common::{Emitter, Animation, RigidObject, DFSPH};
+use sph_common::{Emitter, Animation, RigidObject, Simulation};
 use sph_common::external_forces::{ExternalForces, ViscosityType, VorticityConfig, DragConfig, ElasticityConfig};
 
 use serde_derive::*;
@@ -184,7 +184,7 @@ impl Scene
         Ok(solids)
     }
 
-    pub fn load(&self) -> Result<DFSPH, Box<dyn std::error::Error>> {
+    pub fn load(&self) -> Result<Simulation, Box<dyn std::error::Error>> {
         self.create_cache_dir()?;
 
         let solids = self.load_solids()?;
@@ -199,7 +199,7 @@ impl Scene
 
         let (emitters, emitters_animations) = self.emitters();
 
-        let mut result = DFSPH::new(
+        let mut result = Simulation::new(
             self.config.kernel_radius,
             self.config.particle_radius,
             solids,
@@ -222,7 +222,7 @@ impl Scene
             .unzip()
     }
 
-    pub fn recreate(&self, scene: &mut DFSPH) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn recreate(&self, scene: &mut Simulation) -> Result<(), Box<dyn std::error::Error>> {
         scene.clear();
 
         for liquid in &self.liquids_blocks {
@@ -234,7 +234,7 @@ impl Scene
         Ok(())
     }
 
-    pub fn add_blocks(&self, scene: &mut DFSPH) -> Result<std::ops::Range<usize>, Box<dyn std::error::Error>> {
+    pub fn add_blocks(&self, scene: &mut Simulation) -> Result<std::ops::Range<usize>, Box<dyn std::error::Error>> {
         let prev_size = scene.len();
 
         for liquid in &self.liquids_add_blocks {

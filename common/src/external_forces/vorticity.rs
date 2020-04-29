@@ -3,7 +3,7 @@ use std::sync::RwLock;
 use nalgebra::Vector3;
 use rayon::prelude::*;
 
-use crate::{DFSPH, external_forces::ExternalForce};
+use crate::{Simulation, external_forces::ExternalForce};
 
 /*
  * Vorticity based on Bender 2017: Turbulent Micropolar SPH Fluids with Foam
@@ -31,13 +31,15 @@ impl VorticityForce {
 }
 
 impl ExternalForce for VorticityForce {
-    fn init(&mut self, _: &DFSPH) { }
+    fn init(&mut self, _: &Simulation) { }
 
-    fn compute_acceleration(&self, sim: &DFSPH, accelerations: &mut Vec<Vector3<f32>>) -> f32 {
+    fn compute_acceleration(&self, sim: &Simulation, accelerations: &mut Vec<Vector3<f32>>) -> Option<f32> {
         let densities = sim.density.read().unwrap();
         let positions = sim.positions.read().unwrap();
         let velocities = sim.velocities.read().unwrap();
         let mut omegas = self.omegas.write().unwrap();
+
+        let dt = sim.time_step();
 
         let mut ang_velocity = self.ang_velocity.write().unwrap();
         *ang_velocity = vec![Vector3::zeros(); sim.len()];
@@ -60,7 +62,7 @@ impl ExternalForce for VorticityForce {
 
                 let volumej = sim.mass(j) / densities[j];
 
-                r - (1./sim.time_step) * self.inertia_inverse * self.viscosity_omega * volumej * omegaij * w
+                r - (1./dt) * self.inertia_inverse * self.viscosity_omega * volumej * omegaij * w
                   + (1./densities[i]) * self.inertia_inverse * self.vorticity_coefficient * sim.mass(j) * vij.cross(&grad)
             });
 
@@ -86,9 +88,9 @@ impl ExternalForce for VorticityForce {
 
         *omegas = ang_velocity.par_iter()
             .enumerate()
-            .map(|(i, v)| omegas.get(i).unwrap_or(&Vector3::zeros()) + v * sim.time_step)
+            .map(|(i, v)| omegas.get(i).unwrap_or(&Vector3::zeros()) + v * dt)
             .collect();
 
-        sim.time_step
+        None
     }
 }

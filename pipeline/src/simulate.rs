@@ -3,10 +3,10 @@ use std::fs;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::path::Path;
 
-use sph_common::DFSPH;
+use sph_common::Simulation;
 use sph_scene::Scene;
 
-fn dump_simulation(simulation: &DFSPH, dump_folder: &Path, idx: usize) -> Result<(), Box<dyn std::error::Error>> {
+fn dump_simulation(simulation: &Simulation, dump_folder: &Path, idx: usize) -> Result<(), Box<dyn std::error::Error>> {
     let path = dump_folder.join(format!("{:08}.sim.bin", idx));
     simulation.dump(&path)?;
 
