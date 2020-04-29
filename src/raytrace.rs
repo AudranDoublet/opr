@@ -26,7 +26,7 @@ pub fn main_render(args: &ArgMatches) -> Result<(), Box<dyn std::error::Error>> 
 
     let pixels;
 
-    timeit!("rendering", pixels = scene.render(result_width, result_height));
+    timeit!("rendering", pixels = scene.render(result_width, result_height, 10, 16));
 
     pixels.save(&Path::new("result.png"));
 

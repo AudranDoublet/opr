@@ -55,7 +55,7 @@ pub fn pipeline_render(scene: &Scene, input_directory: &Path, dump_directory: &P
 
         render_scene.build(12);
 
-        render_scene.render(width, height)
+        render_scene.render(width, height, 10, 16)
                     .save(&dump_directory.join(format!("{:08}.png", idx)));
 
         pb.inc(1);

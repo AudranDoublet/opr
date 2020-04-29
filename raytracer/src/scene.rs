@@ -1,7 +1,7 @@
+extern crate image_manipulation;
 extern crate rayon;
 extern crate serde_yaml;
 extern crate tobj;
-extern crate image_manipulation;
 
 use std::collections::HashMap;
 use std::error::Error;
@@ -9,6 +9,8 @@ use std::fs::File;
 use std::path::Path;
 
 use nalgebra::{UnitQuaternion, Vector2, Vector3};
+use rand::*;
+use rand::distributions::Uniform;
 use rayon::prelude::*;
 use search::{BVH, BVHParameters, Ray};
 
@@ -391,7 +393,7 @@ impl Scene {
                 };
 
                 if material.illumination_model == 6 {
-                    color += (Vector3::new(1.0, 1.0, 1.0) - ks).component_mul (&refract_color);
+                    color += (Vector3::new(1.0, 1.0, 1.0) - ks).component_mul(&refract_color);
                 } else {
                     color += (1.0 - coeff_reflectivity) * refract_color;
                 }
@@ -405,15 +407,53 @@ impl Scene {
         }
     }
 
-    pub fn render(&mut self, width: usize, height: usize) -> image_manipulation::Image {
+    fn grad_map(&self, image: &Vec<Vector3<f32>>) -> Vec<f32> {
+        vec![1.0; image.len()]
+    }
+
+    fn apply_anti_aliasing(&self, image: &mut Vec<Vector3<f32>>, width: usize, max_rec: u32, max_sample: f32) {
+        let grad_map = self.grad_map(image);
+        let threshold = (1. / (max_sample + 1.0));
+
+        image.iter_mut().enumerate()
+            .filter(|(i, _)| grad_map[*i] > threshold)
+            .for_each(|(i, p)| {
+                let mut rng = rand::thread_rng();
+                let distribution = Uniform::new_inclusive(0.0, 1.0);
+
+                let (x, y) = ((i % width) as f32, (i / width) as f32);
+                let nb_sample = (grad_map[i] * max_sample) as usize;
+
+                for _ in 0..nb_sample {
+                    let ray = self.camera.generate_ray(x + rng.sample(distribution), y + rng.sample(distribution));
+                    *p += self.cast_ray(ray, max_rec, 0.0);
+                }
+
+                *p /= (nb_sample + 1) as f32;
+            });
+    }
+
+    pub fn render(&mut self, width: usize, height: usize, max_rec: u32, anti_aliasing_max_sample: usize) -> image_manipulation::Image {
         self.camera.set_size(width as f32, height as f32);
 
-        let pixels = (0..width * height).into_par_iter()
-            .map(|i| self.cast_ray(self.camera.generate_ray((i % width) as f32, (i / width) as f32), 10, 0.0))
+        let mut pixels = (0..width * height).into_par_iter()
+            .map(|i| self.cast_ray(self.camera.generate_ray((i % width) as f32, (i / width) as f32), max_rec, 0.0))
             .collect();
 
-        let sobel = image_manipulation::Image::from_vectors(&pixels, width, height).sobel(70);
+        if anti_aliasing_max_sample > 0 {
+            self.apply_anti_aliasing(&mut pixels, width, max_rec, anti_aliasing_max_sample as f32);
+        }
+
+        // let mut sobel = image_manipulation::Image::from_vectors(&pixels, width, height).to_grayscale();//.sobel(128);
 
         image_manipulation::Image::from_vectors(&pixels, width, height)
+
+        // sobel.sobel()
+        //
+        // if anti_aliasing_max_sample > 0 {
+        //     self.apply_anti_aliasing(&image, anti_aliasing_max_sample as f32)
+        // } else {
+        //     image
+        // }
     }
 }
