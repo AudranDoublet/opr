@@ -1,20 +1,16 @@
-use nalgebra::Vector3;
-
-use std::path::{Path, PathBuf};
 use std::fs;
+use std::path::{Path, PathBuf};
 
 use indicatif::{ProgressBar, ProgressStyle};
-
+use nalgebra::Vector3;
+use rayon::prelude::*;
+use raytracer::{Camera, scene_config};
 use sph_scene::Scene;
 
-use sph::Simulation;
+use mesher::anisotropication::Anisotropicator;
 use mesher::interpolation::InterpolationAlgorithms;
 use mesher::Mesher;
-use mesher::anisotropication::Anisotropicator;
-
-use raytracer::{scene_config, Camera};
-
-use rayon::prelude::*;
+use sph_scene::simulation_loader::load;
 
 fn get_simulation_dumps_paths(folder: &Path) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
     let mut files: Vec<PathBuf> = fs::read_dir(folder)?
@@ -47,14 +43,14 @@ pub fn pipeline_polygonize(scene: &Scene, input_directory: &Path, dump_directory
 
     let pb = ProgressBar::new(simulations.len() as u64);
     pb.set_style(ProgressStyle::default_bar()
-      .template("[{elapsed_precise}] [{per_sec}] [{eta_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7}"));
+        .template("[{elapsed_precise}] [{per_sec}] [{eta_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7}"));
     pb.tick();
 
     simulations.par_iter().enumerate().for_each(|(idx, path)| {
-        let simulation  = Simulation::load(&path).unwrap();
-        let path        = &dump_directory.join(format!("{:08}.obj", idx));
-        let path_yaml   = dump_directory.join(format!("{:08}.yaml", idx));
-        let buffer      = &mut fs::File::create(path).unwrap();
+        let (simulation, _bubbler)= load(&path).unwrap();
+        let path = &dump_directory.join(format!("{:08}.obj", idx));
+        let path_yaml = dump_directory.join(format!("{:08}.yaml", idx));
+        let buffer = &mut fs::File::create(path).unwrap();
 
         let camera = &simulation.camera;
 

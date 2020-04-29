@@ -1,14 +1,8 @@
 extern crate nalgebra;
 extern crate serde;
 
-use std::fs::File;
-use std::io::{BufReader, BufWriter};
-use std::path::Path;
 use std::sync::RwLock;
 
-use flate2::Compression;
-use flate2::read::ZlibDecoder;
-use flate2::write::ZlibEncoder;
 use nalgebra::Vector3;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -464,23 +458,5 @@ impl Simulation
 
         self.debug_solid_collisions = collisions;
         dt
-    }
-
-    pub fn dump(&self, path: &Path) -> Result<(), std::io::Error> {
-        let buffer = BufWriter::new(File::create(path)?);
-        let encoder = ZlibEncoder::new(buffer, Compression::default());
-        serde_json::to_writer(encoder, self)?;
-
-        Ok(())
-    }
-
-    pub fn load(path: &Path) -> Result<Simulation, std::io::Error> {
-        let buffer = BufReader::new(File::open(path)?);
-        let decoder = ZlibDecoder::new(buffer);
-        let mut r: Simulation = serde_json::from_reader(decoder)?;
-
-        r.sync();
-
-        Ok(r)
     }
 }

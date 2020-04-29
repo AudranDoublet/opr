@@ -13,6 +13,7 @@ sph_scene = { path = "../scene" }
 sph = { path = "../sph" }
 raytracer = { path = "../raytracer" }
 mesher = { path = "../mesher" }
+bubbler = { path = "../bubbler" }
 
 rayon = "1.3.0"
 

@@ -5,11 +5,12 @@ use std::path::Path;
 
 use sph::Simulation;
 use sph_scene::Scene;
+use bubbler::bubbler::Bubbler;
+use sph_scene::simulation_loader::dump;
 
-fn dump_simulation(simulation: &Simulation, dump_folder: &Path, idx: usize) -> Result<(), Box<dyn std::error::Error>> {
+fn dump_simulation(simulation: &Simulation, bubbler: &Bubbler, dump_folder: &Path, idx: usize) -> Result<(), Box<dyn std::error::Error>> {
     let path = dump_folder.join(format!("{:08}.sim.bin", idx));
-    simulation.dump(&path)?;
-
+    dump(&path, simulation, bubbler)?;
     Ok(())
 }
 
@@ -20,6 +21,7 @@ pub fn pipeline_simulate(scene: &Scene, dump_folder: &Path) -> Result<(), Box<dy
     let fps = 1. / scene.simulation_config.fps;
 
     let mut fluid_simulation = scene.load()?;
+    let mut bubbler = Bubbler::new(scene.bubbler_config);
     let mut total_time = 0.0;
     let mut time_simulated_since_last_frame = fps;
 
@@ -36,12 +38,13 @@ pub fn pipeline_simulate(scene: &Scene, dump_folder: &Path) -> Result<(), Box<dy
 
     while total_time < max_time {
         if time_simulated_since_last_frame >= fps {
-            dump_simulation(&fluid_simulation, dump_folder, idx)?;
+            dump_simulation(&fluid_simulation, &bubbler, dump_folder, idx)?;
             time_simulated_since_last_frame = 0.;
             idx += 1;
         }
 
         time_simulated_since_last_frame += fluid_simulation.tick();
+        bubbler.tick(&fluid_simulation);
 
         let old = perc(total_time);
         total_time += fluid_simulation.get_time_step();

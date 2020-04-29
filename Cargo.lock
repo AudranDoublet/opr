@@ -1096,6 +1096,7 @@ dependencies = [
 name = "pipeline"
 version = "0.1.0"
 dependencies = [
+ "bubbler",
  "indicatif",
  "mesher",
  "nalgebra",
@@ -1631,14 +1632,12 @@ dependencies = [
 name = "sph"
 version = "0.1.0"
 dependencies = [
- "flate2",
  "mesher",
  "nalgebra",
  "rayon",
  "search",
  "serde",
  "serde_derive",
- "serde_json",
  "utils",
 ]
 
@@ -1647,10 +1646,12 @@ name = "sph_scene"
 version = "0.1.0"
 dependencies = [
  "bubbler",
+ "flate2",
  "image 0.23.2",
  "nalgebra",
  "serde",
  "serde_derive",
+ "serde_json",
  "serde_yaml",
  "sph",
  "utils",

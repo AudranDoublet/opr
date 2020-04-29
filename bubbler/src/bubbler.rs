@@ -1,6 +1,7 @@
 use std::ops::{Div};
 use std::sync::RwLock;
 
+use serde::{Deserialize, Serialize};
 use nalgebra::{RealField, Vector3};
 use rand::*;
 use rand::distributions::Uniform;
@@ -10,20 +11,27 @@ use sph::Simulation;
 use crate::config::BubblerConfig;
 use crate::diffuse_particle::{DiffuseParticle, DiffuseParticleType};
 
+#[derive(Deserialize, Serialize)]
 pub struct Bubbler {
+    #[serde(skip_serializing, skip_deserializing)]
     /// Bubbler Hyper Parameters
     hp: BubblerConfig,
 
+    #[serde(skip_serializing, skip_deserializing)]
     /// Time elapsed between the last and the current tick
     dt: f32,
 
     /// Store the likelihood of particles to trap air
+    #[serde(skip_serializing, skip_deserializing)]
     likelihood_ta: RwLock<Vec<f32>>,
     /// Store the likelihood of particles to be at the crest of a wave
+    #[serde(skip_serializing, skip_deserializing)]
     likelihood_wc: RwLock<Vec<f32>>,
     /// Store the likelihood of particles to generate diffuse material due to its kinematic energy
+    #[serde(skip_serializing, skip_deserializing)]
     likelihood_k: RwLock<Vec<f32>>,
 
+    #[serde(skip_serializing, skip_deserializing)]
     grad_densities: RwLock<Vec<Vector3<f32>>>,
 
     particles: Vec<DiffuseParticle>,

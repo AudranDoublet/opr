@@ -33,9 +33,6 @@ impl CubeVertices {
 }
 
 pub trait FluidSnapshot {
-    /// Returns an iterator over all particles of the fluid
-    fn particles(&self) -> Vec<VertexWorld>; //dyn std::iter::Iterator<Item=Vector3<f32>>;
-
     /// Returns the number of particles present in the snapshot
     fn len(&self) -> usize;
 

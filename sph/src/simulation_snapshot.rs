@@ -16,10 +16,6 @@ pub struct SimulationFluidSnapshot
 }
 
 impl FluidSnapshot for SimulationFluidSnapshot {
-    fn particles(&self) -> Vec<Vector3<f32>> {
-        self.particles.clone()
-    }
-
     fn len(&self) -> usize {
         self.particles.len()
     }

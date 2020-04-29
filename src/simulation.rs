@@ -11,6 +11,7 @@ use kiss3d::{camera::camera::Camera, scene::SceneNode};
 use nalgebra::{Point3, Translation3};
 use sph::Simulation;
 use sph_scene::Scene;
+use sph_scene::simulation_loader::dump;
 
 pub fn add_particles(range: std::ops::Range<usize>, dfsph: &Simulation, scene: &mut debug_renderer::scene::Scene) {
     let particles = &dfsph.positions.read().unwrap();
@@ -54,13 +55,14 @@ fn add_meshes(dfsph: &Simulation, config: &sph_scene::Scene, scene: &mut debug_r
     result
 }
 
-fn dump_simulation(simulation: &Simulation, dump_folder: &Path, idx: usize, verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
+fn dump_simulation(simulation: &Simulation, bubbler: &Bubbler, dump_folder: &Path, idx: usize, verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
     let path = dump_folder.join(format!("{:08}.sim.bin", idx));
     if verbose {
         println!("Dumping scene as `{:?}`", &path);
     }
     let now = Instant::now();
-    simulation.dump(&path)?;
+    dump(&path, simulation, bubbler)?;
+
     if verbose {
         println!("> `Simulation::dump()` elapsed time: {} s", now.elapsed().as_secs_f32());
     }
@@ -134,11 +136,6 @@ fn simulate(scene: &Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Resu
                     debug_renderer::event::Key::A => {
                         add_particles(scene.add_blocks(&mut fluid_simulation)?, &fluid_simulation, &mut renderer);
                     }
-                    debug_renderer::event::Key::D => {
-                        if !dump_all {
-                            dump_simulation(&fluid_simulation, dump_folder, frame_idx, true)?;
-                        }
-                    }
                     debug_renderer::event::Key::Y => {
                         show_collisions = !show_collisions;
                     }
@@ -185,7 +182,7 @@ fn simulate(scene: &Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Resu
         if !pause {
             if time_simulated_since_last_frame >= fps {
                 if dump_all {
-                    dump_simulation(&fluid_simulation, dump_folder, frame_idx, true)?;
+                    dump_simulation(&fluid_simulation, &bubbler, dump_folder, frame_idx, true)?;
                 }
 
                 time_simulated_since_last_frame = 0.;
@@ -195,11 +192,9 @@ fn simulate(scene: &Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Resu
             let prev = fluid_simulation.len();
             time_simulated_since_last_frame += fluid_simulation.tick();
             add_particles(prev..fluid_simulation.len(), &fluid_simulation, &mut renderer);
-            /*
             if bubbler.tick(&fluid_simulation) {
                 update_diffuse(&mut renderer, &bubbler);
             }
-            */
 
             let d_v_mean_sq = fluid_simulation.compute_vmean();
             let d_v_max_sq_deviation = fluid_simulation.compute_vmax().powi(2) / d_v_mean_sq;
