@@ -1,6 +1,7 @@
 extern crate rayon;
 extern crate serde_yaml;
 extern crate tobj;
+extern crate image_manipulation;
 
 use std::collections::HashMap;
 use std::error::Error;
@@ -404,11 +405,15 @@ impl Scene {
         }
     }
 
-    pub fn render(&mut self, width: usize, height: usize) -> Vec<Vector3<f32>> {
+    pub fn render(&mut self, width: usize, height: usize) -> image_manipulation::Image {
         self.camera.set_size(width as f32, height as f32);
 
-        (0..width * height).into_par_iter()
+        let pixels = (0..width * height).into_par_iter()
             .map(|i| self.cast_ray(self.camera.generate_ray((i % width) as f32, (i / width) as f32), 10, 0.0))
-            .collect()
+            .collect();
+
+        let sobel = image_manipulation::Image::from_vectors(&pixels, width, height).sobel(70);
+
+        image_manipulation::Image::from_vectors(&pixels, width, height)
     }
 }

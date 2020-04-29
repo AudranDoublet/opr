@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 use indicatif::{ProgressBar, ProgressStyle};
 use nalgebra::Vector3;
-use raytracer::{Light, write_image};
+use raytracer::{Light};
 use raytracer::scene_config::*;
 use sph_common::Camera;
 use sph_scene::Scene;
@@ -55,9 +55,8 @@ pub fn pipeline_render(scene: &Scene, input_directory: &Path, dump_directory: &P
 
         render_scene.build(12);
 
-        let pixels = render_scene.render(width, height);
-
-        write_image(&dump_directory.join(format!("{:08}.png", idx)), &pixels, width, height);
+        render_scene.render(width, height)
+                    .save(&dump_directory.join(format!("{:08}.png", idx)));
 
         pb.inc(1);
     }

@@ -2,7 +2,7 @@ use clap::ArgMatches;
 use std::path::Path;
 
 use std::time::Instant;
-use raytracer::{Scene, write_image};
+use raytracer::Scene;
 
 macro_rules! timeit {
     ($name:expr, $code:expr) => ({
@@ -28,7 +28,7 @@ pub fn main_render(args: &ArgMatches) -> Result<(), Box<dyn std::error::Error>> 
 
     timeit!("rendering", pixels = scene.render(result_width, result_height));
 
-    write_image(&Path::new("result.png"), &pixels, result_width, result_height);
+    pixels.save(&Path::new("result.png"));
 
     Ok(())
 }

@@ -17,3 +17,4 @@ serde_derive = ""
 cfg-if = ""
 
 search = { path = "../search" }
+image_manipulation = { path = "../image_manipulation" }

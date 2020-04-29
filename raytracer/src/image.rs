@@ -25,22 +25,3 @@ pub fn load_image(path: &Path) -> Result<(u32, u32, Vec<Vector3<f32>>), Box<dyn 
 
     Ok((width, height, result))
 }
-
-pub fn write_image(path: &Path, buff: &[Vector3<f32>], width: usize, height: usize)
-{
-    let mut buffer = vec!(0 as u8; width * height * 3);
-    let mut i = 0;
-
-    for v in buff
-    {
-        buffer[i] = (v.x * 255.0) as u8;
-        buffer[i + 1] = (v.y * 255.0) as u8;
-        buffer[i + 2] = (v.z * 255.0) as u8;
-        i += 3;
-    }
-
-    match image::save_buffer(path, &buffer, width as u32, height as u32, image::ColorType::Rgb8) {
-        Ok(_) => (),
-        err => panic!("can't save image: {:?}", err)
-    }
-}
