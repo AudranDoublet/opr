@@ -1,6 +1,8 @@
 use std::error::Error;
 use std::path::Path;
 
+use std::collections::HashMap;
+
 use crate::mesh::{Triangle, BoundingSphereHierarchy, tobj};
 use crate::{kernels, kernels::Kernel, GaussLegendre};
 use crate::DiscreteGrid;
@@ -73,6 +75,23 @@ impl Mesh
                 }
             }
 
+            let mut edges_normal: HashMap<(usize, usize), Vector3<f32>> = HashMap::new();
+
+            let edge = |a: usize, b: usize| (a.min(b), a.max(b));
+
+            for i in (0..mesh.indices.len()).step_by(3)
+            {
+                let a = mesh.indices[i + 0] as usize;
+                let b = mesh.indices[i + 1] as usize;
+                let c = mesh.indices[i + 2] as usize;
+
+                let normal = (vertices[b] - vertices[a]).cross(&(vertices[c] - vertices[a]));
+
+                for e in &[edge(a, b), edge(a, c), edge(b, c)] {
+                    edges_normal.insert(*e, edges_normal.get(e).unwrap_or(&Vector3::zeros()) + normal);
+                }
+            }
+
             for i in (0..mesh.indices.len()).step_by(3)
             {
                 let a = mesh.indices[i + 0] as usize;
@@ -86,6 +105,9 @@ impl Mesh
                                   vertices_normal[a].normalize(),
                                   vertices_normal[b].normalize(),
                                   vertices_normal[c].normalize(),
+                                  edges_normal[&edge(a, b)],
+                                  edges_normal[&edge(a, c)],
+                                  edges_normal[&edge(b, c)],
                 ));
             }
         }

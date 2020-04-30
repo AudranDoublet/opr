@@ -30,7 +30,7 @@ impl ExternalForce for BasicViscosityForce {
         let h = sim.kernel_radius();
         let h2 = sim.kernel_radius().powi(2) / 100.;
 
-        fluid.filter_m(sim, accelerations.par_iter_mut())
+        fluid.filter_m(false, sim, accelerations.par_iter_mut())
              .for_each(|(i, v)| {
                 *v += sim.neighbours_reduce_v(true, i, &|r, i, j| {
                     let vij = velocities[i] - velocities[j];

@@ -61,7 +61,7 @@ impl ElasticityForce {
         let lambda = self.youngs_modulus * self.poisson_ratio
                         / ((1. + self.poisson_ratio) * (1. - 2. * self.poisson_ratio));
 
-        let stress: Vec<Vector6<f32>> = fluid.filter_range(sim)
+        let stress: Vec<Vector6<f32>> = fluid.filter_range(true, sim)
                   .map(|i| {
                     let ci = fluid.correspondance(i);
                     let mut f = Matrix3::zeros();
@@ -96,7 +96,7 @@ impl ElasticityForce {
                     stress
                   }).collect();
 
-        fluid.filter_range(sim)
+        fluid.filter_range(true, sim)
             .map(|i| {
                 let mut force = Vector3::zeros();
                 let ci = fluid.correspondance(i);
@@ -122,14 +122,14 @@ impl ElasticityForce {
     fn compute_guess(&self, fluid: &Fluid, sim: &Simulation, accelerations: &Vec<Vector3<f32>>) -> Vec<Vector3<f32>> {
         let dt = sim.time_step();
 
-        fluid.filter(sim, sim.velocities.read().unwrap().par_iter())
+        fluid.filter(true, sim, sim.velocities.read().unwrap().par_iter())
             .map(|(i, v)| v + dt * accelerations[i])
             .collect()
     }
 
     // equation 1
     fn compute_l(&self, fluid: &Fluid, sim: &Simulation) -> Vec<Matrix3<f32>> {
-        fluid.filter_range(sim)
+        fluid.filter_range(true, sim)
             .map(|i| {
                 let mut result = Matrix3::zeros();
                 let ci = fluid.correspondance(i);
@@ -155,7 +155,7 @@ impl ElasticityForce {
         let positions = sim.positions.read().unwrap();
         let mut rotations = self.rotations.write().unwrap();
 
-        fluid.filter_m(sim, rotations.par_iter_mut())
+        fluid.filter_m(true, sim, rotations.par_iter_mut())
              .for_each(|(i, rotation)| {
                 let mut result = Matrix3::zeros();
                 let ci = fluid.correspondance(i);
@@ -196,7 +196,7 @@ impl ElasticityForce {
         let lambda = self.youngs_modulus * self.poisson_ratio
                         / ((1. + self.poisson_ratio) * (1. - 2. * self.poisson_ratio));
 
-        let (f, stress): (Vec<Matrix3<f32>>, Vec<Vector6<f32>>) = fluid.filter_range(sim)
+        let (f, stress): (Vec<Matrix3<f32>>, Vec<Vector6<f32>>) = fluid.filter_range(true, sim)
                   .map(|i| {
                     let ci = fluid.correspondance(i);
 
@@ -232,8 +232,12 @@ impl ElasticityForce {
                     (f, stress)
                   }).unzip();
 
-        fluid.filter_m(sim, accelerations.par_iter_mut())
+        fluid.filter_m(true, sim, accelerations.par_iter_mut())
             .map(|(i, acc)| {
+                if sim.fixed[i] {
+                    return Vector3::zeros();
+                }
+
                 let ci = fluid.correspondance(i);
                 let mut force = Vector3::zeros();
 
@@ -290,13 +294,13 @@ impl ExternalForce for ElasticityForce {
         let positions = sim.positions.read().unwrap();
 
         // compute initial fluid neighbours
-        self.neighbours_0 = fluid.filter_range(sim)
+        self.neighbours_0 = fluid.filter_range(true, sim)
                                           .map(|i| sim.neighbours_same_phase(i))
                                           .collect();
 
-        self.positions_0 = fluid.filter(sim, positions.par_iter()).map(|(_, v)| *v).collect();
+        self.positions_0 = fluid.filter(true, sim, positions.par_iter()).map(|(_, v)| *v).collect();
 
-        self.rest_volumes = fluid.filter_range(sim)
+        self.rest_volumes = fluid.filter_range(true, sim)
                                           .map(|i| sim.mass(i) / self.compute_particle_density(&positions, sim, i))
                                           .collect();
 
@@ -318,7 +322,7 @@ impl ExternalForce for ElasticityForce {
         );
 
         let velocities = sim.velocities.read().unwrap();
-        fluid.filter_m(sim, accelerations.par_iter_mut())
+        fluid.filter_m(false, sim, accelerations.par_iter_mut())
              .for_each(|(i, a)| *a += (result[fluid.correspondance(i)] - velocities[i]) / dt);
 
         Some(sim.compute_cfl(&result).1)

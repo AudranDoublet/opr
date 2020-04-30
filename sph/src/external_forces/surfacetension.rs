@@ -33,14 +33,14 @@ impl ExternalForce for SurfaceTensionForce {
         let h = sim.kernel_radius();
 
         let mut normals = vec![Vector3::zeros(); positions.len()];
-        fluid.filter_m(sim, normals.par_iter_mut())
+        fluid.filter_m(true, sim, normals.par_iter_mut())
              .for_each(|(i, v)| {
                 *v = h * sim.neighbours_reduce_v(true, i, &|r, i, j| {
                     r + sim.mass(j) / densities[j] * sim.gradient(positions[i], positions[j])
                 });
             });
 
-        fluid.filter_m(sim, accelerations.par_iter_mut())
+        fluid.filter_m(false, sim, accelerations.par_iter_mut())
              .for_each(|(i, v)| {
                 // cohesion & curvature
                 *v += sim.neighbours_reduce_v(true, i, &|r, i, j| {
@@ -55,7 +55,7 @@ impl ExternalForce for SurfaceTensionForce {
                         accel -= self.surface_tension * sim.mass(j) * (xij / norm) * self.cohesion_kernel.apply_on_norm(norm);
                     }
 
-                    accel -= (normals[i] - normals[j]) * self.surface_tension;
+                    accel -= (normals[fluid.correspondance(i)] - normals[fluid.correspondance(j)]) * self.surface_tension;
 
                     r + accel * kij
                 });

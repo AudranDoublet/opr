@@ -39,7 +39,6 @@ pub struct Configuration
 {
     #[serde(default = "default_gravity")]
     pub gravity: [f32; 3],
-    pub kernel_radius: f32,
     pub particle_radius: f32,
 }
 

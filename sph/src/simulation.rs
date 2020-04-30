@@ -59,6 +59,9 @@ pub struct Simulation
     pub camera: Camera,
 
     #[serde(skip_serializing, skip_deserializing)]
+    pub fixed: Vec<bool>,
+
+    #[serde(skip_serializing, skip_deserializing)]
     pub fluid_types: Vec<Fluid>,
 
     #[serde(skip_serializing, skip_deserializing)]
@@ -143,6 +146,8 @@ impl Simulation
 
             len: 0,
 
+            fixed: Vec::new(),
+
             neighbours_struct: HashGrid::new(kernel_radius),
             accelerations: RwLock::new(Vec::new()),
             velocities: RwLock::new(Vec::new()),
@@ -198,7 +203,7 @@ impl Simulation
         *self.time_step.read().unwrap()
     }
 
-    pub fn add_particle_with_velocity(&mut self, fluid_type: usize, position: Vector3<f32>, velocity: Vector3<f32>)
+    pub fn add_particle_with_velocity(&mut self, fixed: bool, fluid_type: usize, position: Vector3<f32>, velocity: Vector3<f32>)
     {
         for solid in &self.solids {
             if solid.is_particle_inside(&position, self.particle_radius) {
@@ -206,6 +211,7 @@ impl Simulation
             }
         }
 
+        self.fixed.push(fixed);
         self.particles_fluid_type.push(fluid_type);
 
         self.positions.write().unwrap().push(position);
@@ -217,7 +223,7 @@ impl Simulation
 
     pub fn add_particle(&mut self, fluid_type: usize, x: f32, y: f32, z: f32)
     {
-        self.add_particle_with_velocity(fluid_type, Vector3::new(x, y, z), Vector3::zeros());
+        self.add_particle_with_velocity(false, fluid_type, Vector3::new(x, y, z), Vector3::zeros());
     }
 
     pub fn gradient(&self, i: Vector3<f32>, j: Vector3<f32>) -> Vector3<f32> {
@@ -478,7 +484,7 @@ impl Simulation
             .flatten().collect();
 
         for (t, p, v) in particles {
-            self.add_particle_with_velocity(t, p, v);
+            self.add_particle_with_velocity(false, t, p, v);
         }
 
         self.debug_solid_collisions = collisions;

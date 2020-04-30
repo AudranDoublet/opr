@@ -58,7 +58,7 @@ impl ExternalForce for DragForce {
         // equation 8
         let y_coeff = (C_F * wei * c_def) / (C_K * C_B);
 
-        fluid.filter_m(sim, accelerations.par_iter_mut())
+        fluid.filter_m(false, sim, accelerations.par_iter_mut())
              .for_each(|(i, v)| {
                 let vi_rel = self.air_velocity - velocities[i];
                 let vi_rel_norm_sq = vi_rel.norm_squared();

@@ -45,7 +45,7 @@ impl ExternalForce for VorticityForce {
         let mut ang_velocity = self.ang_velocity.write().unwrap();
         *ang_velocity = vec![Vector3::zeros(); sim.len()];
 
-        fluid.filter_mt(sim, accelerations.par_iter_mut().zip(ang_velocity.par_iter_mut()))
+        fluid.filter_mt(false, sim, accelerations.par_iter_mut().zip(ang_velocity.par_iter_mut()))
           .for_each(|(i, (a, ang_vel))| {
             *a += sim.neighbours_reduce_v(true, i, &|r, _, j| {
                 let omegaij = omegas.get(i).unwrap_or(&Vector3::zeros()) - omegas.get(j).unwrap_or(&Vector3::zeros());
