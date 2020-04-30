@@ -9,6 +9,7 @@ use crate::*;
 pub struct ObjectConfig
 {
     pub path: String,
+    pub override_material: Option<String>,
     pub rotation: Vector3<f32>,
     pub position: Vector3<f32>,
     pub scale: Vector3<f32>,

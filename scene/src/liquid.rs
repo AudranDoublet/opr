@@ -101,6 +101,7 @@ impl LiquidZone
                     dynamic: false,
                     particle_size: 1000.0,
                     slice: *slice,
+                    material: None
                 };
 
                 let solid = solid.load(config)?;

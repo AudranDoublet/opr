@@ -122,7 +122,7 @@ impl Scene {
 
         for obj in file.objects {
             let r = UnitQuaternion::from_euler_angles(obj.rotation.x, obj.rotation.y, obj.rotation.z);
-            scene.load_obj(Path::new(&obj.path), obj.position, r, obj.scale)?;
+            scene.load_obj(Path::new(&obj.path), obj.position, r, obj.scale, obj.override_material)?;
         }
 
         for mut light in file.lights {
@@ -174,9 +174,13 @@ impl Scene {
         Ok(result)
     }
 
-    pub fn load_obj(&mut self, path: &Path, position: Vector3<f32>, rotation: UnitQuaternion<f32>, scale: Vector3<f32>) -> Result<(), Box<dyn Error>> {
+    pub fn load_obj(&mut self, path: &Path, position: Vector3<f32>, rotation: UnitQuaternion<f32>, scale: Vector3<f32>, override_material: Option<String>) -> Result<(), Box<dyn Error>> {
         let root = path.parent().ok_or("bad path")?;
         let (models, materials) = tobj::load_obj(path)?;
+
+        let override_material_id = if let Some(material_path) = override_material {
+            Some(self.load_mtl(Path::new(&material_path))?[0])
+        } else { None };
 
         let mat_id_app = self.materials.len();
 
@@ -203,10 +207,10 @@ impl Scene {
         for model in models.iter()
         {
             let mesh = &model.mesh;
-            let mat_id = if let Some(mat) = mesh.material_id {
-                mat + mat_id_app
-            } else {
-                0
+            let mat_id = if let Some(id) = override_material_id {id} else {
+                if let Some(mat) = mesh.material_id {
+                    mat + mat_id_app
+                } else { 0 }
             };
 
             let mut vertices = vec![];

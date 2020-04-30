@@ -9,7 +9,7 @@ pub struct DiffuseParticle {
     pub kind: DiffuseParticleType,
 }
 
-#[derive(Copy, Clone, Serialize, Deserialize)]
+#[derive(Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub enum DiffuseParticleType {
     Spray,
     Foam,

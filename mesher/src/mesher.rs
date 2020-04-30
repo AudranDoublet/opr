@@ -27,7 +27,7 @@ impl Mesher {
         }
     }
 
-    fn compute_density_at(&self, snapshot: &Box<dyn FluidSnapshot>, x: &VertexWorld) -> f32 {
+    fn compute_density_at(&self, snapshot: &impl FluidSnapshot, x: &VertexWorld) -> f32 {
         let kernel = snapshot.get_kernel();
 
         let f_approx_density = |j: usize| {
@@ -68,12 +68,12 @@ impl Mesher {
         nalgebra::convert::<VertexLocal, VertexWorld>(point.clone()) * self.cube_size
     }
 
-    fn get_cube_density(&self, snapshot: &Box<dyn FluidSnapshot>, cache_densities: &mut HashMap<VertexLocal, f32>, x_local: &VertexLocal, x_world: &VertexWorld) -> f32 {
+    fn get_cube_density(&self, snapshot: &impl FluidSnapshot, cache_densities: &mut HashMap<VertexLocal, f32>, x_local: &VertexLocal, x_world: &VertexWorld) -> f32 {
         *cache_densities.entry(*x_local)
             .or_insert_with(|| self.compute_density_at(snapshot, x_world))
     }
 
-    fn generate_cube_vertices(&mut self, snapshot: &Box<dyn FluidSnapshot>, cache_densities: &mut HashMap<VertexLocal, f32>,
+    fn generate_cube_vertices(&mut self, snapshot: &impl FluidSnapshot, cache_densities: &mut HashMap<VertexLocal, f32>,
                               local: &VertexLocal) -> CubeVertices {
         let vertices_local = [
             local + VertexLocal::new(-1, 0, 0),   // 0
@@ -110,7 +110,7 @@ impl Mesher {
         index
     }
 
-    fn compute_mesh(&mut self, snapshot: &Box<dyn FluidSnapshot>) -> Mesh {
+    fn compute_mesh(&mut self, snapshot: &impl FluidSnapshot) -> Mesh {
         let (borders, cell_discretization) = snapshot.get_borders();
 
         let iso_value = self.iso_value;
@@ -166,23 +166,13 @@ impl Mesher {
         )
     }
 
-    fn get_anisotropic_kernel_radius(&self, snapshot_provider: &impl FluidSnapshotProvider) -> Option<f32> {
-        if self.anisotropicator.is_some() {
-            Some(Anisotropicator::compute_radius(snapshot_provider.radius()))
-        } else {
-            None
-        }
-    }
-
-    fn update_anisotropicator(&mut self, snapshot: &Box<dyn FluidSnapshot>) {
+    fn update_anisotropicator(&mut self, snapshot: &impl FluidSnapshot) {
         if let Some(ref mut anisotropicator) = self.anisotropicator {
             anisotropicator.precompute_positions(snapshot);
         }
     }
 
-    pub fn convert_into_obj(&mut self, snapshot_provider: &impl FluidSnapshotProvider, writer: &mut impl std::io::Write) {
-        let an_radius = self.get_anisotropic_kernel_radius(snapshot_provider);
-        let snapshot = &snapshot_provider.snapshot(snapshot_provider.radius(), an_radius);
+    pub fn convert_into_obj(&mut self, snapshot: &impl FluidSnapshot, writer: &mut impl std::io::Write) {
         self.update_anisotropicator(snapshot);
 
         let mesh = self.compute_mesh(snapshot);

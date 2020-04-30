@@ -15,7 +15,7 @@ bubbler = { path = "../bubbler" }
 flate2 = { version = "*", features = ["cloudflare_zlib"], default-features = false }
 
 nalgebra = "0.20.0"
-serde = {version = "1.0.105", features = ["derive"]}
+serde = {version = "1.0.105"}
 serde_json = "1.0.48"
 serde_yaml = "0.8.11"
 serde_derive = "1.0.105"

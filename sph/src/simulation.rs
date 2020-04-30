@@ -5,19 +5,14 @@ use std::sync::RwLock;
 
 use nalgebra::Vector3;
 use rayon::prelude::*;
+use search::HashGrid;
 use serde::{Deserialize, Serialize};
+use utils::kernels::{CubicSpine, Kernel};
 
 use crate::{Animation, Camera, Emitter};
-use crate::RigidObject;
-use utils::kernels::{Kernel, CubicSpine};
-use mesher::types::{FluidSnapshot, FluidSnapshotProvider};
-
-use crate::SimulationFluidSnapshot;
-
 use crate::Fluid;
 use crate::pressure_solver::*;
-
-use search::HashGrid;
+use crate::RigidObject;
 
 fn default_pressure_solver() -> RwLock<Box<dyn PressureSolver + Send + Sync>> {
     RwLock::new(DFSPH::new())
@@ -74,34 +69,6 @@ pub struct Simulation
 
     #[serde(skip_serializing, skip_deserializing)]
     neighbours_struct: HashGrid,
-}
-
-impl FluidSnapshotProvider for Simulation {
-    fn radius(&self) -> f32 {
-        self.kernel.radius()
-    }
-
-    fn snapshot(&self, kernel_radius: f32, anisotropic_radius: Option<f32>) -> Box<dyn FluidSnapshot> {
-        let particles = self.positions.read().unwrap().clone();
-        let densities = self.density.read().unwrap().clone();
-        let mut neighbours_struct = HashGrid::new(kernel_radius);
-        neighbours_struct.insert(&particles);
-
-        let anisotropic_neighbours = if let Some(an_radius) = anisotropic_radius {
-            let mut an_grid = HashGrid::new(an_radius);
-            an_grid.insert(&particles); // that is sad :(
-            an_grid.find_all_neighbours(&particles)
-        } else { vec![] };
-
-        Box::new(SimulationFluidSnapshot {
-            particles,
-            densities,
-            neighbours_struct,
-            anisotropic_neighbours,
-            kernel: CubicSpine::new(self.kernel.radius()),
-            mass: self.mass(0),
-        })
-    }
 }
 
 impl Simulation
@@ -180,7 +147,7 @@ impl Simulation
         &self.solids[i]
     }
 
-    pub fn debug_get_solid_collisions (&self) -> &Vec<Vector3<f32>> {
+    pub fn debug_get_solid_collisions(&self) -> &Vec<Vector3<f32>> {
         self.debug_solid_collisions.as_ref()
     }
 
@@ -453,7 +420,7 @@ impl Simulation
         let mut collisions = vec![];
 
         for i in 0..self.solids.len() {
-            for j in i+1..self.solids.len() {
+            for j in i + 1..self.solids.len() {
                 collisions.par_extend(self.solids[i].collide(&self.solids[j]));
             }
         }

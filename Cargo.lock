@@ -1102,8 +1102,10 @@ dependencies = [
  "nalgebra",
  "rayon",
  "raytracer",
+ "search",
  "sph",
  "sph_scene",
+ "utils",
 ]
 
 [[package]]

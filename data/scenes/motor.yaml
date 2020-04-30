@@ -2,10 +2,15 @@ config:
     particle_radius: 0.02
 fluids:
     water:
-        density: 1000.
-bubbler_config:
+        material: data/materials/blue.mtl
+        simulation:
+            density: 1000.
+        meshing:
+            cube_size: 0.04
+bubbler:
     lifetime: [0.6, 2.4]
     k_b: 1.4
+
 solids:
     - mesh: objects/box.obj
       density: 1000

@@ -64,7 +64,7 @@ impl Anisotropicator {
         2. * kernel_radius
     }
 
-    fn init_kernels_centers(&mut self, snapshot: &Box<dyn FluidSnapshot>) {
+    fn init_kernels_centers(&mut self, snapshot: &impl FluidSnapshot) {
         let kernel = snapshot.get_kernel();
 
         self.kernel_radius_inv = 1. / kernel.radius();
@@ -94,7 +94,7 @@ impl Anisotropicator {
         }
     }
 
-    fn compute_covariance_matrix(&self, snapshot: &Box<dyn FluidSnapshot>, i: usize) -> Matrix3<f32> {
+    fn compute_covariance_matrix(&self, snapshot: &impl FluidSnapshot, i: usize) -> Matrix3<f32> {
         let mut c = Matrix3::zeros();
         let x_w_i = &self.weighted_means[i];
 
@@ -131,11 +131,11 @@ impl Anisotropicator {
         self.smoothed_positions[i]
     }
 
-    pub fn precompute_positions(&mut self, snapshot: &Box<dyn FluidSnapshot>) {
+    pub fn precompute_positions(&mut self, snapshot: &impl FluidSnapshot) {
         self.init_kernels_centers(snapshot);
     }
 
-    pub fn compute_anisotropy(&self, snapshot: &Box<dyn FluidSnapshot>, i: usize) -> Matrix3<f32> {
+    pub fn compute_anisotropy(&self, snapshot: &impl FluidSnapshot, i: usize) -> Matrix3<f32> {
         self.kernel_radius_inv * if snapshot.neighbours_anisotropic_kernel(i).len() < self.cst_min_nb_neighbours {
             Matrix3::identity() * (1. / self.cst_kn)
         } else {

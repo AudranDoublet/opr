@@ -20,10 +20,12 @@ pub fn main_polygonization(args: &ArgMatches) -> Result<(), Box<dyn std::error::
 
     let mut scene_c = sph_scene::load_scene(scene_file)?;
 
-    scene_c.meshing_config.fluid.enable_anisotropication = !disable_anisotropication;
-    scene_c.meshing_config.fluid.enable_interpolation = !disable_interpolation;
-    scene_c.meshing_config.fluid.iso_value = cst_meshing_iso_value;
-    scene_c.meshing_config.fluid.cube_size = cst_meshing_cube_size;
+    for (_, conf) in &mut scene_c.fluids {
+        conf.meshing.enable_anisotropication = !disable_anisotropication;
+        conf.meshing.enable_interpolation = !disable_interpolation;
+        conf.meshing.iso_value = cst_meshing_iso_value;
+        conf.meshing.cube_size = cst_meshing_cube_size;
+    }
 
     pipeline::polygonize::pipeline_polygonize(&scene_c, dump_directory, output_directory)
 }

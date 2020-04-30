@@ -6,10 +6,10 @@ use std::path::Path;
 
 use bubbler::config::BubblerConfig;
 use nalgebra::Vector3;
-use serde_derive::*;
+use serde::{Deserialize};
 use sph::{Animation, Emitter, Fluid, RigidObject, Simulation};
 
-use crate::{EmitterConfig, FluidConfiguration, LiquidZone, Solid};
+use crate::{EmitterConfig, FluidConfiguration, FluidConfigurationMeshing, LiquidZone, Solid};
 
 fn default_gravity() -> [f32; 3] {
     [0.0, -9.81, 0.0]
@@ -39,7 +39,6 @@ pub struct Configuration
 {
     #[serde(default = "default_gravity")]
     pub gravity: [f32; 3],
-    pub kernel_radius: f32,
     pub particle_radius: f32,
 }
 
@@ -48,7 +47,8 @@ pub struct SimulationConfig
 {
     pub max_time: f32,
     pub fps: f32,
-    pub with_bubbler: bool,
+    #[serde(default)]
+    pub enable_bubbler: bool,
 }
 
 impl Default for SimulationConfig {
@@ -56,7 +56,7 @@ impl Default for SimulationConfig {
         SimulationConfig {
             max_time: 4.,
             fps: 24.,
-            with_bubbler: false,
+            enable_bubbler: false,
         }
     }
 }
@@ -76,9 +76,13 @@ pub struct RenderConfig {
 }
 
 fn render_conf_default_fps() -> f32 { -1. }
+
 fn render_conf_default_resolution() -> (usize, usize) { (512, 512) }
+
 fn render_conf_default_build_max_def() -> u32 { 12 }
+
 fn render_conf_default_max_rec() -> u8 { 10 }
+
 fn render_conf_default_aa_max_sample() -> usize { 16 }
 
 impl Default for RenderConfig {
@@ -91,63 +95,6 @@ impl Default for RenderConfig {
             aa_max_sample: render_conf_default_aa_max_sample(),
         }
     }
-}
-
-#[derive(Debug, Deserialize)]
-pub struct MeshingConfigAnisotropication {
-    pub smoothness: f32,
-    pub min_nb_neighbours: usize,
-    pub kr: f32,
-    pub ks: f32,
-    pub kn: f32,
-}
-
-impl Default for MeshingConfigAnisotropication {
-    fn default() -> Self {
-        MeshingConfigAnisotropication {
-            smoothness: 0.9,
-            min_nb_neighbours: 5,
-            kr: 8.,
-            ks: 1400.,
-            kn: 0.5,
-        }
-    }
-}
-
-#[derive(Debug, Deserialize)]
-pub struct MeshingConfigParameters
-{
-    pub iso_value: f32,
-    pub cube_size: f32,
-    pub enable_interpolation: bool,
-    pub enable_anisotropication: bool,
-    #[serde(default)]
-    pub anisotropication_config: MeshingConfigAnisotropication,
-}
-
-impl Default for MeshingConfigParameters {
-    fn default() -> Self {
-        MeshingConfigParameters {
-            iso_value: 0.05,
-            cube_size: 0.04,
-            enable_interpolation: true,
-            enable_anisotropication: true,
-            anisotropication_config: Default::default(),
-        }
-    }
-}
-
-#[derive(Debug, Deserialize, Default)]
-pub struct MeshingConfig
-{
-    #[serde(default)]
-    pub fluid: MeshingConfigParameters,
-    #[serde(default)]
-    pub foam: MeshingConfigParameters,
-    #[serde(default)]
-    pub bubble: MeshingConfigParameters,
-    #[serde(default)]
-    pub spray: MeshingConfigParameters,
 }
 
 #[derive(Debug)]
@@ -169,6 +116,52 @@ impl Default for CommandLineConfiguration {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct BubblerFluidConfiguration {
+    #[serde(default = "bubbler_fluid_conf_default_density")]
+    pub density: f32,
+    #[serde(default = "bubbler_fluid_conf_default_mass")]
+    pub mass: f32,
+    #[serde(default = "bubbler_fluid_conf_default_debug_color")]
+    pub debug_color: Vector3<f32>,
+    #[serde(default = "bubbler_fluid_conf_default_kernel_radius")]
+    pub kernel_radius: f32,
+    #[serde(default)]
+    pub material: Option<String>,
+    #[serde(default)]
+    pub meshing: FluidConfigurationMeshing,
+}
+
+impl Default for BubblerFluidConfiguration {
+    fn default() -> Self {
+        BubblerFluidConfiguration {
+            density: bubbler_fluid_conf_default_density(),
+            mass: bubbler_fluid_conf_default_mass(),
+            debug_color: bubbler_fluid_conf_default_debug_color(),
+            kernel_radius: bubbler_fluid_conf_default_kernel_radius(),
+            material: None,
+            meshing: Default::default(),
+        }
+    }
+}
+
+fn bubbler_fluid_conf_default_density() -> f32 { 1. }
+fn bubbler_fluid_conf_default_mass() -> f32 { 1. }
+fn bubbler_fluid_conf_default_debug_color() -> Vector3<f32> { Vector3::new(1., 1., 1.) }
+fn bubbler_fluid_conf_default_kernel_radius() -> f32 { 4. * 0.02 }
+
+#[derive(Debug, Deserialize)]
+pub struct SceneBubblerConfiguration {
+    #[serde(default)]
+    pub config: BubblerConfig,
+    #[serde(default)]
+    pub foam: BubblerFluidConfiguration,
+    #[serde(default)]
+    pub spray: BubblerFluidConfiguration,
+    #[serde(default)]
+    pub bubble: BubblerFluidConfiguration,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct Scene
 {
     #[serde(skip_deserializing)]
@@ -176,13 +169,10 @@ pub struct Scene
     #[serde(default)]
     pub simulation_config: SimulationConfig,
     #[serde(default)]
-    pub meshing_config: MeshingConfig,
-    #[serde(default)]
     pub render_config: RenderConfig,
     #[serde(default)]
     pub camera: CameraConfiguration,
-    #[serde(default)]
-    pub bubbler_config: BubblerConfig,
+    pub bubbler: SceneBubblerConfiguration,
     pub config: Configuration,
     pub fluids: HashMap<String, FluidConfiguration>,
     pub solids: Vec<Solid>,
@@ -308,7 +298,7 @@ impl Scene
 
 pub fn load_scene(name: &str) -> Result<Scene, Box<dyn std::error::Error>> {
     let result: Scene = serde_yaml::from_reader(&File::open(name)?)?;
-    result.bubbler_config.assert_valid();
+    result.bubbler.config.assert_valid();
 
     Ok(result)
 }

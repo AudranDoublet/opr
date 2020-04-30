@@ -21,7 +21,7 @@ pub fn pipeline_simulate(scene: &Scene, dump_folder: &Path) -> Result<(), Box<dy
     let fps = 1. / scene.simulation_config.fps;
 
     let mut fluid_simulation = scene.load()?;
-    let mut bubbler = Bubbler::new(scene.bubbler_config);
+    let mut bubbler = Bubbler::new(scene.bubbler.config);
     let mut total_time = 0.0;
     let mut time_simulated_since_last_frame = fps;
 
@@ -44,7 +44,9 @@ pub fn pipeline_simulate(scene: &Scene, dump_folder: &Path) -> Result<(), Box<dy
         }
 
         time_simulated_since_last_frame += fluid_simulation.tick();
-        bubbler.tick(&fluid_simulation);
+        if scene.simulation_config.enable_bubbler {
+            bubbler.tick(&fluid_simulation);
+        }
 
         let old = perc(total_time);
         total_time += fluid_simulation.get_time_step();

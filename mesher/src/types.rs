@@ -57,10 +57,3 @@ pub trait FluidSnapshot {
 
     fn get_borders(&self) -> (Vec<VertexWorld>, f32);
 }
-
-
-pub trait FluidSnapshotProvider {
-    fn radius(&self) -> f32;
-    fn snapshot(&self, radius: f32, anisotropic_radius: Option<f32>) -> Box<dyn FluidSnapshot>;
-}
-

@@ -9,9 +9,9 @@ use bubbler::diffuse_particle::DiffuseParticleType;
 use clap::ArgMatches;
 use kiss3d::{camera::camera::Camera, scene::SceneNode};
 use nalgebra::{Point3, Translation3};
-use sph::Simulation;
 use sph_scene::Scene;
 use sph_scene::simulation_loader::dump;
+use sph::Simulation;
 
 pub fn add_particles(range: std::ops::Range<usize>, dfsph: &Simulation, scene: &mut debug_renderer::scene::Scene) {
     let particles = &dfsph.positions.read().unwrap();
@@ -96,7 +96,7 @@ fn update_diffuse(renderer: &mut debug_renderer::scene::Scene, bubbler: &Bubbler
 
 fn simulate(scene: &Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Result<(), Box<dyn std::error::Error>> {
     let mut fluid_simulation = scene.load()?;
-    let mut bubbler = Bubbler::new(scene.bubbler_config);
+    let mut bubbler = Bubbler::new(scene.bubbler.config);
     let mut total_time = 0.0;
     let mut time_simulated_since_last_frame = fps;
     let mut display_high_speed_only = false;
@@ -192,7 +192,7 @@ fn simulate(scene: &Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Resu
             let prev = fluid_simulation.len();
             time_simulated_since_last_frame += fluid_simulation.tick();
             add_particles(prev..fluid_simulation.len(), &fluid_simulation, &mut renderer);
-            if bubbler.tick(&fluid_simulation) {
+            if scene.simulation_config.enable_bubbler && bubbler.tick(&fluid_simulation) {
                 update_diffuse(&mut renderer, &bubbler);
             }
 

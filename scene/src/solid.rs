@@ -30,6 +30,9 @@ pub struct Solid {
     pub density: f32,
     pub resolution: [u32; 3],
 
+    #[serde(default)]
+    pub material: Option<String>,
+
     #[serde(default = "particle_size")]
     pub particle_size: f32,
 
