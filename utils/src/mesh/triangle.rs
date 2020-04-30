@@ -9,25 +9,13 @@ pub struct Triangle
     pub v1_normal: Vector3<f32>,
     pub v2_normal: Vector3<f32>,
     pub v3_normal: Vector3<f32>,
+    pub e1_normal: Vector3<f32>,
+    pub e2_normal: Vector3<f32>,
+    pub e3_normal: Vector3<f32>,
 }
 
 impl Triangle
 {
-    pub fn new_no_normals(v1: Vector3<f32>, v2: Vector3<f32>, v3: Vector3<f32>) -> Triangle
-    {
-        //let normal = (v3 - v1).cross(&(v2 - v1));
-        let normal = (v2 - v1).cross(&(v3 - v1));
-
-        Triangle {
-            v1: v1,
-            v2: v2,
-            v3: v3,
-            v1_normal: normal,
-            v2_normal: normal,
-            v3_normal: normal,
-        }
-    }
-
     pub fn mean(&self, coord: usize) -> f32 {
         let coord = coord % 3;
         (*self.v1.index(coord) + *self.v2.index(coord) + *self.v3.index(coord)) / 3.0
@@ -56,7 +44,8 @@ impl Triangle
     }
 
     pub fn new(v1: Vector3<f32>, v2: Vector3<f32>, v3: Vector3<f32>,
-               v1_normal: Vector3<f32>, v2_normal: Vector3<f32>, v3_normal: Vector3<f32>) -> Triangle
+               v1_normal: Vector3<f32>, v2_normal: Vector3<f32>, v3_normal: Vector3<f32>,
+               e1_normal: Vector3<f32>, e2_normal: Vector3<f32>, e3_normal: Vector3<f32>) -> Triangle
     {
         Triangle {
             v1: v1,
@@ -65,6 +54,9 @@ impl Triangle
             v1_normal: v1_normal,
             v2_normal: v2_normal,
             v3_normal: v3_normal,
+            e1_normal: e1_normal,
+            e2_normal: e2_normal,
+            e3_normal: e3_normal,
         }
     }
 
@@ -170,6 +162,30 @@ impl Triangle
         }
     }
 
+    pub fn normal(&self, s: f32, t: f32) -> Vector3<f32> {
+        let eq = |a: f32, b: f32| (a - b).abs() < 1e-5;
+
+        assert!(s + t < 1. + 1e-5);
+
+        if eq(s, 0.0) {
+            if eq(t, 0.0) {
+                self.v1_normal
+            } else if eq(t, 1.0) {
+                self.v3_normal
+            } else {
+                self.e2_normal
+            }
+        } else if eq(s, 1.0) {
+            self.v2_normal
+        } else if eq(t, 0.0) {
+            self.e1_normal
+        } else if eq(s + t, 1.0) {
+            self.e3_normal
+        } else {
+            self.v1_normal + self.v2_normal + self.v3_normal
+        }
+    }
+
     /**
      * Compute signed minimal distance between a point and a triangle
      *
@@ -184,7 +200,8 @@ impl Triangle
         let diff = p - nearest;
 
         let distance = diff.norm_squared();
-        let sign = match self.smoothed_normal(s, t).dot(&diff) {
+
+        let sign = match self.normal(s, t).dot(&diff) {
             v if v >= 0. => 1.0,
             _ => -1.0,
         };

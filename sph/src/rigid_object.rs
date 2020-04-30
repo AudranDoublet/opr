@@ -96,8 +96,13 @@ impl RigidObject
         res
     }
 
-    pub fn to_particles(&self, radius: f32) -> Vec<Vector3<f32>> {
-        let (min, max) = self.grid.get_domain_definition();
+    pub fn to_particles(&self, kr: f32, radius: f32) -> Vec<Vector3<f32>> {
+        let (&min, &max) = self.grid.get_domain_definition();
+        let kr = Vector3::new(kr, kr, kr);
+
+        let min = min + 2. * kr;
+        let max = max - 2. * kr;
+
         let step = (max - min) / radius;
 
         let mut res = vec![];
@@ -121,7 +126,7 @@ impl RigidObject
 
     pub fn to_particle_tree(&self, radius: f32) -> BVH<Sphere> {
         BVH::build(
-            &self.to_particles(radius).iter()
+            &self.to_particles(0.0, radius).iter()
                 .map(|p| Sphere::new(p, radius))
                 .collect()
         )

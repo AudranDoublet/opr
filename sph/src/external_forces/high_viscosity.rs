@@ -36,7 +36,7 @@ impl ViscosityWeiler2018Force {
         let h = sim.kernel_radius();
         let h2 = sim.kernel_radius().powi(2) / 100.;
 
-        fluid.filter_range(sim).map(|i| {
+        fluid.filter_range(true, sim).map(|i| {
             let mut result = sim.neighbours_reduce_v(true, i, &|r, i, j| {
                 let xij = positions[i] - positions[j];
                 let vij = vec[fluid.correspondance(i)] - vec[fluid.correspondance(j)];
@@ -90,7 +90,7 @@ impl ViscosityWeiler2018Force {
         let h = sim.kernel_radius();
         let h2 = sim.kernel_radius().powi(2) / 100.;
 
-        fluid.filter(sim, positions.par_iter()).map(|(i, xi)| {
+        fluid.filter(true, sim, positions.par_iter()).map(|(i, xi)| {
             let mut result = sim.neighbours_reduce(true, i, Matrix3::zeros(), &|r, _, j| {
                 let xij = *xi - positions[j];
 
@@ -133,7 +133,7 @@ impl ViscosityWeiler2018Force {
     fn compute_guess(&self, fluid: &Fluid, sim: &Simulation) -> Vec<Vector3<f32>> {
         let difference = self.difference.read().unwrap();
 
-        fluid.filter(sim, sim.velocities.read().unwrap().par_iter())
+        fluid.filter(true, sim, sim.velocities.read().unwrap().par_iter())
             .map(|(i, v)| v + difference.get(fluid.correspondance(i)).unwrap_or(&Vector3::zeros()))
             .collect()
     }
@@ -144,7 +144,7 @@ impl ExternalForce for ViscosityWeiler2018Force {
 
     fn compute_acceleration(&self, fluid: &Fluid, sim: &Simulation, accelerations: &mut Vec<Vector3<f32>>) -> Option<f32> {
         let mut preconditions = self.compute_preconditions(fluid, sim);
-        let mut b = fluid.filter(sim, sim.velocities.read().unwrap().par_iter()).map(|(_, v)| *v).collect();
+        let mut b = fluid.filter(true, sim, sim.velocities.read().unwrap().par_iter()).map(|(_, v)| *v).collect();
         let mut guess = self.compute_guess(fluid, sim);
 
         let dt = sim.time_step();
@@ -155,11 +155,11 @@ impl ExternalForce for ViscosityWeiler2018Force {
 
         let velocities = sim.velocities.read().unwrap();
 
-        *self.difference.write().unwrap() = fluid.filter(sim, velocities.par_iter())
+        *self.difference.write().unwrap() = fluid.filter(true, sim, velocities.par_iter())
                                                   .map(|(i, v)| result[fluid.correspondance(i)] - v).collect();
 
         let difference = self.difference.read().unwrap();
-        fluid.filter_m(sim, accelerations.par_iter_mut()).for_each(|(i, a)| *a += (1. / dt) * difference[fluid.correspondance(i)]);
+        fluid.filter_m(true, sim, accelerations.par_iter_mut()).for_each(|(i, a)| *a += (1. / dt) * difference[fluid.correspondance(i)]);
         None
     }
 }

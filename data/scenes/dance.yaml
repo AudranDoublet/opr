@@ -1,0 +1,40 @@
+config:
+    particle_radius: 0.02
+fluids:
+    cloth:
+        density: 1000.
+        elasticity:
+            alpha: 0.1
+            young_modulus: 250000
+            poisson_ratio: 0.33
+            max_iteration: 100
+            tolerance: 0.0001
+        drag:
+            drag_coefficient: 1.0
+            air_velocity: [0.0, 15.0, 0.0]
+simulation_config:
+    fps: 168
+    max_time: 4.0
+render_config:
+    fps: 24
+    resolution: [1024, 1024]
+camera:
+    position: [0.0, 1.0, -2.0]
+    generate_at_render: true
+    animation:
+      type: group
+      elements:
+          - type: lookat
+            position: [0.0, 0.3, 0.0]
+solids: []
+liquids_blocks:
+    - type: mesh
+      mesh: objects/armadillo.obj
+      dynamic: true
+      resolution: [31, 31, 31]
+      scale: [0.5, 0.5, 0.5]
+      position: [0.0, -0.4, 0.0]
+      rotation_axis: [0.0, 0.0, 0.0]
+      rotation_angle: 0.0
+      fixed_strategy: Lowest
+liquids_add_blocks: []

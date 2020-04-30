@@ -120,6 +120,10 @@ impl DFSPH {
                 let stiffness = self.stiffness.read().unwrap();
 
                 sim.velocities.write().unwrap().par_iter_mut().enumerate().for_each(|(i, v)| {
+                    if sim.fixed[i] {
+                        return;
+                    }
+
                     let ki = density_adv[i] * stiffness[i] * step;
 
                     let diff = sim.neighbours_reduce_v(false, i, &|r, i, j| {
@@ -182,6 +186,10 @@ impl DFSPH {
                 let stiffness = self.stiffness.read().unwrap();
 
                 sim.velocities.write().unwrap().par_iter_mut().enumerate().for_each(|(i, v)| {
+                    if sim.fixed[i] {
+                        return;
+                    }
+
                     let ki = (density_adv[i] - 1.) * stiffness[i] * step;
 
                     let diff = sim.neighbours_reduce_v(false, i, &|r, i, j| {

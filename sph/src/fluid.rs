@@ -60,33 +60,33 @@ impl Fluid {
         self.correspondances[i]
     }
 
-    pub fn filter<'a, T: 'a + Send + Sync>(&self, sim: &'a Simulation, iter: impl ParallelIterator<Item=&'a T> + IndexedParallelIterator) -> impl ParallelIterator<Item=(usize, &'a T)> {
+    pub fn filter<'a, T: 'a + Send + Sync>(&self, fixed: bool, sim: &'a Simulation, iter: impl ParallelIterator<Item=&'a T> + IndexedParallelIterator) -> impl ParallelIterator<Item=(usize, &'a T)> {
         let idx = self.idx();
 
         iter.enumerate()
-            .filter(move |(i, _)| idx == sim.particles_fluid_type[*i])
+            .filter(move |(i, _)| idx == sim.particles_fluid_type[*i] && (fixed || !sim.fixed[*i]))
     }
 
-    pub fn filter_range<'a>(&self, sim: &'a Simulation) -> impl ParallelIterator<Item=usize>  + 'a {
+    pub fn filter_range<'a>(&self, fixed: bool, sim: &'a Simulation) -> impl ParallelIterator<Item=usize>  + 'a {
         let idx = self.idx();
 
         (0..sim.len())
             .into_par_iter()
-            .filter(move |i| idx == sim.particles_fluid_type[*i])
+            .filter(move |i| idx == sim.particles_fluid_type[*i] && (fixed || !sim.fixed[*i]))
     }
 
-    pub fn filter_m<'a, T: 'a + Send + Sync>(&self, sim: &'a Simulation, iter: impl ParallelIterator<Item=&'a mut T> + IndexedParallelIterator) -> impl ParallelIterator<Item=(usize, &'a mut T)> {
+    pub fn filter_m<'a, T: 'a + Send + Sync>(&self, fixed: bool, sim: &'a Simulation, iter: impl ParallelIterator<Item=&'a mut T> + IndexedParallelIterator) -> impl ParallelIterator<Item=(usize, &'a mut T)> {
         let idx = self.idx();
 
         iter.enumerate()
-            .filter(move |(i, _)| idx == sim.particles_fluid_type[*i])
+            .filter(move |(i, _)| idx == sim.particles_fluid_type[*i] && (fixed || !sim.fixed[*i]))
     }
 
-    pub fn filter_mt<'a, T: 'a + Send + Sync, U: 'a + Send + Sync>(&self, sim: &'a Simulation, iter: impl ParallelIterator<Item=(&'a mut T, &'a mut U)> + IndexedParallelIterator) -> impl ParallelIterator<Item=(usize, (&'a mut T, &'a mut U))> {
+    pub fn filter_mt<'a, T: 'a + Send + Sync, U: 'a + Send + Sync>(&self, fixed: bool, sim: &'a Simulation, iter: impl ParallelIterator<Item=(&'a mut T, &'a mut U)> + IndexedParallelIterator) -> impl ParallelIterator<Item=(usize, (&'a mut T, &'a mut U))> {
         let idx = self.idx();
 
         iter.enumerate()
-            .filter(move |(i, _)| idx == sim.particles_fluid_type[*i])
+            .filter(move |(i, _)| idx == sim.particles_fluid_type[*i] && (fixed || !sim.fixed[*i]))
     }
 
     pub fn init_forces(&self, sim: &Simulation) {
