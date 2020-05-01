@@ -44,6 +44,7 @@ pub struct Simulation
 
     // iteration data
     pub time_step: RwLock<f32>,
+    pub total_time: f32,
 
     solids: Vec<RigidObject>,
 
@@ -61,7 +62,6 @@ pub struct Simulation
     #[serde(skip_serializing, skip_deserializing)]
     pub fixed: Vec<bool>,
 
-    #[serde(skip_serializing, skip_deserializing)]
     pub fluid_types: Vec<Fluid>,
 
     #[serde(skip_serializing, skip_deserializing)]
@@ -136,6 +136,7 @@ impl Simulation
             cfl_max_time_step: 0.005,
             cfl_factor: 1.0,
             time_step: RwLock::new(0.0001),
+            total_time: 0.0,
 
             solids,
             debug_solid_collisions: vec![],
@@ -488,6 +489,7 @@ impl Simulation
         }
 
         self.debug_solid_collisions = collisions;
+        self.total_time += dt;
         dt
     }
 
