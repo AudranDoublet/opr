@@ -1830,6 +1830,7 @@ version = "0.1.0"
 dependencies = [
  "nalgebra",
  "rayon",
+ "search",
  "serde",
  "serde_cbor",
  "serde_derive",
