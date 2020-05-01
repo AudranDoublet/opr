@@ -3,6 +3,8 @@ use std::path::Path;
 
 use std::collections::HashMap;
 
+extern crate search;
+
 use crate::mesh::{Triangle, BoundingSphereHierarchy, tobj};
 use crate::{kernels, kernels::Kernel, GaussLegendre};
 use crate::DiscreteGrid;
@@ -12,6 +14,7 @@ use nalgebra::{Vector3, Matrix3};
 pub struct Mesh
 {
     bsh: BoundingSphereHierarchy,
+    bvh: search::BVH<Triangle>,
     triangles: Vec<Triangle>,
     distance_mult: f32,
     translate: Vector3<f32>,
@@ -124,6 +127,7 @@ impl Mesh
 
         Ok(Mesh {
             bsh: BoundingSphereHierarchy::new(&mut triangles, 15),
+            bvh: search::BVH::build(&triangles),
             translate: Vector3::zeros(),
             triangles: triangles,
             distance_mult: 1.0,
@@ -143,7 +147,20 @@ impl Mesh
      * Compute the minimal (abs) signed distance between the point and the mesh
      */
     pub fn minimal_signed_distance(&self, p: Vector3<f32>) -> f32 {
-        self.bsh.minimal_signed_distance(p + self.translate) * self.distance_mult
+        let p = p + self.translate;
+
+        let dist = self.bsh.minimal_signed_distance(p).abs() * self.distance_mult;
+        let origin = self.bvh.aabb().nearest(&p);
+
+        let diff = p - origin;
+        let ray = search::Ray::new(origin, diff);
+
+        let inside = self.bvh.ray_intersection_count(&ray, diff.norm()) % 2 != 0;
+
+        match inside {
+            true    => -dist,
+            false   => dist,
+        }
     }
 
     pub fn set_translate(&mut self, p: Vector3<f32>) {

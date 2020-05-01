@@ -1,4 +1,5 @@
-use nalgebra::Vector3;
+use nalgebra::{Vector3, Vector2};
+use search::{BVHShape, IntersectsBVHShape, Intersection, Ray, AABB};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Triangle
@@ -201,7 +202,9 @@ impl Triangle
 
         let distance = diff.norm_squared();
 
-        let sign = match self.normal(s, t).dot(&diff) {
+        let normal = self.normal(s, t).normalize();
+
+        let sign = match normal.dot(&diff.normalize()) {
             v if v >= 0. => 1.0,
             _ => -1.0,
         };
@@ -249,5 +252,58 @@ impl Triangle
         intg[7] += d.x * (self.v1.y*gx.x + self.v2.y*gx.y + self.v3.y*gx.z);
         intg[8] += d.y * (self.v1.z*gy.x + self.v2.z*gy.y + self.v3.z*gy.z);
         intg[9] += d.z * (self.v1.x*gz.x + self.v2.x*gz.z + self.v3.x*gz.z);
+    }
+}
+
+const EPSILON: f32 = 0.0000001;
+const SELF_HIT_EPSILON: f32 = 0.00;
+
+impl BVHShape for Triangle {
+    fn aabb(&self) -> AABB {
+        AABB::new_from_pointset(&[self.v1, self.v2, self.v3])
+    }
+}
+
+impl IntersectsBVHShape for Triangle {
+    fn intersects(&self, r: &Ray) -> Option<Intersection>
+    {
+        let edge1 = self.v2 - self.v1;
+        let edge2 = self.v3 - self.v1;
+
+        let h = r.direction.cross(&edge2);
+        let a = edge1.dot(&h);
+
+        if a > -EPSILON && a < EPSILON // ray is parallel to the triangle
+        {
+            return None;
+        }
+
+        let f = 1.0 / a;
+        let s = r.origin - self.v1;
+        let u = f * s.dot(&h);
+
+        if u < 0.0 || u > 1.0
+        {
+            return None;
+        }
+
+        let q = s.cross(&edge1);
+        let v = f * r.direction.dot(&q);
+
+        if v < 0.0 || u + v > 1.0
+        {
+            return None;
+        }
+
+        match f * edge2.dot(&q)
+        {
+            t if t >= SELF_HIT_EPSILON => Some(Intersection::new(t, u, v)),
+            _ => None
+        }
+    }
+
+    fn get_tex_coords(&self, _: f32, _: f32) -> Vector2<f32>
+    {
+        Vector2::new(0.0, 0.0)
     }
 }

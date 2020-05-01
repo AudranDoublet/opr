@@ -1,3 +1,5 @@
+#![feature(clamp)]
+
 mod ray;
 mod aabb;
 mod bucket;
