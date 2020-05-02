@@ -104,12 +104,10 @@ impl AABB {
         result
     }
 
-    #[allow(dead_code)]
     pub fn coord(&self, i: f32, j: f32, k: f32) -> Vector3<f32> {
         self.min + (self.max - self.min).component_mul(&Vector3::new(i, j, k))
     }
 
-    #[allow(dead_code)]
     pub fn transform(&self, rotation: &Matrix3<f32>, translation: &Vector3<f32>) -> AABB {
         let origin = rotation*self.min + translation;
 
@@ -134,5 +132,29 @@ impl AABB {
         }
 
         AABB::new(min, max)
+    }
+
+    pub fn nearest(&self, p: &Vector3<f32>) -> Vector3<f32> {
+        let mut result = Vector3::new(
+            p.x.clamp(self.min.x, self.max.x),
+            p.y.clamp(self.min.y, self.max.y),
+            p.z.clamp(self.min.z, self.max.z),
+        );
+
+        let (mut min, mut coord) = (f32::INFINITY, (0, 0));
+
+        for i in 0..2 {
+            for j in 0..3 {
+                let dist = (self.get(i)[j] - p[j]).abs();
+
+                if dist < min {
+                    min = dist;
+                    coord = (i, j);
+                }
+            }
+        }
+
+        result[coord.1] = self.get(coord.0)[coord.1];
+        result
     }
 }
