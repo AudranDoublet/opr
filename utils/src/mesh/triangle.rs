@@ -256,7 +256,6 @@ impl Triangle
 }
 
 const EPSILON: f32 = 0.0000001;
-const SELF_HIT_EPSILON: f32 = 0.00;
 
 impl BVHShape for Triangle {
     fn aabb(&self) -> AABB {
@@ -265,7 +264,7 @@ impl BVHShape for Triangle {
 }
 
 impl IntersectsBVHShape for Triangle {
-    fn intersects(&self, r: &Ray) -> Option<Intersection>
+    fn intersects(&self, r: &Ray, self_hit_eps: f32) -> Option<Intersection>
     {
         let edge1 = self.v2 - self.v1;
         let edge2 = self.v3 - self.v1;
@@ -297,7 +296,7 @@ impl IntersectsBVHShape for Triangle {
 
         match f * edge2.dot(&q)
         {
-            t if t >= SELF_HIT_EPSILON => Some(Intersection::new(t, u, v)),
+            t if t >= self_hit_eps => Some(Intersection::new(t, u, v)),
             _ => None
         }
     }

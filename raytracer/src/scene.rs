@@ -25,6 +25,7 @@ pub struct Scene
     lights: Vec<Light>,
     light_ambient: Vector3<f32>,
     correction_bias: f32,
+    correction_bias_shadow: f32,
     air_ior: f32,
     tree: BVH<shapes::Triangle>,
 }
@@ -110,6 +111,7 @@ impl Scene {
             lights: Vec::new(),
             light_ambient: Vector3::zeros(),
             correction_bias: 0.,
+            correction_bias_shadow: 0.01,
             air_ior: 1.,
             tree: BVH::default(),
         }
@@ -301,14 +303,14 @@ impl Scene {
         self.lights.iter().filter(|l| match l.shadow_ray(*position) {
             Some(mut v) => {
                 let mut has_interference = false;
-                while let Some((intersection, triangle)) = self.tree.ray_intersect_with_predicate(&v, &|t| t.id != id_triangle_from).get(0) {
+                while let Some((intersection, triangle)) = self.tree.ray_intersect_with_predicate(&v, self.correction_bias_shadow, &|t| t.id != id_triangle_from).get(0) {
                     let material = &self.materials[triangle.material];
                     has_interference = material.illumination_model < 5; // hack: we just ignore transparent objects
                     if has_interference {
                         break;
                     }
                     let intersection_position = intersection.position(&v);
-                    v = Ray::new(intersection_position + v.direction * self.correction_bias, v.direction);
+                    v = Ray::new(intersection_position, v.direction);
                     id_triangle_from = triangle.id;
                 }
                 !has_interference
@@ -340,7 +342,7 @@ impl Scene {
     }
 
     fn cast_ray(&self, ray: Ray, max_rec: u8, mut distance_inside_medium: f32, id_triangle_from: usize) -> Vector3<f32> {
-        if let Some((i, triangle)) = self.tree.ray_intersect_with_predicate(&ray, &|t| t.id != id_triangle_from).get(0) {
+        if let Some((i, triangle)) = self.tree.ray_intersect_with_predicate(&ray, self.correction_bias, &|t| t.id != id_triangle_from).get(0) {
             let normal = (triangle.v1_normal * (1.0 - i.u - i.v)
                 + triangle.v2_normal * i.u
                 + triangle.v3_normal * i.v).normalize();
@@ -364,11 +366,13 @@ impl Scene {
 
             let reflected_color = if material.illumination_model >= 3 {
                 let reflect_direction = reflect(&ray, &normal);
-                let reflect_ray = Ray::new(position + &reflect_direction * self.correction_bias, reflect_direction);
+                let reflect_ray = Ray::new(position, reflect_direction);
+
                 if max_rec == 0 { self.sky_color(reflect_ray) } else {
                     self.cast_ray(reflect_ray, max_rec - 1, distance_inside_medium, triangle.id)
                 }
             } else { Vector3::zeros() };
+
             let mut refract_direction = None;
             let mut coeff_reflectivity = 0.0;
             let mut is_inside = false;
@@ -403,7 +407,7 @@ impl Scene {
             } else { Vector3::new(1., 1., 1.) };
 
             if let Some(refract_direction) = refract_direction {
-                let refract_ray = Ray::new(&position + &refract_direction * self.correction_bias, refract_direction);
+                let refract_ray = Ray::new(position, refract_direction);
                 let refract_color = if max_rec == 0 {
                     self.sky_color(refract_ray)
                 } else {
