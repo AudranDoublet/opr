@@ -218,26 +218,25 @@ impl Scene
 
     pub fn load_fluids(&self) -> Vec<Fluid> {
         let mut fluids = Vec::new();
-        let mut idx = 0;
 
-        for (_, v) in self.fluids.iter() {
-            fluids.push(v.create(idx, self.volume(), self.gravity(), self.kernel_radius()));
-            idx += 1;
+        let map = self.load_fluids_map();
+
+        for (k, &idx) in map.iter() {
+            fluids.push(self.fluids[k].create(idx, self.volume(), self.gravity(), self.kernel_radius()));
         }
 
         fluids
     }
 
     pub fn load_fluids_map(&self) -> HashMap<String, usize> {
-        let mut idx = 0;
-        let mut map = HashMap::new();
-
-        for (k, _) in self.fluids.iter() {
-            map.insert(k.clone(), idx);
-            idx += 1;
-        }
-
-        map
+        let mut names = self.fluids.iter()
+                       .map(|(k, _)| k).collect::<Vec<&String>>();
+        
+        names.sort();
+        names.iter()
+             .enumerate()
+             .map(|(i, k)| ((*k).clone(), i))
+             .collect()
     }
 
     pub fn load(&self) -> Result<Simulation, Box<dyn std::error::Error>> {

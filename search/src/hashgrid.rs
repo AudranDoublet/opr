@@ -162,8 +162,6 @@ impl HashGrid
     }
 
     pub fn get_borders(&self) -> (Vec<Vector3<f32>>, f32) {
-        let mut result = vec![];
-
         let mut grid: HashMap<HashGridKey, LakeState> = HashMap::new();
 
         self.map.iter()
@@ -172,11 +170,10 @@ impl HashGrid
                 self._get_borders_rec(v.key(), &mut grid);
             });
 
-        result.par_extend(
-            grid.into_par_iter()
-                .filter(|(_, s)| *s != LakeState::INTERNAL)
-                .map(|(k, _)| self.cell_to_world(&k))
-        );
+        let result = grid.into_par_iter()
+                         .filter(|(_, s)| *s == LakeState::JUNCTURE)
+                         .map(|(k, _)| self.cell_to_world(&k))
+                         .collect();
 
         (result, self.cell_size)
     }
