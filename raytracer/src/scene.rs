@@ -78,7 +78,7 @@ fn reflectivity_coeff(cos_i: f32, n1: f32, n2: f32) -> f32 {
     (r_orth + r_par) / 2.0
 }
 
-#[cfg(any(use_fresnel_approximation))]
+#[cfg(use_fresnel_approximation)]
 fn reflectivity_coeff(cos_i: f32, n1: f32, n2: f32) -> f32 {
     // Schlick: Fresnel approximation
     let r0 = ((n1 - n2) / (n1 + n2)).powi(2);
@@ -109,7 +109,7 @@ impl Scene {
             textures: Vec::new(),
             lights: Vec::new(),
             light_ambient: Vector3::zeros(),
-            correction_bias: 0.1,
+            correction_bias: 0.,
             air_ior: 1.,
             tree: BVH::default(),
         }
@@ -207,7 +207,7 @@ impl Scene {
         for model in models.iter()
         {
             let mesh = &model.mesh;
-            let mat_id = if let Some(id) = override_material_id {id} else {
+            let mat_id = if let Some(id) = override_material_id { id } else {
                 if let Some(mat) = mesh.material_id {
                     mat + mat_id_app
                 } else { 0 }
@@ -259,6 +259,7 @@ impl Scene {
                                           vertices_tex[b] - vertices_tex[a],
                                           vertices_tex[c] - vertices_tex[a],
                                           mat_id,
+                                          self.triangles.len(),
                     ));
             }
         }
@@ -294,11 +295,24 @@ impl Scene {
         // Vector3::new(0.65, 0.65, 0.65)
     }
 
-    fn compute_diffuse_and_specular(&self, position: &Vector3<f32>, normal: &Vector3<f32>, shininess: f32) -> (Vector3<f32>, Vector3<f32>) {
+    fn compute_diffuse_and_specular(&self, position: &Vector3<f32>, normal: &Vector3<f32>, shininess: f32, mut id_triangle_from: usize) -> (Vector3<f32>, Vector3<f32>) {
         let mut diffuse = Vector3::zeros();
         let mut specular = Vector3::zeros();
         self.lights.iter().filter(|l| match l.shadow_ray(*position) {
-            Some(v) => self.tree.ray_intersect(&v).is_none(),
+            Some(mut v) => {
+                let mut has_interference = false;
+                while let Some((intersection, triangle)) = self.tree.ray_intersect_with_predicate(&v, &|t| t.id != id_triangle_from) {
+                    let material = &self.materials[triangle.material];
+                    has_interference = material.illumination_model < 5; // hack: we just ignore transparent objects
+                    if has_interference {
+                        break;
+                    }
+                    let intersection_position = intersection.position(&v);
+                    v = Ray::new(intersection_position + v.direction * self.correction_bias, v.direction);
+                    id_triangle_from = triangle.id;
+                }
+                !has_interference
+            }
             None => true,
         }).for_each(|l| {
             let light_color = &l.get_color();
@@ -325,11 +339,12 @@ impl Scene {
         }
     }
 
-    fn cast_ray(&self, ray: Ray, max_rec: u8, mut distance_inside_medium: f32) -> Vector3<f32> {
-        if let Some((i, triangle)) = self.tree.ray_intersect(&ray) {
+    fn cast_ray(&self, ray: Ray, max_rec: u8, mut distance_inside_medium: f32, id_triangle_from: usize) -> Vector3<f32> {
+        if let Some((i, triangle)) = self.tree.ray_intersect_with_predicate(&ray, &|t| t.id != id_triangle_from) {
             let normal = (triangle.v1_normal * (1.0 - i.u - i.v)
                 + triangle.v2_normal * i.u
                 + triangle.v3_normal * i.v).normalize();
+
 
             let material = &self.materials[triangle.material];
 
@@ -342,7 +357,7 @@ impl Scene {
             }
 
             let position = i.position(&ray);
-            let (diffuse, mut specular) = self.compute_diffuse_and_specular(&position, &normal, material.shininess);
+            let (diffuse, mut specular) = self.compute_diffuse_and_specular(&position, &normal, material.shininess, id_triangle_from);
             let mut color = Vector3::zeros();
 
             distance_inside_medium += i.distance;
@@ -351,7 +366,7 @@ impl Scene {
                 let reflect_direction = reflect(&ray, &normal);
                 let reflect_ray = Ray::new(position + &reflect_direction * self.correction_bias, reflect_direction);
                 if max_rec == 0 { self.sky_color(reflect_ray) } else {
-                    self.cast_ray(reflect_ray, max_rec - 1, distance_inside_medium)
+                    self.cast_ray(reflect_ray, max_rec - 1, distance_inside_medium, triangle.id)
                 }
             } else { Vector3::zeros() };
             let mut refract_direction = None;
@@ -373,7 +388,6 @@ impl Scene {
                 }
                 7 => {
                     let (cos_i, normal, n1, n2) = self.get_juncture_information(&ray, normal, &material, &mut is_inside);
-
                     coeff_reflectivity = reflectivity_coeff(cos_i, n1, n2);
                     if coeff_reflectivity < 0.99 {
                         refract_direction = Some(refract(&ray, &normal, cos_i, n1, n2));
@@ -393,7 +407,7 @@ impl Scene {
                 let refract_color = if max_rec == 0 {
                     self.sky_color(refract_ray)
                 } else {
-                    self.cast_ray(refract_ray, max_rec - 1, 0.0)
+                    self.cast_ray(refract_ray, max_rec - 1, 0.0, triangle.id)
                 };
 
                 if material.illumination_model == 6 {
@@ -433,7 +447,7 @@ impl Scene {
 
                 for _ in 0..nb_sample {
                     let ray = self.camera.generate_ray(x + rng.sample(distribution), y + rng.sample(distribution));
-                    *p += self.cast_ray(ray, max_rec, 0.0);
+                    *p += self.cast_ray(ray, max_rec, 0.0, usize::max_value());
                 }
 
                 *p /= (nb_sample + 1) as f32;
@@ -444,7 +458,7 @@ impl Scene {
         self.camera.set_size(width as f32, height as f32);
 
         let mut pixels = (0..width * height).into_par_iter()
-            .map(|i| self.cast_ray(self.camera.generate_ray((i % width) as f32, (i / width) as f32), max_rec, 0.0))
+            .map(|i| self.cast_ray(self.camera.generate_ray((i % width) as f32, (i / width) as f32), max_rec, 0.0, usize::max_value()))
             .collect();
 
         if anti_aliasing_max_sample > 0 {

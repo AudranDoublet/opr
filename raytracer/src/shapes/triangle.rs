@@ -17,6 +17,7 @@ pub struct Triangle
     pub tex2: Vector2<f32>,
     pub tex3: Vector2<f32>,
     pub material: usize,
+    pub id: usize,
 }
 
 impl Triangle
@@ -24,7 +25,7 @@ impl Triangle
     pub fn new(v1: Vector3<f32>, v2: Vector3<f32>, v3: Vector3<f32>,
                v1_normal: Vector3<f32>, v2_normal: Vector3<f32>, v3_normal: Vector3<f32>,
                tex1: Vector2<f32>, tex2: Vector2<f32>, tex3: Vector2<f32>,
-               material: usize) -> Triangle
+               material: usize, id: usize) -> Triangle
     {
         Triangle {
             v1: v1,
@@ -37,6 +38,7 @@ impl Triangle
             tex2: tex2,
             tex3: tex3,
             material: material,
+            id: id
         }
     }
 
