@@ -116,10 +116,16 @@ impl HashGrid
             })
     }
 
-    fn _get_borders_rec(&self, cell: &HashGridKey, grid: &mut HashMap<HashGridKey, LakeState>) -> LakeState {
-        grid.insert(*cell, LakeState::INTERNAL);
+    fn _state(&self, cell: &HashGridKey) -> LakeState {
+        match self.map.get(&cell) {
+            Some(particles) if particles.is_empty() => LakeState::EXTERNAL,
+            None => LakeState::EXTERNAL,
+            _ => LakeState::INTERNAL,
+        }
+    }
 
-        let mut count_non_void_neighbours: u8 = 0;
+    fn _get_borders_rec(&self, cell: &HashGridKey, grid: &mut HashMap<HashGridKey, LakeState>) {
+        let mut state = self._state(cell);
 
         for dz in -1..=1 {
             for dy in -1..=1 {
@@ -128,35 +134,16 @@ impl HashGrid
                         continue;
                     }
 
-                    let neighbour = cell.relative(dx, dy, dz);
+                    let neighbour_state = self._state(&cell.relative(dx, dy, dz));
 
-                    let neighbour_state = match grid.get(&neighbour) {
-                        Some(&state) => state,
-                        None => {
-                            match self.map.get(&neighbour) {
-                                Some(particles) =>
-                                    if particles.is_empty() { LakeState::EXTERNAL } else { self._get_borders_rec(&neighbour, grid) }
-                                None =>
-                                    LakeState::EXTERNAL
-                            }
-                        }
-                    };
-
-                    if neighbour_state == LakeState::EXTERNAL {
-                        grid.entry(neighbour).or_insert(LakeState::EXTERNAL);
+                    if neighbour_state != state {
+                        state = LakeState::JUNCTURE;
                     }
-
-                    count_non_void_neighbours += (neighbour_state != LakeState::EXTERNAL) as u8;
                 }
             }
         }
 
-        if count_non_void_neighbours == 26 {
-            LakeState::INTERNAL
-        } else {
-            grid.insert(*cell, LakeState::JUNCTURE);
-            LakeState::JUNCTURE
-        }
+        grid.insert(*cell, state);
     }
 
     pub fn cell_to_world(&self, v: &HashGridKey) -> Vector3<f32> {
