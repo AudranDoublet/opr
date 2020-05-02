@@ -301,7 +301,7 @@ impl Scene {
         self.lights.iter().filter(|l| match l.shadow_ray(*position) {
             Some(mut v) => {
                 let mut has_interference = false;
-                while let Some((intersection, triangle)) = self.tree.ray_intersect_with_predicate(&v, &|t| t.id != id_triangle_from) {
+                while let Some((intersection, triangle)) = self.tree.ray_intersect_with_predicate(&v, &|t| t.id != id_triangle_from).get(0) {
                     let material = &self.materials[triangle.material];
                     has_interference = material.illumination_model < 5; // hack: we just ignore transparent objects
                     if has_interference {
@@ -340,7 +340,7 @@ impl Scene {
     }
 
     fn cast_ray(&self, ray: Ray, max_rec: u8, mut distance_inside_medium: f32, id_triangle_from: usize) -> Vector3<f32> {
-        if let Some((i, triangle)) = self.tree.ray_intersect_with_predicate(&ray, &|t| t.id != id_triangle_from) {
+        if let Some((i, triangle)) = self.tree.ray_intersect_with_predicate(&ray, &|t| t.id != id_triangle_from).get(0) {
             let normal = (triangle.v1_normal * (1.0 - i.u - i.v)
                 + triangle.v2_normal * i.u
                 + triangle.v3_normal * i.v).normalize();
@@ -349,7 +349,7 @@ impl Scene {
             let material = &self.materials[triangle.material];
 
             let ka = &material.get_ambient();
-            let kd = &material.get_diffuse(&self.textures, &triangle, i.u, i.v);
+            let kd = &material.get_diffuse(&self.textures, triangle, i.u, i.v);
             let ks = &material.specular;
 
             if material.illumination_model == 0 {
