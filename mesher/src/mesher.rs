@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use nalgebra::Vector3;
 
@@ -122,7 +122,7 @@ impl Mesher {
         let mut mesh = Mesh::new();
 
         let mut cache_vertices: HashMap<VertexLocal, f32> = HashMap::new();
-
+        let mut cache_seen_cubes = HashSet::new();
 
         borders.iter()
             .for_each(|cube_origin| {
@@ -134,6 +134,10 @@ impl Mesher {
                     for dy in 0..=steps.y {
                         for dx in 0..=steps.x {
                             let local_pos = &min + Vector3::new(dx, dy, dz);
+                            if !cache_seen_cubes.insert(local_pos) {
+                                continue;
+                            }
+
                             let cube_vertices = self.generate_cube_vertices(snapshot, &mut cache_vertices, &local_pos);
                             let config_id = self.search_configuration(&cube_vertices);
 
