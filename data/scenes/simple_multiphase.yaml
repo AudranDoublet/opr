@@ -1,18 +1,30 @@
 config:
     kernel_radius: 0.08
     particle_radius: 0.02
+simulation_config:
+    max_time: 4.0
+    fps: 24.0
+    enable_bubbler: false
 fluids:
     water:
-        density: 1000.0
+        material: data/materials/transparent.mtl
+        simulation:
+            density: 1000.0
+        meshing:
+            cube_size: 0.04
     cloth:
-        density: 1000.
         debug_color: [0.0, 1.0, 0.0]
-        viscosity:
-            type: weiler2018
-            coefficient: 1000.0
-            surface_coefficient: 1000.0
-            max_iteration: 100
-            tolerance: 0.01
+        material: data/materials/green.mtl
+        meshing:
+            cube_size: 0.04
+        simulation:
+            density: 1000.
+            viscosity:
+                type: weiler2018
+                coefficient: 1000.0
+                surface_coefficient: 1000.0
+                max_iteration: 100
+                tolerance: 0.01
 solids:
     - mesh: objects/box.obj
       density: 1000
@@ -39,3 +51,49 @@ liquids_add_blocks:
     - type: block
       from:  [-0.100, 0.200, -0.100]
       to:  [0.100, 0.400, 0.100]
+render_config:
+    max_rec: 2
+
+bubbler:
+    lifetime: [0.01, 0.03]
+    k_b: 1.4
+    spray:
+        kernel_radius: 0.001
+        meshing:
+            enable_anisotropic: false
+            cube_size: 0.0005
+        material: data/materials/white.mtl
+    bubble:
+        kernel_radius: 0.001
+        meshing:
+            enable_anisotropic: false
+            cube_size: 0.0008
+        material: data/materials/white_transparent.mtl
+    foam:
+        mass: 0.001
+        kernel_radius: 0.1
+        meshing:
+            enable_anisotropic: true
+            cube_size: 0.04
+        material: data/materials/white.mtl
+camera:
+    position: [0.0, 0.0, -5.0]
+    generate_at_render: true
+    animation:
+        type: group
+        elements:
+            - type: curve
+              time: 2
+              variable: Position
+              smoothing:
+                  begin: 0.20
+                  end: 0.80
+              curve:
+                  type: bezier
+                  control_points:
+                      - [0.0, 0.5, -1.5]
+                      - [2.0, 1.5, -1.5]
+                      - [2.0, 1.5, 1.0]
+                      - [0.0, 0.5, 1.0]
+            - type: lookat
+              position: [0.0, -0.5, 0.0]
