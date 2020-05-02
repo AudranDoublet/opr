@@ -33,6 +33,52 @@ impl Intersection {
     }
 }
 
+pub struct IntersectionGroup<T: Clone> {
+    pub intersections: Vec<(Intersection, T)>,
+
+    pub min_distance: f32,
+    pub epsilon: f32,
+}
+
+impl<T: Clone> IntersectionGroup<T> {
+    pub fn new(epsilon: f32) -> IntersectionGroup<T> {
+        IntersectionGroup {
+            intersections: Vec::new(),
+            min_distance: std::f32::INFINITY,
+            epsilon: epsilon,
+        }
+    }
+
+    #[inline]
+    pub fn add_intersection(&mut self, shape: &T, intersection: Intersection) {
+        let epsilon = self.epsilon;
+
+        if intersection.distance < self.min_distance {
+            self.min_distance = intersection.distance;
+
+            self.intersections.retain(|(i, _)| i.distance - intersection.distance < epsilon);
+            self.intersections.push((intersection, shape.clone()));
+        } else if intersection.distance - self.min_distance < epsilon {
+            self.intersections.push((intersection, shape.clone()));
+        }
+    }
+
+    #[inline]
+    pub fn end(&mut self) {
+        self.intersections.sort_unstable_by(|(a, _), (b, _)| a.distance.partial_cmp(&b.distance).unwrap());
+    }
+
+    #[inline]
+    pub fn get(&self, i: usize) -> Option<&(Intersection, T)> {
+        self.intersections.get(i)
+    }
+
+    #[inline]
+    pub fn max_allowed_distance(&self) -> f32 {
+        self.min_distance + self.epsilon
+    }
+}
+
 impl Ray {
     pub fn new(origin: Vector3<f32>, direction: Vector3<f32>) -> Ray {
         let classify = |v: f32| match v {

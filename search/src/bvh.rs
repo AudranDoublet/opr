@@ -1,4 +1,4 @@
-use crate::{AABB, Bucket, Ray, Intersection};
+use crate::{AABB, Bucket, Ray, Intersection, IntersectionGroup};
 use std::f32;
 
 use nalgebra::{Matrix3, Vector3, Vector2};
@@ -191,7 +191,7 @@ impl<T: BVHShape + Clone> BVHNode<T> {
 }
 
 impl<T: BVHShape + IntersectsBVHShape + Clone> BVHNode<T> {
-    fn ray_intersects(&self, ray: &Ray, result: &mut (Intersection, Option<T>), p: &dyn Fn(&T) -> bool) {
+    fn ray_intersects(&self, ray: &Ray, result: &mut IntersectionGroup<T>, p: &dyn Fn(&T) -> bool) {
         match self {
             BVHNode::Leaf { shapes } => {
                 for s in shapes {
@@ -200,9 +200,7 @@ impl<T: BVHShape + IntersectsBVHShape + Clone> BVHNode<T> {
                     }
 
                     if let Some(i) = s.intersects(ray) {
-                        if i.distance < result.0.distance {
-                            *result = (i, Some(s.clone()))
-                        }
+                        result.add_intersection(s, i);
                     }
                 }
             },
@@ -210,16 +208,16 @@ impl<T: BVHShape + IntersectsBVHShape + Clone> BVHNode<T> {
                 let a = ray.intersects_aabb(left_box).unwrap_or(std::f32::INFINITY);
                 let b = ray.intersects_aabb(right_box).unwrap_or(std::f32::INFINITY);
 
-                if a <= b && a <= result.0.distance && a != std::f32::INFINITY {
+                if a <= b && a <= result.max_allowed_distance() && a != std::f32::INFINITY {
                     left_node.ray_intersects(ray, result, p);
 
-                    if b <= result.0.distance {
+                    if b <= result.max_allowed_distance() {
                         right_node.ray_intersects(ray, result, p);
                     }
-                } else if b <= a && b <= result.0.distance && b != std::f32::INFINITY {
+                } else if b <= a && b <= result.max_allowed_distance() && b != std::f32::INFINITY {
                     right_node.ray_intersects(ray, result, p);
 
-                    if a <= result.0.distance {
+                    if a <= result.max_allowed_distance() {
                         left_node.ray_intersects(ray, result, p);
                     }
                 }
@@ -309,22 +307,20 @@ impl<T: BVHShape + Clone> BVH<T> {
 }
 
 impl<T: BVHShape + IntersectsBVHShape + Clone> BVH<T> {
-    pub fn ray_intersect(&self, ray: &Ray) -> Option<(Intersection, T)> {
+    pub fn ray_intersect(&self, ray: &Ray) -> IntersectionGroup<T> {
         self.ray_intersect_with_predicate(ray, &|_| true)
     }
 
-    pub fn ray_intersect_with_predicate(&self, ray: &Ray, p: &dyn Fn(&T) -> bool) -> Option<(Intersection, T)> {
-        let mut result = (Intersection::new_empty(), None);
+    pub fn ray_intersect_with_predicate(&self, ray: &Ray, p: &dyn Fn(&T) -> bool) -> IntersectionGroup<T> {
+        let mut result = IntersectionGroup::new(0.0001);
 
         if !ray.intersects_aabb(&self.aabb()).is_none() {
             self.root.ray_intersects(ray, &mut result, p);
         }
 
-        if let Some(s) = result.1 {
-            Some((result.0, s))
-        } else {
-            None
-        }
+        result.end();
+
+        result
     }
 
     pub fn ray_intersection_count(&self, ray: &Ray, max_distance: f32) -> usize {
