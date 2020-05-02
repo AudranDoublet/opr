@@ -125,7 +125,8 @@ impl HashGrid
     }
 
     fn _get_borders_rec(&self, cell: &HashGridKey, grid: &mut HashMap<HashGridKey, LakeState>) {
-        let mut state = self._state(cell);
+        let original_state = self._state(cell);
+        let mut state = original_state;
 
         for dz in -1..=1 {
             for dy in -1..=1 {
@@ -134,7 +135,13 @@ impl HashGrid
                         continue;
                     }
 
-                    let neighbour_state = self._state(&cell.relative(dx, dy, dz));
+                    let neighbour = cell.relative(dx, dy, dz);
+                    let neighbour_state = self._state(&neighbour);
+
+                    // if the neighbouring cell is empty, set it as a juncture
+                    if original_state == LakeState::INTERNAL && original_state != state {
+                        grid.insert(neighbour, LakeState::JUNCTURE);
+                    }
 
                     if neighbour_state != state {
                         state = LakeState::JUNCTURE;
@@ -162,10 +169,7 @@ impl HashGrid
         self.map.iter()
             .filter(|v| !v.is_empty())
             .for_each(|v| {
-                let k = v.key();
-                if !grid.contains_key(k) {
-                    self._get_borders_rec(k, &mut grid);
-                }
+                self._get_borders_rec(v.key(), &mut grid);
             });
 
         result.par_extend(
