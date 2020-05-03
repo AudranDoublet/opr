@@ -17,22 +17,6 @@ use search::{BVH, BVHParameters, Ray};
 use crate::*;
 use crate::shapes::{Shape, Sphere};
 
-type Object = Box<dyn Shape + Sync + Send>;
-
-pub struct Scene
-{
-    camera: Camera,
-    objects: Vec<Object>,
-    materials: Vec<Material>,
-    textures: Vec<Texture>,
-    lights: Vec<Light>,
-    light_ambient: Vector3<f32>,
-    correction_bias: f32,
-    correction_bias_shadow: f32,
-    air_ior: f32,
-    tree: BVH<Object>,
-}
-
 fn load_texture(root: &Path, path: &Path) -> Result<Texture, Box<dyn Error>>
 {
     let (width, height, pixels) = load_image(&root.join(path))?;
@@ -104,6 +88,23 @@ fn beer_attenuation(transmittance: &Vector3<f32>, distance: f32) -> Vector3<f32>
     )
 }
 
+type Object = Box<dyn Shape + Sync + Send>;
+
+pub struct Scene
+{
+    camera: Camera,
+    objects: Vec<Object>,
+    materials: Vec<Material>,
+    textures: Vec<Texture>,
+    lights: Vec<Light>,
+    light_ambient: Vector3<f32>,
+    default_material_id: usize,
+    correction_bias: f32,
+    correction_bias_shadow: f32,
+    air_ior: f32,
+    tree: BVH<Object>,
+}
+
 impl Scene {
     pub fn new() -> Scene {
         Scene {
@@ -112,6 +113,7 @@ impl Scene {
             textures: Vec::new(),
             lights: Vec::new(),
             light_ambient: Vector3::zeros(),
+            default_material_id: 0,
             correction_bias: 0.,
             correction_bias_shadow: 0.01,
             air_ior: 1.,
@@ -125,9 +127,17 @@ impl Scene {
 
         scene.load_mtl(default_material)?[0];
 
-        for obj in file.objects {
+        for obj in file.meshes {
             let r = UnitQuaternion::from_euler_angles(obj.rotation.x, obj.rotation.y, obj.rotation.z);
             scene.load_obj(Path::new(&obj.path), obj.position, r, obj.scale, obj.override_material)?;
+        }
+
+        for sphere in file.spheres {
+            scene.load_sphere(sphere.center, sphere.radius, sphere.material)?;
+        }
+
+        for particle in file.particles {
+            scene.load_particles(particle.path, particle.material)?;
         }
 
         for mut light in file.lights {
@@ -143,6 +153,8 @@ impl Scene {
 
         Ok(scene)
     }
+
+    fn get_next_material_id(&self) -> usize { self.objects.len() }
 
     pub fn from_file(path: &Path, default_material: &Path) -> Result<Scene, Box<dyn Error>> {
         let file: scene_config::SceneConfig = serde_yaml::from_reader(File::open(path)?)?;
@@ -177,6 +189,39 @@ impl Scene {
         }
 
         Ok(result)
+    }
+
+    pub fn load_particles(&mut self, path: String, material: Option<String>) -> Result<(), Box<dyn Error>>  {
+        let material_id = if let Some(material_path) = material {
+            self.load_mtl(Path::new(&material_path))?[0]
+        } else { self.default_material_id };
+
+        let particles = Particles::load(&Path::new(&path))?;
+
+        let (positions, radii) = (particles.get_positions(), particles.get_radii());
+
+        for i in 0..particles.len() {
+            self.objects.push(
+                Box::new(
+                    Sphere::new(positions[i], radii[i], material_id, self.get_next_material_id())
+                )
+            );
+        }
+
+        Ok(())
+    }
+    pub fn load_sphere(&mut self, center: Vector3<f32>, radius: f32, material: Option<String>) -> Result<(), Box<dyn Error>> {
+        let material_id = if let Some(material_path) = material {
+            self.load_mtl(Path::new(&material_path))?[0]
+        } else { self.default_material_id };
+
+        self.objects.push(
+            Box::new(
+                Sphere::new(center, radius, material_id, self.get_next_material_id())
+            )
+        );
+
+        Ok(())
     }
 
     pub fn load_obj(&mut self, path: &Path, position: Vector3<f32>, rotation: UnitQuaternion<f32>, scale: Vector3<f32>, override_material: Option<String>) -> Result<(), Box<dyn Error>> {
@@ -264,7 +309,7 @@ impl Scene {
                                                    vertices_tex[b] - vertices_tex[a],
                                                    vertices_tex[c] - vertices_tex[a],
                                                    mat_id,
-                                                   self.objects.len(),
+                                                   self.get_next_material_id(),
                     )));
             }
         }
@@ -317,6 +362,7 @@ impl Scene {
                     id_triangle_from = triangle.id();
                 }
                 !has_interference
+                //self.tree.ray_intersect_with_predicate(&v, self.correction_bias_shadow, &|t| t.id() != id_triangle_from).get(0).is_none()
             }
             None => true,
         }).for_each(|l| {
@@ -460,7 +506,6 @@ impl Scene {
 
     pub fn render(&mut self, width: usize, height: usize, max_rec: u8, anti_aliasing_max_sample: usize) -> image_manipulation::Image {
         self.camera.set_size(width as f32, height as f32);
-
 
         let mut pixels = (0..width * height).into_par_iter()
             .map(|i| self.cast_ray(self.camera.generate_ray((i % width) as f32, (i / width) as f32), max_rec, 0.0, usize::max_value()))

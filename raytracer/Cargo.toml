@@ -7,14 +7,18 @@ edition = "2018"
 [dependencies]
 nalgebra = { version = "0.20.0", features = ["serde-serialize"] }
 
+flate2 = { version = "*", features = ["cloudflare_zlib"], default-features = false }
+
 image = "0.23.0"
 rand = ""
 tobj = ""
 rayon = ""
 serde = ""
+serde_json = ""
 serde_yaml = ""
 serde_derive = ""
 cfg-if = ""
 
+sph_scene = { path = "../scene" }
 search = { path = "../search" }
 image_manipulation = { path = "../image_manipulation" }

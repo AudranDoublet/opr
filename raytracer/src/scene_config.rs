@@ -6,7 +6,7 @@ use serde_derive::*;
 use crate::*;
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct ObjectConfig
+pub struct MeshConfig
 {
     pub path: String,
     pub override_material: Option<String>,
@@ -16,9 +16,26 @@ pub struct ObjectConfig
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+pub struct ParticleConfig
+{
+    pub path: String,
+    pub material: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct SphereConfig
+{
+    pub material: Option<String>,
+    pub center: Vector3<f32>,
+    pub radius: f32,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct SceneConfig
 {
-    pub objects: Vec<ObjectConfig>,
+    pub spheres: Vec<SphereConfig>,
+    pub meshes: Vec<MeshConfig>,
+    pub particles: Vec<ParticleConfig>,
     pub lights: Vec<Light>,
     pub camera: Camera,
 }

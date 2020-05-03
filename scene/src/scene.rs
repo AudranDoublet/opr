@@ -6,10 +6,10 @@ use std::path::Path;
 
 use bubbler::config::BubblerConfig;
 use nalgebra::Vector3;
-use serde::{Deserialize};
+use serde::Deserialize;
 use sph::{Animation, Emitter, Fluid, RigidObject, Simulation};
 
-use crate::{EmitterConfig, FluidConfiguration, FluidConfigurationMeshing, LiquidZone, Solid};
+use crate::{EmitterConfig, FluidConfiguration, LiquidZone, Solid};
 
 fn default_gravity() -> [f32; 3] {
     [0.0, -9.81, 0.0]
@@ -117,39 +117,31 @@ impl Default for CommandLineConfiguration {
 
 #[derive(Debug, Deserialize)]
 pub struct BubblerFluidConfiguration {
-    #[serde(default = "bubbler_fluid_conf_default_density")]
-    pub density: f32,
-    #[serde(default = "bubbler_fluid_conf_default_mass")]
-    pub mass: f32,
     #[serde(default = "bubbler_fluid_conf_default_debug_color")]
     pub debug_color: Vector3<f32>,
-    #[serde(default = "bubbler_fluid_conf_default_kernel_radius")]
-    pub kernel_radius: f32,
+    #[serde(default = "bubbler_fluid_conf_default_radius")]
+    pub radius: f32,
     #[serde(default)]
     pub material: Option<String>,
     #[serde(default)]
-    pub meshing: FluidConfigurationMeshing,
+    pub ignore: bool,
 }
 
 impl Default for BubblerFluidConfiguration {
     fn default() -> Self {
         BubblerFluidConfiguration {
-            density: bubbler_fluid_conf_default_density(),
-            mass: bubbler_fluid_conf_default_mass(),
             debug_color: bubbler_fluid_conf_default_debug_color(),
-            kernel_radius: bubbler_fluid_conf_default_kernel_radius(),
+            radius: bubbler_fluid_conf_default_radius(),
             material: None,
-            meshing: Default::default(),
+            ignore: false,
         }
     }
 }
 
-fn bubbler_fluid_conf_default_density() -> f32 { 1. }
-fn bubbler_fluid_conf_default_mass() -> f32 { 1. }
 fn bubbler_fluid_conf_default_debug_color() -> Vector3<f32> { Vector3::new(1., 1., 1.) }
-fn bubbler_fluid_conf_default_kernel_radius() -> f32 { 4. * 0.02 }
+fn bubbler_fluid_conf_default_radius() -> f32 { 0.002 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Default)]
 pub struct SceneBubblerConfiguration {
     #[serde(default)]
     pub config: BubblerConfig,
@@ -172,6 +164,7 @@ pub struct Scene
     pub render_config: RenderConfig,
     #[serde(default)]
     pub camera: CameraConfiguration,
+    #[serde(default)]
     pub bubbler: SceneBubblerConfiguration,
     pub config: Configuration,
     pub fluids: HashMap<String, FluidConfiguration>,

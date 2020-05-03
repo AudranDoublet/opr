@@ -1377,6 +1377,7 @@ name = "raytracer"
 version = "0.1.0"
 dependencies = [
  "cfg-if",
+ "flate2",
  "image 0.23.2",
  "image_manipulation",
  "nalgebra",
@@ -1385,7 +1386,9 @@ dependencies = [
  "search",
  "serde",
  "serde_derive",
+ "serde_json",
  "serde_yaml",
+ "sph_scene",
  "tobj",
 ]
 
