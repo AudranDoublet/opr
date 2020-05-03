@@ -32,7 +32,7 @@ pub fn pipeline_simulate(scene: &Scene, dump_folder: &Path) -> Result<(), Box<dy
     let mut idx = 0;
 
     let pb = ProgressBar::new(100);
-    pb.set_style(ProgressStyle::default_bar() .template("[{elapsed}] [{per_sec}] [{eta}] {bar:40.cyan/blue} {pos:>7}/{len:7}"));
+    pb.set_style(ProgressStyle::default_bar() .template("[{elapsed}] [{per_sec}] [{eta}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}"));
 
     let perc = |x| ((x / max_time) * 100.) as u64;
 
@@ -52,6 +52,7 @@ pub fn pipeline_simulate(scene: &Scene, dump_folder: &Path) -> Result<(), Box<dy
         total_time += fluid_simulation.get_time_step();
 
         let percent = perc(total_time);
+        pb.set_message(format!("vmax: {}, timestep: {}", fluid_simulation.compute_vmax(), fluid_simulation.get_time_step()).as_str());
         pb.inc(percent - old);
     }
 
