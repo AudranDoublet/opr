@@ -1,6 +1,8 @@
 use search::{BVHShape, IntersectsBVHShape, Intersection, Ray, AABB};
 use nalgebra::{Vector3, Vector2};
 
+use crate::shapes::Shape;
+
 const EPSILON: f32 = 0.0000001;
 
 #[derive(Clone, Copy)]
@@ -120,5 +122,25 @@ impl IntersectsBVHShape for Triangle {
     fn get_tex_coords(&self, u: f32, v: f32) -> Vector2<f32>
     {
         self.tex1 + self.tex2 * u + self.tex3 * v
+    }
+}
+
+impl Shape for Triangle {
+    fn clone_shape(&self) -> Box<dyn Shape + Sync + Send> {
+        Box::new(*self)
+    }
+
+    fn material(&self) -> usize {
+        self.material
+    }
+
+    fn id(&self) -> usize {
+        self.id
+    }
+
+    fn smoothed_normal(&self, _: &Ray, i: &Intersection) -> Vector3<f32> {
+        (self.v1_normal * (1.0 - i.u - i.v)
+            + self.v2_normal * i.u
+            + self.v3_normal * i.v).normalize()
     }
 }
