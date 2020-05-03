@@ -1,5 +1,5 @@
-use search::{BVHShape, IntersectsBVHShape, Intersection, Ray, AABB};
-use nalgebra::{Vector3, Vector2};
+use nalgebra::{Vector2, Vector3};
+use search::{AABB, BVHShape, Intersection, IntersectsBVHShape, Ray};
 
 use crate::shapes::Shape;
 
@@ -39,7 +39,7 @@ impl Triangle
             tex2: tex2,
             tex3: tex3,
             material: material,
-            id: id
+            id: id,
         }
     }
 
@@ -68,8 +68,8 @@ impl Triangle
     }
 
     pub fn normal(&self) -> Vector3<f32> {
-        let ab = self.v2 - self.v1;
-        let ac = self.v3 - self.v1;
+        let ab = &self.v2 - &self.v1;
+        let ac = &self.v3 - &self.v1;
 
         return ab.cross(&ac);
     }
@@ -84,8 +84,8 @@ impl BVHShape for Triangle {
 impl IntersectsBVHShape for Triangle {
     fn intersects(&self, r: &Ray, self_hit_eps: f32) -> Option<Intersection>
     {
-        let edge1 = self.v2 - self.v1;
-        let edge2 = self.v3 - self.v1;
+        let edge1 = &self.v2 - &self.v1;
+        let edge2 = &self.v3 - &self.v1;
 
         let h = r.direction.cross(&edge2);
         let a = edge1.dot(&h);
@@ -96,7 +96,7 @@ impl IntersectsBVHShape for Triangle {
         }
 
         let f = 1.0 / a;
-        let s = r.origin - self.v1;
+        let s = &r.origin - &self.v1;
         let u = f * s.dot(&h);
 
         if u < 0.0 || u > 1.0
@@ -121,7 +121,7 @@ impl IntersectsBVHShape for Triangle {
 
     fn get_tex_coords(&self, u: f32, v: f32) -> Vector2<f32>
     {
-        self.tex1 + self.tex2 * u + self.tex3 * v
+        &self.tex1 + &self.tex2 * u + &self.tex3 * v
     }
 }
 
@@ -139,8 +139,8 @@ impl Shape for Triangle {
     }
 
     fn smoothed_normal(&self, _: &Ray, i: &Intersection) -> Vector3<f32> {
-        (self.v1_normal * (1.0 - i.u - i.v)
-            + self.v2_normal * i.u
-            + self.v3_normal * i.v).normalize()
+        (&self.v1_normal * (1.0 - i.u - i.v)
+            + &self.v2_normal * i.u
+            + &self.v3_normal * i.v).normalize()
     }
 }

@@ -1,15 +1,14 @@
+use std::ops::Deref;
+
+use nalgebra::{Vector2, Vector3};
+use search::{BVHShape, IntersectsBVHShape, Intersection, Ray, AABB};
+pub use sphere::*;
+pub use triangle::*;
+
 mod triangle;
 mod sphere;
 
-pub use triangle::*;
-pub use sphere::*;
-
-use search::*;
-use nalgebra::{Vector3, Vector2};
-
-use std::ops::Deref;
-
-pub trait Shape : BVHShape + IntersectsBVHShape {
+pub trait Shape: BVHShape + IntersectsBVHShape {
     fn clone_shape(&self) -> Box<dyn Shape + Sync + Send>;
 
     fn material(&self) -> usize;

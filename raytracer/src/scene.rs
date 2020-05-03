@@ -15,11 +15,14 @@ use rayon::prelude::*;
 use search::{BVH, BVHParameters, Ray};
 
 use crate::*;
+use crate::shapes::{Shape, Sphere};
+
+type Object = Box<dyn Shape + Sync + Send>;
 
 pub struct Scene
 {
     camera: Camera,
-    triangles: Vec<Box<dyn shapes::Shape + Sync + Send>>,
+    objects: Vec<Object>,
     materials: Vec<Material>,
     textures: Vec<Texture>,
     lights: Vec<Light>,
@@ -27,7 +30,7 @@ pub struct Scene
     correction_bias: f32,
     correction_bias_shadow: f32,
     air_ior: f32,
-    tree: BVH<Box<dyn shapes::Shape + Sync + Send>>,
+    tree: BVH<Object>,
 }
 
 fn load_texture(root: &Path, path: &Path) -> Result<Texture, Box<dyn Error>>
@@ -105,7 +108,6 @@ impl Scene {
     pub fn new() -> Scene {
         Scene {
             camera: Camera::new_empty(),
-            triangles: Vec::new(),
             materials: Vec::new(),
             textures: Vec::new(),
             lights: Vec::new(),
@@ -114,6 +116,7 @@ impl Scene {
             correction_bias_shadow: 0.01,
             air_ior: 1.,
             tree: BVH::default(),
+            objects: Vec::new(),
         }
     }
 
@@ -250,18 +253,18 @@ impl Scene {
 
                 let normal = (vertices[b] - vertices[a]).cross(&(vertices[c] - vertices[a]));
 
-                self.triangles.push(
+                self.objects.push(
                     Box::new(shapes::Triangle::new(vertices[a],
-                                          vertices[b],
-                                          vertices[c],
-                                          *vertices_normal.get(a).unwrap_or(&normal),
-                                          *vertices_normal.get(b).unwrap_or(&normal),
-                                          *vertices_normal.get(c).unwrap_or(&normal),
-                                          vertices_tex[a],
-                                          vertices_tex[b] - vertices_tex[a],
-                                          vertices_tex[c] - vertices_tex[a],
-                                          mat_id,
-                                          self.triangles.len(),
+                                                   vertices[b],
+                                                   vertices[c],
+                                                   *vertices_normal.get(a).unwrap_or(&normal),
+                                                   *vertices_normal.get(b).unwrap_or(&normal),
+                                                   *vertices_normal.get(c).unwrap_or(&normal),
+                                                   vertices_tex[a],
+                                                   vertices_tex[b] - vertices_tex[a],
+                                                   vertices_tex[c] - vertices_tex[a],
+                                                   mat_id,
+                                                   self.objects.len(),
                     )));
             }
         }
@@ -271,7 +274,7 @@ impl Scene {
 
     pub fn add_triangles(&mut self, triangles: &Vec<shapes::Triangle>) {
         for v in triangles {
-            self.triangles.push(Box::new(*v));
+            self.objects.push(Box::new(*v));
         }
     }
 
@@ -288,7 +291,7 @@ impl Scene {
             max_depth: max_depth as usize,
             max_shapes_in_leaf: 1,
             bucket_count: 6,
-        }, &self.triangles)
+        }, &self.objects)
     }
 
     fn sky_color(&self, _ray: Ray) -> Vector3<f32> {
@@ -457,6 +460,7 @@ impl Scene {
 
     pub fn render(&mut self, width: usize, height: usize, max_rec: u8, anti_aliasing_max_sample: usize) -> image_manipulation::Image {
         self.camera.set_size(width as f32, height as f32);
+
 
         let mut pixels = (0..width * height).into_par_iter()
             .map(|i| self.cast_ray(self.camera.generate_ray((i % width) as f32, (i / width) as f32), max_rec, 0.0, usize::max_value()))
