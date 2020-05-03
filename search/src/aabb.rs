@@ -77,6 +77,10 @@ impl AABB {
         AABB::new_from_pointset_mm(&[self.min, p], &[self.max, p])
     }
 
+    pub fn augment(&self, v: Vector3<f32>) -> AABB {
+        AABB::new(self.min - v, self.max + v)
+    }
+
     pub fn center(&self) -> Vector3<f32> {
         (self.min + self.max) / 2.
     }

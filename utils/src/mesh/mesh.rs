@@ -150,14 +150,14 @@ impl Mesh
         let p = p + self.translate;
 
         let dist = self.bsh.minimal_signed_distance(p).abs() * self.distance_mult;
-        let origin = self.bvh.aabb().nearest(&p);
+        let origin = self.bvh.aabb().augment(Vector3::new(1.0, 1.0, 1.0)).nearest(&p);
 
         let diff = p - origin;
         let ray = search::Ray::new(origin, diff);
 
-        let inside = self.bvh.ray_intersection_count(&ray, diff.norm()) % 2 != 0;
+        let count = self.bvh.ray_intersection_count(&ray, diff.norm());
 
-        match inside {
+        match count % 2 != 0 {
             true    => -dist,
             false   => dist,
         }

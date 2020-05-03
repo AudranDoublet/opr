@@ -125,7 +125,7 @@ fn timer(current: &mut f32, max: f32, dt: &mut f32) -> f32 {
     let old = *current;
 
     if next > max {
-        *dt = *current - max;
+        *dt = next - max;
         *current = max;
     } else {
         *dt = 0.0;
@@ -168,8 +168,9 @@ impl Animation {
                     }
                 }
 
-                if *current > steps.len() {
+                if *current >= steps.len() {
                     *loop_num -= 1;
+                    *current = 0;
 
                     if *loop_num == 0 {
                         Some(dt)

@@ -225,13 +225,16 @@ impl<T: BVHShape + IntersectsBVHShape + Clone> BVHNode<T> {
         }
     }
 
-    fn ray_intersection_count(&self, ray: &Ray, max_distance: f32, count: &mut usize) {
+    fn ray_intersection_count(&self, ray: &Ray, max_distance: f32, count: &mut usize, known: &mut Vec<f32>) {
         match self {
             BVHNode::Leaf { shapes } => {
                 for s in shapes {
                     if let Some(i) = s.intersects(ray, 0.0) {
                         if i.distance < max_distance {
-                            *count += 1;
+                            if known.iter().filter(|v| (i.distance - *v).abs() < 0.0001).count() == 0 {
+                                *count += 1;
+                                known.push(i.distance);
+                            }
                         }
                     }
                 }
@@ -241,11 +244,11 @@ impl<T: BVHShape + IntersectsBVHShape + Clone> BVHNode<T> {
                 let b = ray.intersects_aabb(right_box).unwrap_or(std::f32::INFINITY);
 
                 if a <= max_distance {
-                    left_node.ray_intersection_count(ray, max_distance, count);
+                    left_node.ray_intersection_count(ray, max_distance, count, known);
                 }
 
                 if b <= max_distance {
-                    right_node.ray_intersection_count(ray, max_distance, count);
+                    right_node.ray_intersection_count(ray, max_distance, count, known);
                 }
             }
         }
@@ -325,9 +328,10 @@ impl<T: BVHShape + IntersectsBVHShape + Clone> BVH<T> {
 
     pub fn ray_intersection_count(&self, ray: &Ray, max_distance: f32) -> usize {
         let mut result = 0;
+        let mut known = Vec::new();
 
         if ray.intersects_aabb(&self.aabb()).unwrap_or(std::f32::INFINITY) < max_distance {
-            self.root.ray_intersection_count(ray, max_distance, &mut result);
+            self.root.ray_intersection_count(ray, max_distance, &mut result, &mut known);
         }
 
         result
