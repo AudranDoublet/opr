@@ -1,17 +1,15 @@
-use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use bubbler::bubbler::Bubbler;
-use bubbler::diffuse_particle::DiffuseParticleType;
+use sph::bubbler::DiffuseParticleType;
 use indicatif::{ProgressBar, ProgressStyle};
 use nalgebra::Vector3;
 use rayon::prelude::*;
 use raytracer::{Camera, scene_config};
-use raytracer::scene_config::{MeshConfig, ParticleConfig};
+use raytracer::scene_config::{MeshConfig, BubbleConfig, VolumeConfig, FoamConfig};
 use search::HashGrid;
-use sph::{Simulation, SimulationFluidSnapshot};
-use sph_scene::{BubblerFluidConfiguration, ConfigurationAnisotropication, Scene};
+use sph::{Simulation, SimulationFluidSnapshot, Fluid};
+use sph_scene::{ConfigurationAnisotropication, Scene, FluidConfiguration};
 use sph_scene::simulation_loader::load;
 use utils::kernels::CubicSpine;
 
@@ -92,8 +90,9 @@ fn get_simulation_dumps_paths(folder: &Path) -> Result<Vec<PathBuf>, Box<dyn std
     Ok(files)
 }
 
-fn generate_rigid_objects(results: &mut Vec<MeshConfig>, scene: &Scene, simulation: &Simulation) {
-    results.extend(
+fn generate_rigid_objects(scene: &Scene, simulation: &Simulation) -> Vec<MeshConfig> {
+    let mut result = vec![];
+    result.extend(
         (0..simulation.solid_count()).filter_map(|i| {
             let v = simulation.solid(i);
             let conf = &scene.solids[i];
@@ -110,67 +109,109 @@ fn generate_rigid_objects(results: &mut Vec<MeshConfig>, scene: &Scene, simulati
                 None
             }
         })
-    )
+    );
+    result
 }
 
-fn generate_fluid_objects(results: &mut Vec<MeshConfig>, scene: &Scene, simulation: &Simulation, dump_directory: &Path, idx: usize) {
-    let fluids_map = scene.load_fluids_map();
 
-    for (name, conf) in &scene.fluids {
-        let path = &dump_directory.join(format!("{:08}_{}.obj", idx, name));
-        let buffer = &mut fs::File::create(path).unwrap();
-
-        let interpolation_algorithm = get_interpolation_algorithm(conf.meshing.enable_interpolation);
-        let (anisotropicator, anisotropic_radius) = get_anisotropicator(simulation.kernel_radius(),
-                                                                        conf.meshing.enable_anisotropication,
-                                                                        &conf.meshing.anisotropication_config);
-
-
-        let snapshot = snapshot_simulation(simulation, anisotropic_radius, *fluids_map.get(name).unwrap());
-
-        let mesher = Mesher::new(conf.meshing.iso_value, conf.meshing.cube_size, interpolation_algorithm, anisotropicator);
-        mesher.clone().convert_into_obj(&snapshot, buffer);
-
-        results.push(scene_config::MeshConfig {
-            path: path.to_str().unwrap().to_string(),
-            scale: Vector3::new(1., 1., 1.),
-            rotation: Vector3::zeros(),
-            position: Vector3::zeros(),
-            override_material: conf.material.clone(),
-        });
-    }
-}
-
-fn generate_bubbler_objects(scene: &Scene, bubbler: &Bubbler, dump_directory: &Path, idx: usize) -> Vec<ParticleConfig> {
-    let mut particles = vec![];
-
-    let mut diffuse: HashMap<&str, (&BubblerFluidConfiguration, DiffuseParticleType)> = HashMap::new();
-    diffuse.insert("bubble", (&scene.bubbler.bubble, DiffuseParticleType::Bubble));
-    diffuse.insert("foam", (&scene.bubbler.foam, DiffuseParticleType::Foam));
-    diffuse.insert("spray", (&scene.bubbler.spray, DiffuseParticleType::Spray));
-
-    for (name, (conf, kind)) in diffuse {
-        if conf.ignore {
-            continue;
+fn generate_fluid_bubble(conf: &FluidConfiguration, fluid: &Fluid, path: &Path) -> Option<BubbleConfig> {
+    if let Some(conf) = &conf.bubbler {
+        if conf.bubble.ignore {
+            return None;
         }
 
-        let path = &dump_directory.join(format!("{:08}_bubbler_{}.bin", idx, name));
+        assert!(fluid.bubbler().is_some());
 
-        let positions: Vec<Vector3<f32>> = bubbler.get_particles().iter()
-            .filter(|&p| p.kind == kind)
+        let positions: Vec<Vector3<f32>> = fluid.bubbler().unwrap().read().unwrap().get_particles().iter()
+            .filter(|&p| p.kind == DiffuseParticleType::Bubble)
             .map(|p| p.position).collect();
 
-        Particles::new_cst_radius(positions, conf.radius).dump(path).unwrap();
+        Particles::new_cst_radius(positions, conf.bubble.radius)
+            .dump(path)
+            .unwrap();
 
-        particles.push(scene_config::ParticleConfig {
+        Some(BubbleConfig {
             path: path.to_str().unwrap().to_string(),
-            material: conf.material.clone(),
+            material: conf.bubble.material.clone(),
+        })
+
+    } else {
+        None
+    }
+}
+
+fn generate_fluid_foam(conf: &FluidConfiguration, fluid: &Fluid, path: &Path)  -> Option<FoamConfig> {
+    if let Some(conf) = &conf.bubbler {
+        if conf.foam.ignore {
+            return None;
+        }
+
+        assert!(fluid.bubbler().is_some());
+
+        let positions: Vec<Vector3<f32>> = fluid.bubbler().unwrap().read().unwrap().get_particles().iter()
+            .filter(|&p| p.kind == DiffuseParticleType::Foam)
+            .map(|p| p.position).collect();
+
+        Particles::new_cst_radius(positions, conf.foam.radius)
+            .dump(path)
+            .unwrap();
+
+        Some(FoamConfig{
+            path: path.to_str().unwrap().to_string(),
+            color: conf.foam.color,
+            radius: conf.foam.radius,
+            density_scaling_factor: conf.foam.density_scaling_factor
+        })
+    } else {
+        None
+    }
+}
+
+
+fn generate_fluid_mesh(conf: &FluidConfiguration, simulation: &Simulation, fluid_idx: usize, path: &Path) -> MeshConfig {
+    let buffer = &mut fs::File::create(path).unwrap();
+
+    let interpolation_algorithm = get_interpolation_algorithm(conf.meshing.enable_interpolation);
+    let (anisotropicator, anisotropic_radius) = get_anisotropicator(simulation.kernel_radius(),
+    conf.meshing.enable_anisotropication,
+    &conf.meshing.anisotropication_config);
+
+    let snapshot = snapshot_simulation(simulation, anisotropic_radius, fluid_idx);
+
+    let mesher = Mesher::new(conf.meshing.iso_value, conf.meshing.cube_size, interpolation_algorithm, anisotropicator);
+    mesher.clone().convert_into_obj(&snapshot, buffer);
+
+    scene_config::MeshConfig {
+        path: path.to_str().unwrap().to_string(),
+        scale: Vector3::new(1., 1., 1.),
+        rotation: Vector3::zeros(),
+        position: Vector3::zeros(),
+        override_material: conf.material.clone(),
+    }
+}
+
+fn generate_fluid_objects(scene: &Scene, simulation: &Simulation, dump_directory: &Path, idx: usize) -> Vec<VolumeConfig> {
+    let mut result = vec![];
+
+    let fluids_map = scene.load_fluids_map();
+    for (name, conf) in &scene.fluids {
+        let fluid_idx = *fluids_map.get(name).unwrap();
+        let fluid = &simulation.fluids()[fluid_idx];
+        let template_path = |s| dump_directory.join(format!("{:08}_{}_{}.obj", idx, name, s));
+
+        let mesh = generate_fluid_mesh(conf, simulation, fluid_idx, &template_path("mesh"));
+        let foam = generate_fluid_foam(conf, fluid, &template_path("foam"));
+        let bubble = generate_fluid_bubble(conf, fluid, &template_path("bubble"));
+
+        result.push(VolumeConfig {
+            mesh,
+            foam,
+            bubble
         });
     }
 
-    particles
+    result
 }
-
 pub fn pipeline_polygonize(scene: &Scene, input_directory: &Path, dump_directory: &Path) -> Result<(), Box<dyn std::error::Error>> {
     fs::create_dir_all(dump_directory)?;
 
@@ -182,19 +223,17 @@ pub fn pipeline_polygonize(scene: &Scene, input_directory: &Path, dump_directory
     pb.tick();
 
     simulations.par_iter().enumerate().for_each(|(idx, path)| {
-        let (simulation, bubbler) = load(&path).unwrap();
+        let simulation = load(&path).unwrap();
         let path_yaml = dump_directory.join(format!("{:08}.yaml", idx));
 
         let camera = &simulation.camera;
 
-        let mut objects = vec![];
-        generate_rigid_objects(&mut objects, scene, &simulation);
-        generate_fluid_objects(&mut objects, scene, &simulation, dump_directory, idx);
-        let particles = generate_bubbler_objects(scene, &bubbler, dump_directory, idx);
+        let rigid_objects = generate_rigid_objects(scene, &simulation);
+        let volumes = generate_fluid_objects(scene, &simulation, dump_directory, idx);
 
         let config = scene_config::SceneConfig {
-            meshes: objects,
-            particles,
+            meshes: rigid_objects,
+            volumes,
             spheres: Vec::new(),
             lights: Vec::new(),
             camera: Camera::new(camera.position(), camera.up(), camera.forward(),

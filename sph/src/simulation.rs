@@ -89,8 +89,8 @@ impl Simulation
 
         Simulation {
             kernel: CubicSpine::new(kernel_radius),
-            particle_radius: particle_radius,
-            volume: volume,
+            particle_radius,
+            volume,
 
             // time step
             cfl_min_time_step: 0.0001,
@@ -118,10 +118,10 @@ impl Simulation
             fluid_types: fluids,
 
             camera: Camera::new(camera_position),
-            camera_animation: camera_animation,
+            camera_animation,
 
-            emitters: emitters,
-            emitters_animations: emitters_animations,
+            emitters,
+            emitters_animations,
 
             pressure_solver: default_pressure_solver(),
         }
@@ -151,6 +151,10 @@ impl Simulation
 
     pub fn solid(&self, i: usize) -> &RigidObject {
         &self.solids[i]
+    }
+
+    pub fn fluids(&self) -> &Vec<Fluid> {
+        &self.fluid_types
     }
 
     pub fn debug_get_solid_collisions(&self) -> &Vec<Vector3<f32>> {
@@ -216,8 +220,12 @@ impl Simulation
         self.fluid_types[self.particles_fluid_type[i]].debug_color()
     }
 
-    pub fn find_neighbours(&self, x: &Vector3<f32>) -> Vec<usize> {
-        self.neighbours_struct.find_neighbours(self.len(), &self.positions.read().unwrap(), *x)
+    pub fn find_neighbours(&self, x: &Vector3<f32>, phase_idx: usize) -> Vec<usize> {
+        self.neighbours_struct
+            .find_neighbours(self.len(), &self.positions.read().unwrap(), *x)
+            .into_iter()
+            .filter(|&j| self.particles_fluid_type[j] == phase_idx)
+            .collect()
     }
 
     pub fn neighbours(&self, i: usize) -> Vec<usize> {
@@ -228,7 +236,7 @@ impl Simulation
         self.neighbours[i]
             .iter()
             .map(|i| *i)
-            .filter(|j| self.particles_fluid_type[i] == self.particles_fluid_type[*j])
+            .filter(|&j| self.particles_fluid_type[i] == self.particles_fluid_type[j])
             .collect()
     }
 

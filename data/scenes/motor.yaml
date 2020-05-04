@@ -11,20 +11,18 @@ fluids:
             density: 1000.
         meshing:
             cube_size: 0.04
-bubbler:
-    lifetime: [0.30, 1.00]
-    k_b: 1.4
-    spray:
-        radius: 0.001
-        material: data/materials/white.mtl
-        ignore: true
-    bubble:
-        radius: 0.001
-        material: data/materials/white_transparent.mtl
-        ignore: true 
-    foam:
-        radius: 0.001
-        material: data/materials/white.mtl
+        bubbler:
+            lifetime: [0.30, 1.00]
+            k_b: 1.4
+            bubble:
+                radius: 0.001
+                material: data/materials/white_transparent.mtl
+                ignore: true
+            foam:
+                radius: 0.01
+                material: data/materials/white.mtl
+                density_scaling_factor: 0.01
+
 render_config:
     max_rec: 4
 solids:

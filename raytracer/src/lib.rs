@@ -6,6 +6,7 @@ mod scene;
 mod light;
 mod image;
 mod particle;
+mod shaders;
 
 pub mod scene_config;
 pub mod shapes;
@@ -16,6 +17,7 @@ pub use scene::*;
 pub use light::*;
 pub use crate::image::*;
 pub use particle::*;
+pub use shaders::*;
 
 use nalgebra::Vector3;
 

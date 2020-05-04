@@ -9,12 +9,13 @@ pub struct Sphere
     pub center: Vector3<f32>,
     pub radius: f32,
     pub material: usize,
+    pub shader: Option<usize>,
     pub id: usize,
 }
 
 impl Sphere
 {
-    pub fn new(center: Vector3<f32>, radius: f32, material: usize, id: usize) -> Sphere
+    pub fn new(center: Vector3<f32>, radius: f32, material: usize, shader: Option<usize>, id: usize) -> Sphere
     {
         assert!(radius > 0.0);
 
@@ -22,6 +23,7 @@ impl Sphere
             center,
             radius,
             material,
+            shader,
             id,
         }
     }
@@ -86,6 +88,10 @@ impl Shape for Sphere {
 
     fn material(&self) -> usize {
         self.material
+    }
+
+    fn shader(&self) -> Option<usize> {
+        self.shader
     }
 
     fn id(&self) -> usize {

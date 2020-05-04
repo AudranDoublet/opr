@@ -7,10 +7,10 @@ edition = "2018"
 [dependencies]
 # Maths
 nalgebra = { version = "0.20.0", features = ["serde-serialize"] }
+rand = "*"
 
 # Multithreading
 rayon = "1.3.0"
-
 
 # serialization
 serde = {version = "1.0.105", features = ["derive"]}

@@ -1,7 +1,8 @@
 use nalgebra::Vector3;
 use serde_derive::*;
-use sph::external_forces::{DragConfig, ElasticityConfig, ExternalForces, ViscosityType, VorticityConfig};
 use sph::Fluid;
+use sph::bubbler::{BubblerConfig, Bubbler};
+use sph::external_forces::{DragConfig, ElasticityConfig, ExternalForces, ViscosityType, VorticityConfig};
 
 fn default_debug_color() -> Vector3<f32> {
     Vector3::new(0.0, 0.0, 1.0)
@@ -97,16 +98,69 @@ impl Default for FluidConfigurationMeshing {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct BubblerFluidConfiguration {
+    // FIXME: the interpretation of the radius for Foam differs from Bubbles/Spray
+    #[serde(default = "bubbler_fluid_conf_default_color")]
+    pub color: Vector3<f32>,
+    #[serde(default = "bubbler_fluid_conf_default_radius")]
+    pub radius: f32,
+    // FIXME-END
+
+    // FIXME: this field is ignore for Foam
+    #[serde(default)]
+    pub material: Option<String>,
+    // FIXME-END
+
+    // FIXME: this is specific to Foam particles
+    #[serde(default = "bubbler_fluid_conf_default_density_scaling_factor")]
+    pub density_scaling_factor: f32,
+    // FIXME-END
+
+    #[serde(default)]
+    pub ignore: bool,
+}
+
+impl Default for BubblerFluidConfiguration {
+    fn default() -> Self {
+        BubblerFluidConfiguration {
+            color: bubbler_fluid_conf_default_color(),
+            radius: bubbler_fluid_conf_default_radius(),
+            material: None,
+            density_scaling_factor: 1.,
+            ignore: false,
+        }
+    }
+}
+
+fn bubbler_fluid_conf_default_color() -> Vector3<f32> { Vector3::new(1., 1., 1.) }
+fn bubbler_fluid_conf_default_radius() -> f32 { 0.002 }
+fn bubbler_fluid_conf_default_density_scaling_factor() -> f32 { 1. }
+
+#[derive(Debug, Deserialize, Default)]
+pub struct FluidBubblerConfig {
+    #[serde(default)]
+    pub config: BubblerConfig,
+    #[serde(default)]
+    pub foam: BubblerFluidConfiguration,
+    //#[serde(default)]
+    //pub spray: BubblerFluidConfiguration,
+    #[serde(default)]
+    pub bubble: BubblerFluidConfiguration,
+}
+
+
+#[derive(Debug, Deserialize)]
 pub struct FluidConfiguration {
     #[serde(default = "default_debug_color")]
     pub debug_color: Vector3<f32>,
     #[serde(default)]
     pub material: Option<String>,
     #[serde(default)]
-    pub track_with_bubbler: bool,
+    pub bubbler: Option<FluidBubblerConfig>,
     pub simulation: FluidConfigurationSimulation,
     pub meshing: FluidConfigurationMeshing,
 }
+
 
 impl FluidConfiguration {
     pub fn create(&self, id: usize, volume: f32, gravity: Vector3<f32>, kernel_radius: f32) -> Fluid {
@@ -121,6 +175,10 @@ impl FluidConfiguration {
             .drag(&conf_simulation.drag)
             .elasticity(&conf_simulation.elasticity);
 
-        Fluid::new(id, volume, conf_simulation.density, forces, self.debug_color)
+        let bubbler = if let Some(bubbler_conf) = &self.bubbler {
+            Some(Bubbler::new(bubbler_conf.config))
+        } else { None };
+
+        Fluid::new(id, volume, conf_simulation.density, forces, bubbler, self.debug_color)
     }
 }

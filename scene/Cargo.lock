@@ -48,19 +48,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf1de2fe8c75bc145a2f577add951f8134889b4795d47466a54a5c846d691693"
 
 [[package]]
-name = "bubbler"
-version = "0.1.0"
-dependencies = [
- "nalgebra",
- "rand",
- "rayon",
- "serde",
- "serde_derive",
- "serde_yaml",
- "sph",
-]
-
-[[package]]
 name = "bytemuck"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -671,6 +658,7 @@ version = "0.1.0"
 dependencies = [
  "mesher",
  "nalgebra",
+ "rand",
  "rayon",
  "search",
  "serde",
@@ -682,7 +670,6 @@ dependencies = [
 name = "sph_scene"
 version = "0.1.0"
 dependencies = [
- "bubbler",
  "flate2",
  "image",
  "nalgebra",

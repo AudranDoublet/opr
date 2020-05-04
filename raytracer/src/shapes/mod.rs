@@ -13,6 +13,8 @@ pub trait Shape: BVHShape + IntersectsBVHShape {
 
     fn material(&self) -> usize;
 
+    fn shader(&self) -> Option<usize>;
+
     fn id(&self) -> usize;
 
     fn smoothed_normal(&self, ray: &Ray, intersection: &Intersection) -> Vector3<f32>;

@@ -10,7 +10,6 @@ sph_scene = { path = "scene" }
 debug_renderer = { path = "debug_renderer" }
 raytracer = { path = "raytracer" }
 pipeline = { path = "pipeline" }
-bubbler = { path = "bubbler" }
 
 image = "0.23.2"
 

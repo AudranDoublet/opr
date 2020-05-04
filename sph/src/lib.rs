@@ -8,6 +8,7 @@ mod camera;
 mod emitter;
 mod fluid;
 
+pub mod bubbler;
 pub mod external_forces;
 pub mod pressure_solver;
 

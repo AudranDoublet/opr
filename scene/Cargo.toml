@@ -9,7 +9,6 @@ edition = "2018"
 [dependencies]
 sph = { path = "../sph" }
 utils = { path = "../utils" }
-bubbler = { path = "../bubbler" }
 
 # compression
 flate2 = { version = "*", features = ["cloudflare_zlib"], default-features = false }

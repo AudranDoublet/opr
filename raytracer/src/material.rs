@@ -9,8 +9,8 @@ use std::collections::HashMap;
 
 pub struct Material
 {
-    ambient: Vector3<f32>,
-    diffuse: Vector3<f32>,
+    pub ambient: Vector3<f32>,
+    pub diffuse: Vector3<f32>,
     pub transmission: Vector3<f32>,
     pub specular: Vector3<f32>,
     pub shininess: f32,

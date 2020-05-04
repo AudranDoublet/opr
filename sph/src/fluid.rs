@@ -7,6 +7,7 @@ use nalgebra::Vector3;
 
 use crate::Simulation;
 use crate::external_forces::ExternalForces;
+use crate::bubbler::{Bubbler};
 
 use serde_derive::*;
 
@@ -16,23 +17,33 @@ pub struct Fluid {
     rest_density: f32,
     mass: f32,
 
+    len: usize,
+
     #[serde(skip_serializing, skip_deserializing)]
     correspondances: Vec<usize>,
     #[serde(skip_serializing, skip_deserializing)]
     external_forces: RwLock<ExternalForces>,
 
+    bubbler: Option<RwLock<Bubbler>>,
+
     debug_color: Vector3<f32>,
 }
 
 impl Fluid {
-    pub fn new(id: usize, volume: f32, density: f32, forces: ExternalForces, debug_color: Vector3<f32>) -> Fluid {
+    pub fn new(id: usize, volume: f32, density: f32, forces: ExternalForces, bubbler: Option<Bubbler>, debug_color: Vector3<f32>) -> Fluid {
+        let bubbler = if let Some(bubbler) = bubbler {
+            Some(RwLock::new(bubbler))
+        } else {None};
+
         Fluid {
             fluid_type: id,
             rest_density: density,
             mass: volume * density,
+            len: 0,
             external_forces: RwLock::new(forces),
             correspondances: Vec::new(),
-            debug_color: debug_color,
+            bubbler,
+            debug_color,
         }
     }
 
@@ -52,6 +63,28 @@ impl Fluid {
     }
 
     #[inline]
+    pub fn bubbler(&self) -> Option<&RwLock<Bubbler>> {
+        if let Some(bubbler) = self.bubbler.as_ref() {
+            Some(bubbler)
+        } else {
+            None
+        }
+    }
+
+    pub fn bubbler_tick(&self, sim: &Simulation) -> bool {
+        if let Some(bubbler) = &self.bubbler {
+            bubbler.write().unwrap().tick(self, sim)
+        } else {
+            false
+        }
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize { 
+        self.len
+    }
+
+    #[inline]
     pub fn debug_color(&self) -> Vector3<f32> {
         self.debug_color
     }
@@ -59,6 +92,7 @@ impl Fluid {
     pub fn correspondance(&self, i: usize) -> usize {
         self.correspondances[i]
     }
+
 
     pub fn filter<'a, T: 'a + Send + Sync>(&self, fixed: bool, sim: &'a Simulation, iter: impl ParallelIterator<Item=&'a T> + IndexedParallelIterator) -> impl ParallelIterator<Item=(usize, &'a T)> {
         let idx = self.idx();
@@ -111,6 +145,8 @@ impl Fluid {
                 curr += 1;
             }
         }
+
+        self.len = curr;
     }
 
     pub fn apply_non_pressure_forces(&self, sim: &Simulation, accelerations: &mut Vec<Vector3<f32>>) -> f32 {

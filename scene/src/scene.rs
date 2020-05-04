@@ -4,7 +4,6 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::path::Path;
 
-use bubbler::config::BubblerConfig;
 use nalgebra::Vector3;
 use serde::Deserialize;
 use sph::{Animation, Emitter, Fluid, RigidObject, Simulation};
@@ -116,44 +115,6 @@ impl Default for CommandLineConfiguration {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct BubblerFluidConfiguration {
-    #[serde(default = "bubbler_fluid_conf_default_debug_color")]
-    pub debug_color: Vector3<f32>,
-    #[serde(default = "bubbler_fluid_conf_default_radius")]
-    pub radius: f32,
-    #[serde(default)]
-    pub material: Option<String>,
-    #[serde(default)]
-    pub ignore: bool,
-}
-
-impl Default for BubblerFluidConfiguration {
-    fn default() -> Self {
-        BubblerFluidConfiguration {
-            debug_color: bubbler_fluid_conf_default_debug_color(),
-            radius: bubbler_fluid_conf_default_radius(),
-            material: None,
-            ignore: false,
-        }
-    }
-}
-
-fn bubbler_fluid_conf_default_debug_color() -> Vector3<f32> { Vector3::new(1., 1., 1.) }
-fn bubbler_fluid_conf_default_radius() -> f32 { 0.002 }
-
-#[derive(Debug, Deserialize, Default)]
-pub struct SceneBubblerConfiguration {
-    #[serde(default)]
-    pub config: BubblerConfig,
-    #[serde(default)]
-    pub foam: BubblerFluidConfiguration,
-    #[serde(default)]
-    pub spray: BubblerFluidConfiguration,
-    #[serde(default)]
-    pub bubble: BubblerFluidConfiguration,
-}
-
-#[derive(Debug, Deserialize)]
 pub struct Scene
 {
     #[serde(skip_deserializing)]
@@ -164,8 +125,6 @@ pub struct Scene
     pub render_config: RenderConfig,
     #[serde(default)]
     pub camera: CameraConfiguration,
-    #[serde(default)]
-    pub bubbler: SceneBubblerConfiguration,
     pub config: Configuration,
     pub fluids: HashMap<String, FluidConfiguration>,
     pub solids: Vec<Solid>,
@@ -290,7 +249,6 @@ impl Scene
 
 pub fn load_scene(name: &str) -> Result<Scene, Box<dyn std::error::Error>> {
     let result: Scene = serde_yaml::from_reader(&File::open(name)?)?;
-    result.bubbler.config.assert_valid();
 
     Ok(result)
 }

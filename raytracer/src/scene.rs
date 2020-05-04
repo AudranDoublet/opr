@@ -14,6 +14,7 @@ use rand::distributions::Uniform;
 use rayon::prelude::*;
 use search::{BVH, BVHParameters, Ray};
 
+use crate::scene_config::*;
 use crate::*;
 use crate::shapes::{Shape, Sphere};
 
@@ -95,6 +96,7 @@ pub struct Scene
     camera: Camera,
     objects: Vec<Object>,
     materials: Vec<Material>,
+    shaders: Vec<Box<dyn FragmentShader>>,
     textures: Vec<Texture>,
     lights: Vec<Light>,
     light_ambient: Vector3<f32>,
@@ -110,6 +112,7 @@ impl Scene {
         Scene {
             camera: Camera::new_empty(),
             materials: Vec::new(),
+            shaders: Vec::new(),
             textures: Vec::new(),
             lights: Vec::new(),
             light_ambient: Vector3::zeros(),
@@ -128,16 +131,15 @@ impl Scene {
         scene.load_mtl(default_material)?[0];
 
         for obj in file.meshes {
-            let r = UnitQuaternion::from_euler_angles(obj.rotation.x, obj.rotation.y, obj.rotation.z);
-            scene.load_obj(Path::new(&obj.path), obj.position, r, obj.scale, obj.override_material)?;
+            scene.load_mesh(obj, None)?;
         }
 
         for sphere in file.spheres {
             scene.load_sphere(sphere.center, sphere.radius, sphere.material)?;
         }
 
-        for particle in file.particles {
-            scene.load_particles(particle.path, particle.material)?;
+        for volume in file.volumes {
+            scene.load_volume(volume)?;
         }
 
         for mut light in file.lights {
@@ -147,6 +149,7 @@ impl Scene {
                 _ => scene.add_light(light)
             }
         }
+
         scene.light_ambient = clamp_light(&scene.light_ambient);
 
         scene.camera = file.camera;
@@ -191,6 +194,11 @@ impl Scene {
         Ok(result)
     }
 
+    pub fn load_mesh(&mut self, conf: MeshConfig, shader: Option<usize>) -> Result<(), Box<dyn Error>> {
+        let r = UnitQuaternion::from_euler_angles(conf.rotation.x, conf.rotation.y, conf.rotation.z);
+        self.load_obj(Path::new(&conf.path), conf.position, r, conf.scale, conf.override_material, shader)
+    }
+
     pub fn load_particles(&mut self, path: String, material: Option<String>) -> Result<(), Box<dyn Error>>  {
         let material_id = if let Some(material_path) = material {
             self.load_mtl(Path::new(&material_path))?[0]
@@ -203,7 +211,7 @@ impl Scene {
         for i in 0..particles.len() {
             self.objects.push(
                 Box::new(
-                    Sphere::new(positions[i], radii[i], material_id, self.get_next_material_id())
+                    Sphere::new(positions[i], radii[i], material_id, None, self.get_next_material_id())
                 )
             );
         }
@@ -217,14 +225,18 @@ impl Scene {
 
         self.objects.push(
             Box::new(
-                Sphere::new(center, radius, material_id, self.get_next_material_id())
+                Sphere::new(center, radius, material_id, None, self.get_next_material_id())
             )
         );
 
         Ok(())
     }
 
-    pub fn load_obj(&mut self, path: &Path, position: Vector3<f32>, rotation: UnitQuaternion<f32>, scale: Vector3<f32>, override_material: Option<String>) -> Result<(), Box<dyn Error>> {
+    pub fn load_obj(&mut self, path: &Path, position: Vector3<f32>, rotation: UnitQuaternion<f32>, 
+        scale: Vector3<f32>, 
+        override_material: Option<String>, 
+        shader: Option<usize>) -> Result<(), Box<dyn Error>> {
+
         let root = path.parent().ok_or("bad path")?;
         let (models, materials) = tobj::load_obj(path)?;
 
@@ -309,12 +321,36 @@ impl Scene {
                                                    vertices_tex[b] - vertices_tex[a],
                                                    vertices_tex[c] - vertices_tex[a],
                                                    mat_id,
+                                                   shader,
                                                    self.get_next_material_id(),
                     )));
             }
         }
 
         Ok(())
+    }
+
+    pub fn load_volume(&mut self, config: VolumeConfig) -> Result<(), Box<dyn Error>> {
+        if let Some(bubble) = config.bubble {
+            self.load_particles(bubble.path, bubble.material)?;
+        }
+
+        let mut foam_shader = None;
+
+        if let Some(foam) = config.foam {
+            let color = foam.color;
+            let particles = Particles::load(&Path::new(&foam.path))?;
+
+            let shader = FoamFragmentShader::new(particles, color, foam.radius, foam.density_scaling_factor);
+
+            foam_shader = Some(self.shaders.len());
+
+            self.shaders.push(Box::new(
+                shader
+            ));
+        }
+
+        self.load_mesh(config.mesh, foam_shader)
     }
 
     pub fn add_triangles(&mut self, triangles: &Vec<shapes::Triangle>) {
@@ -341,8 +377,6 @@ impl Scene {
 
     fn sky_color(&self, _ray: Ray) -> Vector3<f32> {
         _ray.direction.apply_into(|f| f.cos())
-        // Vector3::zeros()
-        // Vector3::new(0.65, 0.65, 0.65)
     }
 
     fn compute_diffuse_and_specular(&self, position: &Vector3<f32>, normal: &Vector3<f32>, shininess: f32, mut id_triangle_from: usize) -> (Vector3<f32>, Vector3<f32>) {
@@ -469,7 +503,13 @@ impl Scene {
 
             color += ka.component_mul(&self.light_ambient) + kd.component_mul(&diffuse) + ks.component_mul(&specular);
 
-            clamp_light(&color.component_mul(&beer))
+            color = clamp_light(&color.component_mul(&beer));
+
+            if let Some(shader) = triangle.shader() {
+                color = self.shaders[shader].apply(&position, &color);
+            }
+
+            color
         } else {
             self.sky_color(ray)
         }

@@ -6,7 +6,7 @@ use flate2::Compression;
 use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
 use nalgebra::Vector3;
-use serde::{Deserialize, Serialize};
+use serde_derive::*;
 
 #[derive(Deserialize, Serialize)]
 pub struct Particles {

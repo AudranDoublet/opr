@@ -4,8 +4,7 @@ use std::fs;
 use std::path::Path;
 use std::time::Instant;
 
-use bubbler::bubbler::Bubbler;
-use bubbler::diffuse_particle::DiffuseParticleType;
+use sph::bubbler::{DiffuseParticle, DiffuseParticleType};
 use clap::ArgMatches;
 use kiss3d::{camera::camera::Camera, scene::SceneNode};
 use nalgebra::{Point3, Translation3};
@@ -55,13 +54,13 @@ fn add_meshes(dfsph: &Simulation, config: &sph_scene::Scene, scene: &mut debug_r
     result
 }
 
-fn dump_simulation(simulation: &Simulation, bubbler: &Bubbler, dump_folder: &Path, idx: usize, verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
+fn dump_simulation(simulation: &Simulation, dump_folder: &Path, idx: usize, verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
     let path = dump_folder.join(format!("{:08}.sim.bin", idx));
     if verbose {
         println!("Dumping scene as `{:?}`", &path);
     }
     let now = Instant::now();
-    dump(&path, simulation, bubbler)?;
+    dump(&path, simulation)?;
 
     if verbose {
         println!("> `Simulation::dump()` elapsed time: {} s", now.elapsed().as_secs_f32());
@@ -69,18 +68,16 @@ fn dump_simulation(simulation: &Simulation, bubbler: &Bubbler, dump_folder: &Pat
     Ok(())
 }
 
-fn update_diffuse(renderer: &mut debug_renderer::scene::Scene, bubbler: &Bubbler) {
-    renderer.window.remove_node(&mut renderer.diffuse);
-    renderer.diffuse = renderer.window.add_group();
-
+fn add_diffuse(renderer: &mut debug_renderer::scene::Scene, bubbles: &Vec<DiffuseParticle>) {
     let radius = renderer.get_particle_radius();
 
-    for diffuse in bubbler.get_particles() {
+    for diffuse in bubbles {
         let diffuse_radius = match diffuse.kind {
             DiffuseParticleType::Spray => radius * 0.4,
             DiffuseParticleType::Bubble => radius * 0.8,
             DiffuseParticleType::Foam => radius * 0.7,
         };
+
         let (r, g, b) = match diffuse.kind {
             DiffuseParticleType::Spray => (1., 1., 1.),
             DiffuseParticleType::Bubble => (1., 0., 1.),
@@ -94,9 +91,14 @@ fn update_diffuse(renderer: &mut debug_renderer::scene::Scene, bubbler: &Bubbler
     }
 }
 
+
+fn clear_diffuse(renderer: &mut debug_renderer::scene::Scene) {
+    renderer.window.remove_node(&mut renderer.diffuse);
+    renderer.diffuse = renderer.window.add_group();
+}
+
 fn simulate(scene: &Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Result<(), Box<dyn std::error::Error>> {
     let mut fluid_simulation = scene.load()?;
-    let mut bubbler = Bubbler::new(scene.bubbler.config);
     let mut total_time = 0.0;
     let mut time_simulated_since_last_frame = fps;
     let mut display_high_speed_only = false;
@@ -182,7 +184,7 @@ fn simulate(scene: &Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Resu
         if !pause {
             if time_simulated_since_last_frame >= fps {
                 if dump_all {
-                    dump_simulation(&fluid_simulation, &bubbler, dump_folder, frame_idx, true)?;
+                    dump_simulation(&fluid_simulation, dump_folder, frame_idx, true)?;
                 }
 
                 time_simulated_since_last_frame = 0.;
@@ -192,8 +194,25 @@ fn simulate(scene: &Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Resu
             let prev = fluid_simulation.len();
             time_simulated_since_last_frame += fluid_simulation.tick();
             add_particles(prev..fluid_simulation.len(), &fluid_simulation, &mut renderer);
-            if scene.simulation_config.enable_bubbler && bubbler.tick(&fluid_simulation) {
-                update_diffuse(&mut renderer, &bubbler);
+
+            if scene.simulation_config.enable_bubbler {
+                let nb_bubbler_updated = fluid_simulation
+                    .fluids()
+                    .iter()
+                    .filter(|f| f.bubbler_tick(&fluid_simulation))
+                    .count();
+
+                // FIXME: I was supposed to implement a lazy algorithm to only update the diffuse
+                //        particles that have changed, however I've been the lazy one => it update
+                //        all the diffuse particles if one is updated
+                if nb_bubbler_updated > 0 {
+                    clear_diffuse(&mut renderer);
+                    fluid_simulation.fluids()
+                        .iter()
+                        .filter_map(|f| f.bubbler())
+                        .for_each(|bubbler| add_diffuse(&mut renderer, bubbler.read().unwrap().get_particles()));
+                }
+                // FIXME-END
             }
 
             let d_v_mean_sq = fluid_simulation.compute_vmean();

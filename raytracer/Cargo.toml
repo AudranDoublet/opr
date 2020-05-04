@@ -19,6 +19,5 @@ serde_yaml = ""
 serde_derive = ""
 cfg-if = ""
 
-sph_scene = { path = "../scene" }
 search = { path = "../search" }
 image_manipulation = { path = "../image_manipulation" }

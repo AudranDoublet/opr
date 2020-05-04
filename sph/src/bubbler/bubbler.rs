@@ -1,4 +1,4 @@
-use std::ops::{Div};
+use std::ops::Div;
 use std::sync::RwLock;
 
 use serde::{Deserialize, Serialize};
@@ -6,10 +6,11 @@ use nalgebra::{RealField, Vector3};
 use rand::*;
 use rand::distributions::Uniform;
 use rayon::prelude::*;
-use sph::Simulation;
+use crate::Simulation;
 
-use crate::config::BubblerConfig;
-use crate::diffuse_particle::{DiffuseParticle, DiffuseParticleType};
+use crate::bubbler::BubblerConfig;
+use crate::bubbler::{DiffuseParticle, DiffuseParticleType};
+use crate::fluid::Fluid;
 
 #[derive(Deserialize, Serialize)]
 pub struct Bubbler {
@@ -91,8 +92,8 @@ impl Bubbler {
         &self.particles
     }
 
-    fn update_containers_capacities(&mut self, simulation: &Simulation) {
-        let new_size = simulation.len();
+    fn update_containers_capacities(&mut self, fluid: &Fluid) {
+        let new_size = fluid.len();
 
         self.likelihood_ta.write().unwrap().resize(new_size, 0.);
         self.likelihood_wc.write().unwrap().resize(new_size, 0.);
@@ -100,45 +101,45 @@ impl Bubbler {
         self.grad_densities.write().unwrap().resize(new_size, Vector3::zeros());
     }
 
-    fn compute_likelihood_ta(&mut self, simulation: &Simulation) {
+    fn compute_likelihood_ta(&mut self, fluid: &Fluid, simulation: &Simulation) {
         let velocities = simulation.velocities.read().unwrap();
         let positions = simulation.positions.read().unwrap();
 
-        // FIXME: we must ignore particles that aren't near from the surface of the fluid
-        // FIXME-END;
-        self.likelihood_ta.write().unwrap().par_iter_mut().enumerate().for_each(|(i, potential)| {
-            let v_diff = simulation.neighbours_reduce_f(false, i, &| v, i, j| {
-                let x_ij: Vector3<f32> = &positions[i] - &positions[j];
-                let v_ij: Vector3<f32> = &velocities[i] - &velocities[j];
+        *self.likelihood_ta.write().unwrap() = 
+            fluid.filter_range(false, simulation)
+            .map(|i| {
+                let v_diff = simulation.neighbours_reduce_f(true, i, &| v, i, j| {
+                    let x_ij: Vector3<f32> = &positions[i] - &positions[j];
+                    let v_ij: Vector3<f32> = &velocities[i] - &velocities[j];
 
-                let w_ij = weighting(x_ij.norm(), simulation.kernel_radius());
+                    let w_ij = weighting(x_ij.norm(), simulation.kernel_radius());
 
-                v + if w_ij == 0.0 { 0.0 } else { v_ij.norm() * (1.0 - v_ij.normalize().dot(&x_ij.normalize())) * w_ij }
-            });
+                    v + if w_ij == 0.0 { 0.0 } 
+                    else { 
+                        v_ij.norm() * (1.0 - v_ij.normalize().dot(&x_ij.normalize())) * w_ij 
+                    }
+                });
 
-            *potential = clamp_normalized(v_diff, &self.hp.tau_ta);
-
-            assert!(*potential >= 0. && *potential <= 1.0)
-        });
+                clamp_normalized(v_diff, &self.hp.tau_ta)
+            }).collect();
     }
 
-    fn compute_likelihood_wc(&mut self, simulation: &Simulation) {
+    fn compute_likelihood_wc(&mut self, fluid: &Fluid, simulation: &Simulation) {
         let velocities = simulation.velocities.read().unwrap();
         let positions = simulation.positions.read().unwrap();
         let grad_densities = self.grad_densities.read().unwrap();
 
-        // FIXME: we must ignore particles that aren't near from the surface of the fluid
-        // FIXME-END;
-        self.likelihood_wc.write().unwrap().par_iter_mut().enumerate().for_each(|(i, potential)| {
-            // FIXME: is the normal to the surface of the fluid just the opposite of the density gradient?
-            let n_i: Vector3<f32> = (-&grad_densities[i]).normalize();
-            // FIXME-END;
+        *self.likelihood_wc.write().unwrap() = 
+            fluid.filter_range(false, simulation)
+            .map(|i| {
+                // FIXME: is the normal to the surface of the fluid just the opposite of the density gradient?
+                let n_i: Vector3<f32> = (-&grad_densities[i]).normalize();
+                // FIXME-END;
 
-            *potential =
                 // We check if the velocity follows enough the normal of the surface normal, if they aren't aiming enough at the same direction
                 // it's likely we're not at crest but just at an edge of the fluid (e.g. cube of water), so we can discard the particle
                 if velocities[i].normalize().dot(&n_i) >= self.hp.threshold_wc_normal_direction {
-                    let curvature_i = simulation.neighbours_reduce_f(false, i, &|acc, i, j| {
+                    let curvature_i = simulation.neighbours_reduce_f(true, i, &|acc, i, j| {
                         let x_ji: Vector3<f32> = &positions[j] - &positions[i];
                         let n_j: Vector3<f32> = (-&grad_densities[j]).normalize();
 
@@ -152,34 +153,33 @@ impl Bubbler {
                     clamp_normalized(curvature_i, &self.hp.tau_wc)
                 } else {
                     0.
-                };
-
-            assert!(*potential >= 0. && *potential <= 1.0)
-        });
+                }
+            }).collect();
     }
 
-    fn compute_likelihood_k(&mut self, simulation: &Simulation) {
+    fn compute_likelihood_k(&mut self, fluid: &Fluid, simulation: &Simulation) {
         let velocities = simulation.velocities.read().unwrap();
 
-        // FIXME: we must ignore particles that aren't near from the surface of the fluid
-        // FIXME-END;
-        self.likelihood_k.write().unwrap().par_iter_mut().enumerate().for_each(|(i, potential)| {
-            *potential = clamp_normalized(0.5 * simulation.mass(i) * velocities[i].norm().powi(2), &self.hp.tau_k);
-            assert!(*potential >= 0. && *potential <= 1.0)
-        });
+        *self.likelihood_k.write().unwrap() =
+            fluid.filter_range(false, simulation)
+            .map(|i| {
+                clamp_normalized(0.5 * simulation.mass(i) * velocities[i].norm().powi(2), &self.hp.tau_k)
+            }).collect();
     }
 
-    fn compute_grad_densities(&mut self, simulation: &Simulation) {
+    fn compute_grad_densities(&mut self, fluid: &Fluid, simulation: &Simulation) {
         let positions = simulation.positions.read().unwrap();
 
-        self.grad_densities.write().unwrap().par_iter_mut().enumerate().for_each(|(i, grad_density)| {
-            *grad_density = simulation.neighbours_reduce_v(false, i, &|v, i, j| {
-                v + simulation.mass(j) * simulation.gradient(positions[i], positions[j])
-            });
-        });
+        *self.grad_densities.write().unwrap() =
+            fluid.filter_range(false, simulation)
+            .map(|i| {
+                simulation.neighbours_reduce_v(true, i, &|v, i, j| {
+                    v + simulation.mass(j) * simulation.gradient(positions[i], positions[j])
+                })
+            }).collect();
     }
 
-    fn generate_diffuse_particles(&mut self, simulation: &Simulation) {
+    fn generate_diffuse_particles(&mut self, fluid: &Fluid, simulation: &Simulation) {
         let likelihood_ta = self.likelihood_ta.read().unwrap();
         let likelihood_wc = self.likelihood_wc.read().unwrap();
         let likelihood_k = self.likelihood_k.read().unwrap();
@@ -188,7 +188,8 @@ impl Bubbler {
 
         let particle_radius = simulation.particle_radius;
 
-        self.particles.par_extend((0..simulation.len()).into_par_iter()
+        self.particles.par_extend(
+            fluid.filter_range(false, simulation)
             .map(|i| {
                 let mut rng = rand::thread_rng();
                 let nb_diffuse = (likelihood_k[i] * (self.hp.k_ta * likelihood_ta[i] + self.hp.k_wc * likelihood_wc[i]) * self.dt) as usize;
@@ -210,8 +211,9 @@ impl Bubbler {
                     let v_d = &velocities[i] + dir;
                     let lifetime = self.infer_diffuse_particle_lifetime(likelihood_ta[i], likelihood_wc[i], likelihood_k[i]);
 
-                    let neighbours = simulation.find_neighbours(&x_d);
-                    res.push(DiffuseParticle { position: x_d, velocity: v_d, lifetime: lifetime, kind: self.infer_diffuse_particle_type(&neighbours) });
+                    let phase_idx = fluid.idx();
+                    let neighbours = simulation.find_neighbours(&x_d, phase_idx);
+                    res.push(DiffuseParticle { position: x_d, velocity: v_d, lifetime, kind: self.infer_diffuse_particle_type(&neighbours) });
                 }
 
                 res
@@ -246,7 +248,7 @@ impl Bubbler {
         }
     }
 
-    fn update_diffuse_particles(&mut self, simulation: &Simulation) {
+    fn update_diffuse_particles(&mut self, fluid: &Fluid, simulation: &Simulation) {
         let positions = simulation.positions.read().unwrap();
         let velocities = simulation.velocities.read().unwrap();
         let gravity = simulation.gravity();
@@ -265,10 +267,12 @@ impl Bubbler {
         let dt = self.dt;
         self.particles.par_iter_mut().for_each(|p| p.lifetime -= dt);
 
+        let phase_idx = fluid.idx();
+
         self.particles = (*self.particles).into_par_iter()
             .filter(|p| !p.is_dissolved())
             .map(|p| {
-                let neighbours = simulation.find_neighbours(&p.position);
+                let neighbours = simulation.find_neighbours(&p.position, phase_idx);
                 let p_type = self.infer_diffuse_particle_type(&neighbours);
 
                 let new_velocity = match p_type {
@@ -297,23 +301,23 @@ impl Bubbler {
             });
     }
 
-    pub fn tick(&mut self, simulation: &Simulation) -> bool {
+    pub fn tick(&mut self, fluid: &Fluid, simulation: &Simulation) -> bool {
         self.dt += simulation.get_time_step();
 
         if self.dt < self.hp.dt_min {
             return false;
         }
 
-        self.update_containers_capacities(&simulation);
+        self.update_containers_capacities(fluid);
 
-        self.update_diffuse_particles(simulation);
+        self.update_diffuse_particles(fluid, simulation);
 
-        self.compute_grad_densities(simulation);
-        self.compute_likelihood_ta(simulation);
-        self.compute_likelihood_wc(simulation);
-        self.compute_likelihood_k(simulation);
+        self.compute_grad_densities(fluid, simulation);
+        self.compute_likelihood_ta(fluid, simulation);
+        self.compute_likelihood_wc(fluid, simulation);
+        self.compute_likelihood_k(fluid, simulation);
 
-        self.generate_diffuse_particles(simulation);
+        self.generate_diffuse_particles(fluid, simulation);
 
         self.dt = 0.0;
 
