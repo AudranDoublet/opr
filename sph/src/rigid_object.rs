@@ -378,13 +378,11 @@ impl RigidObject
     }
 
     pub fn is_particle_inside(&self, position: &Vector3<f32>, radius: f32) -> bool {
-        let position = &self.position_in_mesh_space(*position);
-        let sphere = Sphere::new(position, radius);
-
-        self.bvh.intersect_one(&sphere.aabb())
-            .iter()
-            .filter(|v| v.radius + radius > (v.position - position).norm())
-            .peekable().peek().is_some()
+        if let Some((dist, _)) = self.grid.interpolate(0, self.position_in_mesh_space(*position), false) {
+            dist <= 2. * radius
+        } else {
+            false
+        }
     }
 
     pub fn compute_volume_and_boundary_x(&self, position: &mut Vector3<f32>, velocity: &mut Vector3<f32>, particle_radius: f32, kernel_radius: f32, dt: f32) -> (f32, Vector3<f32>)

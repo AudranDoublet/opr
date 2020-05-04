@@ -166,7 +166,7 @@ impl Triangle
     pub fn normal(&self, s: f32, t: f32) -> Vector3<f32> {
         let eq = |a: f32, b: f32| (a - b).abs() < 1e-5;
 
-        assert!(s + t < 1. + 1e-5);
+        assert!(s + t < 1. + 1e-5, "s = {}, t = {}, s+t = {}", s, t, s + t);
 
         if eq(s, 0.0) {
             if eq(t, 0.0) {
