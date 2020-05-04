@@ -1,7 +1,6 @@
 use nalgebra::Vector3;
 use crate::Particles;
 use search::HashGrid;
-use utils::kernel::CubicSpine;
 
 pub trait FragmentShader: Sync + Send {
     fn apply(&self, position: &Vector3<f32>, color: &Vector3<f32>) -> Vector3<f32>;
