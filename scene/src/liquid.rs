@@ -13,6 +13,7 @@ fn default_density() -> f32 {
 pub enum FixedStrategy {
     Empty,
     Lowest,
+    TopDown,
 }
 
 impl Default for FixedStrategy {
@@ -29,6 +30,12 @@ impl FixedStrategy {
                 let y_min = points.iter().fold(std::f32::INFINITY, |a, b| a.min(b.y));
 
                 points.iter().map(|v| ((v.y - y_min).abs() < 0.01, *v)).collect()
+            },
+            FixedStrategy::TopDown => {
+                let y_min = points.iter().fold(std::f32::INFINITY, |a, b| a.min(b.y));
+                let y_max = points.iter().fold(std::f32::NEG_INFINITY, |a, b| a.max(b.y));
+
+                points.iter().map(|v| ((v.y - y_min).abs() < 0.01 || (v.y - y_max).abs() < 0.01, *v)).collect()
             },
         }
     }

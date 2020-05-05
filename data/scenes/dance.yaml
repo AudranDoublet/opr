@@ -2,16 +2,43 @@ config:
     particle_radius: 0.02
 fluids:
     cloth:
-        density: 1000.
-        elasticity:
-            alpha: 0.1
-            young_modulus: 250000
-            poisson_ratio: 0.33
-            max_iteration: 100
-            tolerance: 0.0001
-        drag:
-            drag_coefficient: 1.0
-            air_velocity: [0.0, 15.0, 0.0]
+        simulation:
+            density: 1000.
+            elasticity:
+                alpha: 0.1
+                young_modulus: 250000
+                poisson_ratio: 0.33
+                max_iteration: 100
+                tolerance: 0.0001
+            drag:
+                drag_coefficient: 1.0
+                air_velocity: [0.0, 15.0, 0.0]
+                air_animation:
+                    type: steps
+                    loop_count: -1
+                    steps:
+                        - type: curve
+                          time: 0.5
+                          curve:
+                              type: bezier
+                              control_points:
+                                  - [0.0, 20., 0.0]
+                                  - [30.0, 20., 0.0]
+                                  - [30.0, -20.0, 0.0]
+                                  - [0.0, -20.0, 0.0]
+                          variable: Position
+                        - type: curve
+                          time: 0.5
+                          curve:
+                              type: bezier
+                              control_points:
+                                  - [0.0, -20., 0.0]
+                                  - [-30.0, -20., 0.0]
+                                  - [-30.0, 20.0, 0.0]
+                                  - [0.0, 20.0, 0.0]
+                          variable: Position
+        meshing: 
+            cube_size: 0.01
 simulation_config:
     fps: 168
     max_time: 4.0
@@ -32,9 +59,9 @@ liquids_blocks:
       mesh: objects/armadillo.obj
       dynamic: true
       resolution: [31, 31, 31]
-      scale: [0.5, 0.5, 0.5]
+      scale: [0.2, 0.2, 0.2]
       position: [0.0, -0.4, 0.0]
       rotation_axis: [0.0, 0.0, 0.0]
       rotation_angle: 0.0
-      fixed_strategy: Lowest
+      fixed_strategy: TopDown
 liquids_add_blocks: []
