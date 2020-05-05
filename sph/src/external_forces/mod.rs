@@ -12,6 +12,7 @@ use nalgebra::Vector3;
 
 use crate::Fluid;
 use crate::Simulation;
+use crate::Animation;
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type")]
@@ -60,6 +61,8 @@ impl Default for VorticityConfig {
 pub struct DragConfig {
     drag_coefficient: f32,
     air_velocity: Vector3<f32>,
+    #[serde(default)]
+    air_animation: Animation,
 }
 
 impl Default for DragConfig {
@@ -67,6 +70,7 @@ impl Default for DragConfig {
         DragConfig {
             drag_coefficient: 1.0,
             air_velocity: Vector3::zeros(),
+            air_animation: Animation::default(),
         }
     }
 }
@@ -128,6 +132,7 @@ impl ExternalForces {
         self.add(drag::DragForce::new(
             config.air_velocity,
             config.drag_coefficient,
+            config.air_animation.clone(),
         ))
     }
 
