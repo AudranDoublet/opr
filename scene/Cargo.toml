@@ -9,9 +9,7 @@ edition = "2018"
 [dependencies]
 sph = { path = "../sph" }
 utils = { path = "../utils" }
-
-# compression
-flate2 = { version = "*", features = ["cloudflare_zlib"], default-features = false }
+raytracer = { path = "../raytracer" }
 
 nalgebra = "0.20.0"
 serde = {version = "1.0.105"}

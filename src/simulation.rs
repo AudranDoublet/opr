@@ -9,7 +9,6 @@ use clap::ArgMatches;
 use kiss3d::{camera::camera::Camera, scene::SceneNode};
 use nalgebra::{Point3, Translation3};
 use sph_scene::Scene;
-use sph_scene::simulation_loader::dump;
 use sph::Simulation;
 
 pub fn add_particles(range: std::ops::Range<usize>, dfsph: &Simulation, scene: &mut debug_renderer::scene::Scene) {
@@ -60,7 +59,7 @@ fn dump_simulation(simulation: &Simulation, dump_folder: &Path, idx: usize, verb
         println!("Dumping scene as `{:?}`", &path);
     }
     let now = Instant::now();
-    dump(&path, simulation)?;
+    simulation.dump(&path)?;
 
     if verbose {
         println!("> `Simulation::dump()` elapsed time: {} s", now.elapsed().as_secs_f32());

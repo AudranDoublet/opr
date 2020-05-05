@@ -1,7 +1,7 @@
 use std::ops::Div;
 use std::sync::RwLock;
 
-use serde::{Deserialize, Serialize};
+use serde_derive::*;
 use nalgebra::{RealField, Vector3};
 use rand::*;
 use rand::distributions::Uniform;
@@ -15,7 +15,6 @@ use crate::fluid::Fluid;
 #[derive(Deserialize, Serialize)]
 pub struct Bubbler {
     #[serde(skip_serializing, skip_deserializing)]
-    /// Bubbler Hyper Parameters
     hp: BubblerConfig,
 
     #[serde(skip_serializing, skip_deserializing)]
@@ -253,9 +252,9 @@ impl Bubbler {
         let velocities = simulation.velocities.read().unwrap();
         let gravity = simulation.gravity();
 
-        let compute_avg_local_fluid_velocity = |x: &Vector3<f32>, neighbours: Vec<usize>| {
-            let mut w_sum = 0.;
-            let mut weighted_velocities = Vector3::zeros();
+        let compute_avg_local_fluid_velocity = |x: &Vector3<f32>, v: Vector3<f32>, neighbours: Vec<usize>| {
+            let mut w_sum = 1.;
+            let mut weighted_velocities = v;
             for j in neighbours {
                 let w = simulation.kernel_apply(*x, positions[j]);
                 weighted_velocities += &velocities[j] * w;
@@ -279,9 +278,9 @@ impl Bubbler {
                     // FIXME: the paper is mentioning F_ext, but which forces should we add? Perhaps we should consider the fluid acceleration as well?
                     DiffuseParticleType::Spray => &p.velocity + self.dt * gravity,
                     // FIXME-END;
-                    DiffuseParticleType::Foam => compute_avg_local_fluid_velocity(&p.position, neighbours),
+                    DiffuseParticleType::Foam => compute_avg_local_fluid_velocity(&p.position, p.velocity, neighbours),
                     DiffuseParticleType::Bubble => &p.velocity +
-                        self.dt * (-self.hp.k_b * gravity + self.hp.k_d * (&compute_avg_local_fluid_velocity(&p.position, neighbours) - &p.velocity) / self.dt),
+                        self.dt * (-self.hp.k_b * gravity + self.hp.k_d * (compute_avg_local_fluid_velocity(&p.position, p.velocity, neighbours) - &p.velocity) / self.dt),
                 };
 
                 DiffuseParticle {

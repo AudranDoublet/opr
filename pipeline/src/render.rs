@@ -4,8 +4,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use indicatif::{ProgressBar, ProgressStyle};
-use nalgebra::Vector3;
-use raytracer::{Light};
 use raytracer::scene_config::*;
 use sph::Camera;
 use sph_scene::Scene;
@@ -32,11 +30,7 @@ pub fn pipeline_render(scene: &Scene, input_directory: &Path, dump_directory: &P
         .template("[{elapsed_precise}] [{per_sec}] [{eta_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7}"));
     pb.tick();
 
-    let lights = vec![
-        Light::ambient(Vector3::new(0.3, 0.3, 0.3)),
-        Light::directional(Vector3::new(-1., 1., -1.), Vector3::new(1., 1., 1.)),
-    ];
-
+    let lights = scene.render_config.lights.clone();
     let (width, height) = scene.render_config.resolution;
 
     for idx in 0..simulations.len() {
@@ -53,6 +47,7 @@ pub fn pipeline_render(scene: &Scene, input_directory: &Path, dump_directory: &P
             render_scene.setup_camera(camera.position(), camera.up(), camera.forward());
         }
 
+        render_scene.sky_color = scene.render_config.sky_color;
         render_scene.build(scene.render_config.build_max_depth);
 
         render_scene.render(width, height, scene.render_config.max_rec, scene.render_config.aa_max_sample)

@@ -654,6 +654,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "tobj",
+ "utils",
 ]
 
 [[package]]
@@ -755,6 +756,7 @@ dependencies = [
 name = "sph"
 version = "0.1.0"
 dependencies = [
+ "flate2",
  "mesher",
  "nalgebra",
  "rand",
@@ -762,6 +764,7 @@ dependencies = [
  "search",
  "serde",
  "serde_derive",
+ "serde_json",
  "utils",
 ]
 
@@ -769,9 +772,9 @@ dependencies = [
 name = "sph_scene"
 version = "0.1.0"
 dependencies = [
- "flate2",
  "image",
  "nalgebra",
+ "raytracer",
  "serde",
  "serde_derive",
  "serde_json",
