@@ -11,9 +11,6 @@ sph = { path = "../sph" }
 utils = { path = "../utils" }
 raytracer = { path = "../raytracer" }
 
-# compression
-flate2 = { version = "*", features = ["cloudflare_zlib"], default-features = false }
-
 nalgebra = "0.20.0"
 serde = {version = "1.0.105"}
 serde_json = "1.0.48"

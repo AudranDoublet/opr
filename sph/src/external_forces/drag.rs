@@ -4,6 +4,10 @@ use rayon::prelude::*;
 use crate::Fluid;
 use crate::{Simulation, external_forces::ExternalForce};
 
+use crate::{Animation, AnimationHandler, VariableType};
+
+use std::sync::RwLock;
+
 const PI: f32 = std::f32::consts::PI;
 const RHO_A: f32 = 1.2041;
 const MU_A: f32 = 0.00001845;
@@ -19,16 +23,42 @@ const MAX_NEIGHBOUR: f32 = 38. * 2./3.; // 2/3 of max neighbour count
  * Reference: Approximate Air-Fluid Interactions for SPH (C. Glisser, 2017)
  */
 pub struct DragForce {
-    air_velocity: Vector3<f32>,
+    air_velocity: RwLock<Vector3<f32>>,
     drag_coefficient: f32,
+    air_animation: RwLock<Animation>,
 }
 
 impl DragForce {
-    pub fn new(air_velocity: Vector3<f32>, drag_coefficient: f32) -> Box<DragForce> {
+    pub fn new(air_velocity: Vector3<f32>, drag_coefficient: f32, animation: Animation) -> Box<DragForce> {
         Box::new(DragForce {
-            air_velocity: air_velocity,
-            drag_coefficient: drag_coefficient,
+            air_velocity: RwLock::new(air_velocity),
+            drag_coefficient,
+            air_animation: RwLock::new(animation),
         })
+    }
+}
+
+struct AirAnimationHandler {
+    velocity: Vector3<f32>,
+}
+
+impl AnimationHandler for AirAnimationHandler {
+    fn get_variable(&self, variable: &VariableType) -> Vector3<f32> {
+        match variable {
+            VariableType::Position => self.velocity,
+            _ => unimplemented!(),
+        }
+    }
+
+    fn set_variable(&mut self, variable: &VariableType, value: Vector3<f32>) {
+        match variable {
+            VariableType::Position => self.velocity = value,
+            _ => unimplemented!(),
+        }
+    }
+
+    fn look_at(&mut self, at: Vector3<f32>) {
+        unimplemented!();
     }
 }
 
@@ -36,6 +66,11 @@ impl ExternalForce for DragForce {
     fn init(&mut self, _: &Fluid, _: &Simulation) { }
 
     fn compute_acceleration(&self, fluid: &Fluid, sim: &Simulation, accelerations: &mut Vec<Vector3<f32>>) -> Option<f32> {
+        let mut handler = AirAnimationHandler { velocity: *self.air_velocity.read().unwrap() };
+        self.air_animation.write().unwrap().animate(&mut handler, sim.time_step(), false);
+
+        *self.air_velocity.write().unwrap() = handler.velocity;
+
         let positions = sim.positions.read().unwrap();
         let velocities = sim.velocities.read().unwrap();
 
@@ -57,10 +92,11 @@ impl ExternalForce for DragForce {
 
         // equation 8
         let y_coeff = (C_F * wei * c_def) / (C_K * C_B);
+        let air_velocity = handler.velocity;
 
         fluid.filter_m(false, sim, accelerations.par_iter_mut())
              .for_each(|(i, v)| {
-                let vi_rel = self.air_velocity - velocities[i];
+                let vi_rel = air_velocity - velocities[i];
                 let vi_rel_norm_sq = vi_rel.norm_squared();
                 let vi_rel_norm = vi_rel_norm_sq.sqrt();
 

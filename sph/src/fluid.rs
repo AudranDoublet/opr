@@ -7,7 +7,7 @@ use nalgebra::Vector3;
 
 use crate::Simulation;
 use crate::external_forces::ExternalForces;
-use crate::bubbler::{Bubbler};
+use crate::bubbler::Bubbler;
 
 use serde_derive::*;
 
