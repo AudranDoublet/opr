@@ -10,7 +10,6 @@ use raytracer::scene_config::{MeshConfig, BubbleConfig, VolumeConfig, FoamConfig
 use search::HashGrid;
 use sph::{Simulation, SimulationFluidSnapshot, Fluid};
 use sph_scene::{ConfigurationAnisotropication, Scene, FluidConfiguration};
-use sph_scene::simulation_loader::load;
 use utils::kernels::CubicSpine;
 
 use raytracer::Particles;
@@ -212,6 +211,7 @@ fn generate_fluid_objects(scene: &Scene, simulation: &Simulation, dump_directory
 
     result
 }
+
 pub fn pipeline_polygonize(scene: &Scene, input_directory: &Path, dump_directory: &Path) -> Result<(), Box<dyn std::error::Error>> {
     fs::create_dir_all(dump_directory)?;
 
@@ -223,7 +223,11 @@ pub fn pipeline_polygonize(scene: &Scene, input_directory: &Path, dump_directory
     pb.tick();
 
     simulations.par_iter().enumerate().for_each(|(idx, path)| {
-        let simulation = load(&path).unwrap();
+        let simulation = match Simulation::load(&path) {
+            Err(e) => {panic!(format!("error (path:{:?}): {:?}", path, e))},
+            Ok(o) => o
+        };
+
         let path_yaml = dump_directory.join(format!("{:08}.yaml", idx));
 
         let camera = &simulation.camera;

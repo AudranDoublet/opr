@@ -5,11 +5,10 @@ use std::path::Path;
 
 use sph::Simulation;
 use sph_scene::Scene;
-use sph_scene::simulation_loader::dump;
 
 fn dump_simulation(simulation: &Simulation, dump_folder: &Path, idx: usize) -> Result<(), Box<dyn std::error::Error>> {
     let path = dump_folder.join(format!("{:08}.sim.bin", idx));
-    dump(&path, simulation)?;
+    simulation.dump(&path)?;
     Ok(())
 }
 
@@ -49,7 +48,6 @@ pub fn pipeline_simulate(scene: &Scene, dump_folder: &Path) -> Result<(), Box<dy
                 .iter()
                 .for_each(|f| { f.bubbler_tick(&fluid_simulation); });
         }
-
 
         let old = perc(total_time);
         total_time += fluid_simulation.get_time_step();
