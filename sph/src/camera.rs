@@ -82,9 +82,9 @@ impl AnimationHandler for Camera {
 
     fn look_at(&mut self, at: Vector3<f32>) {
         let mut y = Vector3::y();
-        let dir = (at - self.position).normalize();
+        let dir = at - self.position;
 
-        if dir.dot(&y) < 0.001 {
+        if dir.normalize().dot(&y).abs() < 0.001 {
             y = Vector3::x();
         }
 

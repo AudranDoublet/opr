@@ -166,7 +166,7 @@ impl AnimationHandler for Emitter {
         let mut y = Vector3::y();
         let dir = (at - self.position).normalize();
 
-        if dir.dot(&y) < 0.001 {
+        if dir.dot(&y).abs() < 0.001 {
             y = Vector3::x();
         }
 

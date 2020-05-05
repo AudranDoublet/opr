@@ -19,6 +19,13 @@ simulation_config:
 render_config:
     fps: 24
     resolution: [1024, 1024]
+    planes:
+        - axis: 1
+          position: -5.
+          material: data/materials/metal_ground.mtl
+    sky_color:
+        type: color
+        color: [0.149, 0.6471, 0.7961]
 camera:
     position: [0.0, -3.0, -5.0]
     generate_at_render: true

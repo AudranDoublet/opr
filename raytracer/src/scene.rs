@@ -12,11 +12,11 @@ use nalgebra::{UnitQuaternion, Vector2, Vector3};
 use rand::*;
 use rand::distributions::Uniform;
 use rayon::prelude::*;
-use search::{BVH, BVHParameters, Ray};
+use search::{BVH, BVHParameters, Ray, IntersectsBVHShape, Intersection};
 
 use crate::scene_config::*;
 use crate::*;
-use crate::shapes::{Shape, Sphere};
+use crate::shapes::{Shape, Plane, Sphere};
 
 fn load_texture(root: &Path, path: &Path) -> Result<Texture, Box<dyn Error>>
 {
@@ -94,6 +94,7 @@ type Object = Box<dyn Shape + Sync + Send>;
 pub struct Scene
 {
     camera: Camera,
+    planes: Vec<Plane>,
     objects: Vec<Object>,
     materials: Vec<Material>,
     shaders: Vec<Box<dyn FragmentShader>>,
@@ -112,6 +113,7 @@ impl Scene {
     pub fn new() -> Scene {
         Scene {
             camera: Camera::new_empty(),
+            planes: Vec::new(),
             materials: Vec::new(),
             shaders: Vec::new(),
             textures: Vec::new(),
@@ -229,6 +231,20 @@ impl Scene {
             Box::new(
                 Sphere::new(center, radius, material_id, None, self.get_next_material_id())
             )
+        );
+
+        Ok(())
+    }
+
+    pub fn load_plane(&mut self, config: &scene_config::PlaneConfig) -> Result<(), Box<dyn Error>> {
+        let material_id = if let Some(material_path) = &config.material {
+            self.load_mtl(Path::new(&material_path))?[0]
+        } else {
+            self.default_material_id
+        };
+
+        self.planes.push(
+            Plane::new(config.axis, config.position, material_id, 0)
         );
 
         Ok(())
@@ -385,9 +401,9 @@ impl Scene {
         let mut diffuse = Vector3::zeros();
         let mut specular = Vector3::zeros();
         self.lights.iter().filter(|l| match l.shadow_ray(*position) {
-            Some(mut v) => /*{
+            Some(mut v) => {
                 let mut has_interference = false;
-                while let Some((intersection, triangle)) = self.tree.ray_intersect_with_predicate(&v, self.correction_bias_shadow, &|t| t.id() != id_triangle_from).get(0) {
+                while let Some((intersection, triangle)) = self.launch_ray(&v, self.correction_bias_shadow, id_triangle_from) {
                     let material = &self.materials[triangle.material()];
                     has_interference = material.illumination_model < 5; // hack: we just ignore transparent objects
                     if has_interference {
@@ -398,8 +414,7 @@ impl Scene {
                     id_triangle_from = triangle.id();
                 }
                 !has_interference
-                //self.tree.ray_intersect_with_predicate(&v, self.correction_bias_shadow, &|t| t.id() != id_triangle_from).get(0).is_none()
-            }*/true,
+            },
             None => true,
         }).for_each(|l| {
             let light_color = &l.get_color();
@@ -426,14 +441,34 @@ impl Scene {
         }
     }
 
+    fn launch_ray(&self, ray: &Ray, bias: f32, ignore: usize) -> Option<(Intersection, Object)> {
+        let mut intersection = self.tree.ray_intersect_with_predicate(ray, bias, &|t| t.id() != ignore).get(0);
+        let mut min_dist = if let Some((i, _)) = &intersection {
+            i.distance
+        } else {
+            std::f32::INFINITY
+        };
+
+        for plane in &self.planes {
+            if let Some(i) = plane.intersects(ray, bias) {
+                if i.distance < min_dist {
+                    min_dist = i.distance;
+                    intersection = Some((i, Box::new(plane.clone())));
+                }
+            }
+        }
+
+        intersection
+    }
+
     fn cast_ray(&self, ray: Ray, max_rec: u8, mut distance_inside_medium: f32, id_triangle_from: usize) -> Vector3<f32> {
-        if let Some((i, triangle)) = self.tree.ray_intersect_with_predicate(&ray, self.correction_bias, &|t| t.id() != id_triangle_from).get(0) {
+        if let Some((i, triangle)) = self.launch_ray(&ray, self.correction_bias, id_triangle_from) {
             let normal = triangle.smoothed_normal(&ray, &i);
 
             let material = &self.materials[triangle.material()];
 
             let ka = &material.get_ambient();
-            let kd = &material.get_diffuse(&self.textures, triangle, i.u, i.v);
+            let kd = &material.get_diffuse(&self.textures, &triangle, i.u, i.v);
             let ks = &material.specular;
 
             if material.illumination_model == 0 {

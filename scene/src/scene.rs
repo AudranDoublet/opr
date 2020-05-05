@@ -10,7 +10,7 @@ use sph::{Animation, Emitter, Fluid, RigidObject, Simulation};
 
 use crate::{EmitterConfig, FluidConfiguration, LiquidZone, Solid};
 
-use raytracer::{Light, scene_config::SkyColor};
+use raytracer::{Light, scene_config::SkyColor, scene_config::PlaneConfig};
 
 fn default_gravity() -> [f32; 3] {
     [0.0, -9.81, 0.0]
@@ -78,6 +78,8 @@ pub struct RenderConfig {
     pub lights: Vec<Light>,
     #[serde(default)]
     pub sky_color: SkyColor,
+    #[serde(default)]
+    pub planes: Vec<PlaneConfig>,
 }
 
 fn render_conf_default_fps() -> f32 { -1. }
@@ -107,6 +109,7 @@ impl Default for RenderConfig {
             aa_max_sample: render_conf_default_aa_max_sample(),
             lights: render_conf_default_lights(),
             sky_color: SkyColor::default(),
+            planes: Vec::new(),
         }
     }
 }

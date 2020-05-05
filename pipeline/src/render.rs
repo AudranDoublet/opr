@@ -48,6 +48,11 @@ pub fn pipeline_render(scene: &Scene, input_directory: &Path, dump_directory: &P
         }
 
         render_scene.sky_color = scene.render_config.sky_color;
+
+        for plane in &scene.render_config.planes {
+            render_scene.load_plane(plane)?;
+        }
+
         render_scene.build(scene.render_config.build_max_depth);
 
         render_scene.render(width, height, scene.render_config.max_rec, scene.render_config.aa_max_sample)

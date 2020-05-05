@@ -27,9 +27,22 @@ impl SkyColor {
     pub fn color(&self, ray: &Ray) -> Vector3<f32> {
         match self {
             SkyColor::Cosinus => ray.direction.apply_into(|f| f.cos()),
-            SkyColor::Color { color } => *color,
+            SkyColor::Color { color } => {
+                let coeff = ray.direction.normalize().dot(&Vector3::y()).abs() * 0.2 + 0.8;
+
+                coeff * color
+            },
         }
     }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(tag = "type")]
+pub struct PlaneConfig {
+    pub axis: usize,
+    pub position: f32,
+    #[serde(default)]
+    pub material: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
