@@ -1,16 +1,30 @@
 config:
-    particle_radius: 0.02
+    particle_radius: 0.01
 simulation_config:
     fps: 24.0
-    max_time: 4.0
+    max_time: 1.0
     enable_bubbler: false
+render_config:
+  max_rec: 5
+  sky_color:
+    type: color
+    color: [0.7, 0.7, 0.7]
+  lights:
+    - type: ambient
+      color: [0.3, 0.3, 0.3]
+    - type: directional
+      color: [0.5, 0.5, 0.5]
+      direction: [-1., 1, -1.]
+    - type: directional
+      color: [0.5, 0.5, 0.5]
+      direction: [1., -1., 1.]
 fluids:
     water:
-        material: data/materials/transparent.mtl
+        material: data/materials/transparent_water.mtl
         simulation:
             density: 1000.
         meshing:
-            cube_size: 0.04
+            cube_size: 0.02
 solids:
     - mesh: objects/canard_box.obj
       density: 1000
@@ -21,19 +35,10 @@ solids:
       position: [0.0, 0.0, 0.0]
       rotation_axis: [0.0, 0.0, 0.0]
       rotation_angle: 0.0
-      display: false
+      display: true
       particle_size: 0.1
       slice: true
-    - mesh: objects/dragon.obj
-      density: 1000
-      dynamic: true
-      mesh_invert: false
-      resolution: [31, 31, 31]
-      scale: [0.2, 0.2, 0.2]
-      position: [0.0, 0.6, 0.4]
-      rotation_axis: [0.0, 0.0, 0.0]
-      rotation_angle: 0.0
-      display: true
+      material: data/materials/white_box.mtl
     - mesh: objects/propel.obj
       density: 1000
       dynamic: false
@@ -49,7 +54,7 @@ solids:
         loop_count: 1
         steps:
             - type: constant
-              time: 0.3
+              time: 2
               variable: Rotation
               value: [0.0, 0.0, 0.0]
             - type: curve
@@ -66,16 +71,13 @@ solids:
 liquids_blocks:
     - type: block
       from: [-0.5, -0.05, -0.65]
-      to: [0.5, 0.9, -0.15]
-      density: 1.8
+      to: [0.5, 0.85, -0.15]
     - type: block
       from: [-0.5, -0.05, 0.15]
-      to: [0.5, 0.9, 0.65]
-      density: 1.8
+      to: [0.5, 0.85, 0.65]
     - type: block
       from: [-0.2, -0.05, -0.15]
       to: [0.2, 0.2, 0.15]
-      density: 1.8
 liquids_add_blocks:
     - type: block
       from:  [-0.100, 0.200, -0.100]
@@ -103,23 +105,10 @@ bubbler:
             cube_size: 0.04
         material: data/materials/white.mtl
 camera:
-    position: [0.0, 0.0, -5.0]
+    position: [-1.5, 0.5, -0.2]
     generate_at_render: true
     animation:
         type: group
         elements:
-            - type: curve
-              time: 2
-              variable: Position
-              smoothing:
-                  begin: 0.20
-                  end: 0.80
-              curve:
-                  type: bezier
-                  control_points:
-                      - [0.0, 0.5, -1.5]
-                      - [2.0, 1.5, -1.5]
-                      - [2.0, 1.5, 1.0]
-                      - [0.0, 0.5, 1.0]
             - type: lookat
-              position: [0.0, -0.5, 0.0]
+              position: [0.0, 0.0, 0.0]

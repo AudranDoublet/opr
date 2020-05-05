@@ -1638,6 +1638,7 @@ dependencies = [
  "flate2",
  "image 0.23.2",
  "nalgebra",
+ "raytracer",
  "serde",
  "serde_derive",
  "serde_json",
