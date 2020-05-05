@@ -10,6 +10,8 @@ use sph::{Animation, Emitter, Fluid, RigidObject, Simulation};
 
 use crate::{EmitterConfig, FluidConfiguration, LiquidZone, Solid};
 
+use raytracer::{Light, scene_config::SkyColor};
+
 fn default_gravity() -> [f32; 3] {
     [0.0, -9.81, 0.0]
 }
@@ -72,6 +74,10 @@ pub struct RenderConfig {
     pub max_rec: u8,
     #[serde(default = "render_conf_default_aa_max_sample")]
     pub aa_max_sample: usize,
+    #[serde(default = "render_conf_default_lights")]
+    pub lights: Vec<Light>,
+    #[serde(default)]
+    pub sky_color: SkyColor,
 }
 
 fn render_conf_default_fps() -> f32 { -1. }
@@ -84,6 +90,13 @@ fn render_conf_default_max_rec() -> u8 { 10 }
 
 fn render_conf_default_aa_max_sample() -> usize { 16 }
 
+fn render_conf_default_lights() -> Vec<Light> {
+    vec![
+        Light::ambient(Vector3::new(0.3, 0.3, 0.3)),
+        Light::directional(Vector3::new(-1., 1., -1.), Vector3::new(0.5, 0.5, 0.5)),
+    ]
+}
+
 impl Default for RenderConfig {
     fn default() -> RenderConfig {
         RenderConfig {
@@ -92,6 +105,8 @@ impl Default for RenderConfig {
             build_max_depth: render_conf_default_build_max_def(),
             max_rec: render_conf_default_max_rec(),
             aa_max_sample: render_conf_default_aa_max_sample(),
+            lights: render_conf_default_lights(),
+            sky_color: SkyColor::default(),
         }
     }
 }
@@ -183,7 +198,7 @@ impl Scene
     pub fn load_fluids_map(&self) -> HashMap<String, usize> {
         let mut names = self.fluids.iter()
                        .map(|(k, _)| k).collect::<Vec<&String>>();
-        
+
         names.sort();
         names.iter()
              .enumerate()

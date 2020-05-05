@@ -272,6 +272,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "image_manipulation"
+version = "0.1.0"
+dependencies = [
+ "image",
+ "nalgebra",
+ "rayon",
+]
+
+[[package]]
 name = "inflate"
 version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -573,6 +582,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "raytracer"
+version = "0.1.0"
+dependencies = [
+ "cfg-if",
+ "flate2",
+ "image",
+ "image_manipulation",
+ "nalgebra",
+ "rand",
+ "rayon",
+ "search",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "serde_yaml",
+ "tobj",
+]
+
+[[package]]
 name = "ryu"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -673,6 +701,7 @@ dependencies = [
  "flate2",
  "image",
  "nalgebra",
+ "raytracer",
  "serde",
  "serde_derive",
  "serde_json",
@@ -702,6 +731,12 @@ dependencies = [
  "lzw",
  "miniz_oxide",
 ]
+
+[[package]]
+name = "tobj"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b9d0bafde95a2f8f50dd3c10bc127b462efa8c3c0b60dfa276b7e032100e21d"
 
 [[package]]
 name = "typenum"

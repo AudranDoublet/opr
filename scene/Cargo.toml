@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 sph = { path = "../sph" }
 utils = { path = "../utils" }
+raytracer = { path = "../raytracer" }
 
 # compression
 flate2 = { version = "*", features = ["cloudflare_zlib"], default-features = false }

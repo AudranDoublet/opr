@@ -105,6 +105,7 @@ pub struct Scene
     correction_bias_shadow: f32,
     air_ior: f32,
     tree: BVH<Object>,
+    pub sky_color: SkyColor,
 }
 
 impl Scene {
@@ -122,6 +123,7 @@ impl Scene {
             air_ior: 1.,
             tree: BVH::default(),
             objects: Vec::new(),
+            sky_color: SkyColor::Cosinus,
         }
     }
 
@@ -375,15 +377,15 @@ impl Scene {
         }, &self.objects)
     }
 
-    fn sky_color(&self, _ray: Ray) -> Vector3<f32> {
-        _ray.direction.apply_into(|f| f.cos())
+    fn sky_color(&self, ray: Ray) -> Vector3<f32> {
+        self.sky_color.color(&ray)
     }
 
     fn compute_diffuse_and_specular(&self, position: &Vector3<f32>, normal: &Vector3<f32>, shininess: f32, mut id_triangle_from: usize) -> (Vector3<f32>, Vector3<f32>) {
         let mut diffuse = Vector3::zeros();
         let mut specular = Vector3::zeros();
         self.lights.iter().filter(|l| match l.shadow_ray(*position) {
-            Some(mut v) => {
+            Some(mut v) => /*{
                 let mut has_interference = false;
                 while let Some((intersection, triangle)) = self.tree.ray_intersect_with_predicate(&v, self.correction_bias_shadow, &|t| t.id() != id_triangle_from).get(0) {
                     let material = &self.materials[triangle.material()];
@@ -397,7 +399,7 @@ impl Scene {
                 }
                 !has_interference
                 //self.tree.ray_intersect_with_predicate(&v, self.correction_bias_shadow, &|t| t.id() != id_triangle_from).get(0).is_none()
-            }
+            }*/true,
             None => true,
         }).for_each(|l| {
             let light_color = &l.get_color();
