@@ -58,8 +58,11 @@ pub struct VolumeConfig {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SceneConfig
 {
+    #[serde(default)]
     pub spheres: Vec<SphereConfig>,
+    #[serde(default)]
     pub meshes: Vec<MeshConfig>,
+    #[serde(default)]
     pub volumes: Vec<VolumeConfig>,
     pub lights: Vec<Light>,
     pub camera: Camera,

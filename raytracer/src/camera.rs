@@ -31,6 +31,9 @@ impl Camera
         }
     }
 
+    pub fn width(&self) -> f32 { self.width}
+    pub fn height(&self) -> f32 { self.height }
+
     pub fn set_size(&mut self, width: f32, height: f32) {
         self.width = width;
         self.height = height;

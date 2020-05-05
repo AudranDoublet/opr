@@ -1,7 +1,9 @@
 use clap::ArgMatches;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
+use raytracer::Scene;
 use std::time::Instant;
+use raytracer::scene_config::SceneConfig;
 
 macro_rules! timeit {
     ($name:expr, $code:expr) => ({
@@ -16,18 +18,20 @@ macro_rules! timeit {
 
 pub fn main_render(args: &ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
     let scene = Path::new(args.value_of("scene").unwrap());
+    let config = SceneConfig::load(&Path::new(scene))?;
 
-    let result_width = 512;
-    let result_height = 512;
+    let (width, height) = (config.camera.width(), config.camera.height());
+    println!("width: {}, height: {}", width, height);
+    
+    let mut scene = Scene::from_config(config, &Path::new("data/materials/white.mtl"))?;
 
-    let mut scene = Scene::from_file(&Path::new(scene), &Path::new("examples/white.mtl"))?;
     scene.build(12);
 
-    let mut pixels = Vec::new();
+    let pixels;
 
-    timeit!("rendering", pixels = scene.render(result_width, result_height));
+    timeit!("rendering", pixels = scene.render(width as usize, height as usize, 10, 16));
 
-    write_image(&Path::new("result.png"), &pixels, result_width, result_height);
+    pixels.save(&Path::new("result.png"));
 
     Ok(())
 }
