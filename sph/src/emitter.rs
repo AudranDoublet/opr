@@ -4,60 +4,6 @@ use std::sync::RwLock;
 
 use crate::{Animation, VariableType, AnimationHandler};
 
-use serde_derive::*;
-
-#[derive(Debug, Deserialize)]
-#[serde(tag = "type")]
-pub enum EmitterShape {
-    #[serde(rename = "ellipse")]
-    Ellipse {
-        x_radius: f32,
-        y_radius: f32,
-    },
-    #[serde(rename = "rectangle")]
-    Rectangle {
-        width: f32,
-        height: f32,
-    }
-}
-
-impl EmitterShape {
-    pub fn generate_particles(&self, particle_radius: f32) -> Vec<Vector3<f32>> {
-        match self {
-            EmitterShape::Ellipse { x_radius, y_radius } => {
-                let xr = x_radius.powi(2);
-                let yr = y_radius.powi(2);
-
-                let rectangle = EmitterShape::Rectangle { width: *x_radius, height: *y_radius };
-                rectangle.generate_particles(particle_radius)
-                         .iter()
-                         .filter(|p| p.x*p.x / xr + p.y*p.y / yr <= 1.0)
-                         .map(|p| *p)
-                         .collect()
-            },
-            EmitterShape::Rectangle { width, height } => {
-                let x0 = -width/2.;
-                let y0 = -height/2.;
-                let step_x = (width / particle_radius) as usize;
-                let step_y = (height / particle_radius) as usize;
-
-                let mut res = Vec::new();
-                for y in 0..step_y {
-                    for x in 0..step_x {
-                        res.push(Vector3::new(
-                                x as f32 * particle_radius + x0,
-                                y as f32 * particle_radius + y0,
-                                0.0,
-                        ));
-                    }
-                }
-
-                res
-            }
-        }
-    }
-}
-
 pub struct Emitter {
     fluid_type: usize,
     particle_velocity: f32,
@@ -75,11 +21,13 @@ pub struct Emitter {
     next_emit: RwLock<f32>,
 
     emitting: bool,
+    emit: bool,
+    is_shot: bool,
 }
 
 impl Emitter {
     pub fn new(fluid_type: usize, position: Vector3<f32>, particle_velocity: f32,
-                particle_radius: f32, shape: &EmitterShape) -> Emitter {
+                particle_radius: f32, particles: Vec<Vector3<f32>>, is_shot: bool) -> Emitter {
         Emitter {
             fluid_type: fluid_type,
             particle_velocity: particle_velocity,
@@ -89,17 +37,19 @@ impl Emitter {
             rotation: Quaternion::identity(),
             acceleration: Vector3::zeros(),
             angular_acceleration: Vector3::zeros(),
-            particles: shape.generate_particles(particle_radius * 2.),
 
             next_emit: RwLock::new(0.0),
             time_between_emits: particle_radius * 2. / particle_velocity,
 
             emitting: false,
+            emit: false,
+            particles: particles,
+            is_shot: is_shot,
         }
     }
 
     pub fn emit(&self) -> Vec<(usize, Vector3<f32>, Vector3<f32>)> {
-        if !self.emitting {
+        if !self.emit {
             return Vec::new();
         }
 
@@ -186,6 +136,7 @@ impl AnimationHandler for Emitter {
     }
 
     fn set_emit(&mut self, emit: bool) {
+        self.emit = emit && (!self.is_shot || !self.emitting);
         self.emitting = emit;
     }
 }

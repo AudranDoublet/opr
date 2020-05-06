@@ -215,7 +215,7 @@ impl Scene
         let solids = self.load_solids()?;
         let fluids = self.load_fluids();
 
-        let (emitters, emitters_animations) = self.emitters();
+        let (emitters, emitters_animations) = self.emitters()?;
 
         let mut result = Simulation::new(
             self.kernel_radius(),
@@ -233,11 +233,17 @@ impl Scene
         Ok(result)
     }
 
-    pub fn emitters(&self) -> (Vec<Emitter>, Vec<Animation>) {
-        self.emitters
-            .iter()
-            .map(|v| v.load(self))
-            .unzip()
+    pub fn emitters(&self) -> Result<(Vec<Emitter>, Vec<Animation>), Box<dyn std::error::Error>> {
+        let (mut emitters, mut animations) = (Vec::new(), Vec::new());
+
+        for e in &self.emitters {
+            let (a, b) = e.load(self)?;
+
+            emitters.push(a);
+            animations.push(b);
+        }
+
+        Ok((emitters, animations))
     }
 
     pub fn recreate(&self, scene: &mut Simulation) -> Result<(), Box<dyn std::error::Error>> {
