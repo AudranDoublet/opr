@@ -284,6 +284,11 @@ impl RigidObject
         self.position
     }
 
+    pub fn set_rotation(&mut self, r: Vector3<f32>) {
+        self.rotation = *UnitQuaternion::from_euler_angles(r.x, r.y, r.z)
+            .quaternion();
+    }
+
     pub fn set_position(&mut self, position: Vector3<f32>) {
         self.position = position + self.center_of_mass
     }
