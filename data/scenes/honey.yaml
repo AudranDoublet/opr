@@ -39,6 +39,16 @@ solids:
       rotation_axis: [0.0, 0.0, 0.0]
       rotation_angle: 0.0
       display: false
+render_config:
+    fps: 24.0
+    max_rec: 4
+    planes:
+        - axis: 1
+          position: -5.
+          material: data/materials/metal_ground.mtl
+    sky_color:
+        type: color
+        color: [0.149, 0.6471, 0.7961]
 liquids_blocks: []
 liquids_add_blocks:
     - type: block

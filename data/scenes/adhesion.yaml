@@ -2,36 +2,55 @@ config:
     particle_radius: 0.02
 simulation_config:
     fps: 24.0
-    max_time: 1.0
+    max_time: 4.0
     enable_bubbler: false
+render_config:
+    fps: 24.0
+    planes:
+        - axis: 1
+          position: -5.
+          material: data/materials/metal_ground.mtl
+    sky_color:
+        type: color
+        color: [0.149, 0.6471, 0.7961]
 fluids:
     water:
         simulation:
             density: 1000.
             surface_adhesion: 5.0
+            viscosity:
+                type: weiler2018
+                coefficient: 500.0
+                surface_coefficient: 0.0
+                max_iteration: 100
+                tolerance: 0.01
         meshing:
             cube_size: 0.02
+        material: data/materials/chocolate.mtl
 solids:
     - mesh: objects/box.obj
       density: 1000
       dynamic: false
       mesh_invert: true
       resolution: [11, 11, 11]
-      scale: [1.0, 3.0, 1.0]
+      scale: [5.0, 8.0, 5.0]
       position: [0.0, 0.0, 0.0]
       rotation_axis: [0.0, 0.0, 0.0]
       rotation_angle: 0.0
       display: false
-    - mesh: objects/earth/earth.obj
+      particle_size: 1.
+    - mesh: objects/sphere.obj
       dynamic: false
       density: 1000
       mesh_invert: false
       resolution: [31, 31, 31]
-      scale: [0.0008, 0.0008, 0.0008]
-      position: [0.0, -0.5, 0.0]
+      scale: [0.05, 0.05, 0.05]
+      particle_size: 1.
+      position: [0.0, 0.0, 0.0]
       rotation_axis: [0.0, 0.0, 0.0]
       rotation_angle: 0.0
       display: true
+      material: data/materials/red.mtl
 liquids_blocks: []
 liquids_add_blocks:
     - type: block
@@ -40,15 +59,20 @@ liquids_add_blocks:
 emitters:
     - shape:
         type: ellipse
-        x_radius: 0.2
-        y_radius: 0.2
-      position: [0.0, 0.2, 0.0]
+        x_radius: 0.4
+        y_radius: 0.4
+      position: [0.0, 2.5, 0.0]
       velocity: 3.
       animation:
-          type: lookat_relative
-          position: [0., -1., 0.]
+          type: steps
+          loop_count: 1
+          steps:
+              - type: lookat_relative
+                position: [0., -1., 0.]
+              - type: emit
+                time: 2.0
 camera:
-    position: [-1.5, 0.5, -0.2]
+    position: [-2.5, 0.5, 0.0]
     generate_at_render: true
     animation:
         type: group
