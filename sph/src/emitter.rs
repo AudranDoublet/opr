@@ -73,6 +73,8 @@ pub struct Emitter {
     particles: Vec<Vector3<f32>>,
     time_between_emits: f32,
     next_emit: RwLock<f32>,
+
+    emitting: bool,
 }
 
 impl Emitter {
@@ -91,10 +93,16 @@ impl Emitter {
 
             next_emit: RwLock::new(0.0),
             time_between_emits: particle_radius * 2. / particle_velocity,
+
+            emitting: false,
         }
     }
 
     pub fn emit(&self) -> Vec<(usize, Vector3<f32>, Vector3<f32>)> {
+        if !self.emitting {
+            return Vec::new();
+        }
+
         let rotation = UnitQuaternion::from_quaternion(self.rotation);
         let pvelocity = (rotation * Vector3::z()) * self.particle_velocity;
 
@@ -163,6 +171,17 @@ impl AnimationHandler for Emitter {
     }
 
     fn look_at(&mut self, at: Vector3<f32>) {
-        self.rotation = *UnitQuaternion::face_towards(&(at - self.position), &Vector3::y()).quaternion();
+        let mut y = Vector3::y();
+        let dir = (at - self.position).normalize();
+
+        if dir.dot(&y).abs() > 0.99 {
+            y = Vector3::x();
+        }
+
+        self.rotation = *UnitQuaternion::face_towards(&dir, &y).quaternion();
+    }
+
+    fn set_emit(&mut self, _: bool) {
+        self.emitting = true;
     }
 }

@@ -1374,7 +1374,6 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "tobj",
- "utils",
 ]
 
 [[package]]
@@ -1640,6 +1639,7 @@ version = "0.1.0"
 dependencies = [
  "image 0.23.2",
  "nalgebra",
+ "raytracer",
  "serde",
  "serde_derive",
  "serde_json",

@@ -2,19 +2,30 @@ config:
     particle_radius: 0.02
 fluids:
     chocolate:
-        density: 1000.
-        viscosity:
-            type: weiler2018
-            coefficient: 2000.0
-            surface_coefficient: 1000.0
-            max_iteration: 100
-            tolerance: 0.01
+        simulation:
+            density: 1000.
+            viscosity:
+                type: weiler2018
+                coefficient: 2000.0
+                surface_coefficient: 1000.0
+                max_iteration: 100
+                tolerance: 0.01
+        meshing:
+            cube_size: 0.02
+        material: data/materials/chocolate.mtl
 simulation_config:
     fps: 48
     max_time: 4.0
 render_config:
     fps: 24
     resolution: [1024, 1024]
+    planes:
+        - axis: 1
+          position: -5.
+          material: data/materials/metal_ground.mtl
+    sky_color:
+        type: color
+        color: [0.149, 0.6471, 0.7961]
 camera:
     position: [0.0, -3.0, -5.0]
     generate_at_render: true

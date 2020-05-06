@@ -3,7 +3,47 @@ extern crate serde_yaml;
 use nalgebra::Vector3;
 use serde_derive::*;
 
+use search::Ray;
 use crate::*;
+
+#[derive(Copy, Clone, Debug, Deserialize, Serialize)]
+#[serde(tag = "type")]
+pub enum SkyColor {
+    #[serde(rename = "cosinus")]
+    Cosinus,
+    #[serde(rename = "color")]
+    Color {
+        color: Vector3<f32>,
+    }
+}
+
+impl Default for SkyColor {
+    fn default() -> SkyColor {
+        SkyColor::Cosinus
+    }
+}
+
+impl SkyColor {
+    pub fn color(&self, ray: &Ray) -> Vector3<f32> {
+        match self {
+            SkyColor::Cosinus => ray.direction.apply_into(|f| f.cos()),
+            SkyColor::Color { color } => {
+                let coeff = ray.direction.normalize().dot(&Vector3::y()).abs() * 0.2 + 0.8;
+
+                coeff * color
+            },
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(tag = "type")]
+pub struct PlaneConfig {
+    pub axis: usize,
+    pub position: f32,
+    #[serde(default)]
+    pub material: Option<String>,
+}
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct MeshConfig

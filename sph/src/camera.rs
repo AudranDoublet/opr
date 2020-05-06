@@ -81,6 +81,15 @@ impl AnimationHandler for Camera {
     }
 
     fn look_at(&mut self, at: Vector3<f32>) {
-        self.rotation = *UnitQuaternion::face_towards(&(at - self.position), &Vector3::y()).quaternion();
+        let mut y = Vector3::y();
+        let dir = at - self.position;
+
+        if dir.normalize().dot(&y).abs() > 0.99 {
+            y = Vector3::x();
+        }
+
+        self.rotation = *UnitQuaternion::face_towards(&dir, &y).quaternion();
     }
+
+    fn set_emit(&mut self, _: bool) { }
 }

@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 sph = { path = "../sph" }
 utils = { path = "../utils" }
+raytracer = { path = "../raytracer" }
 
 nalgebra = "0.20.0"
 serde = {version = "1.0.105"}

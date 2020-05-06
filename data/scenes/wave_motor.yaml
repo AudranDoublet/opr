@@ -1,8 +1,8 @@
 config:
     particle_radius: 0.01
 simulation_config:
-    fps: 24.0
-    max_time: 4.0
+    fps: 96.0
+    max_time: 10.0
     enable_bubbler: false
 fluids:
     water:
@@ -40,7 +40,7 @@ solids:
       dynamic: false
       mesh_invert: true
       resolution: [11, 11, 11]
-      scale: [2.0, 1.0, 0.4]
+      scale: [4.0, 2.0, 0.8]
       position: [0.0, 0.0, 0.0]
       rotation_axis: [0.0, 0.0, 0.0]
       rotation_angle: 0.0
@@ -51,58 +51,43 @@ solids:
       dynamic: false
       mesh_invert: false
       resolution: [11, 11, 11]
-      scale: [1.0, 1.0, 0.4]
+      scale: [1.0, 2.0, 0.8]
       position: [1.5, 0.0, 0.0]
       rotation_axis: [0.0, 0.0, 0.0]
       rotation_angle: 0.0
-      display: true
+      display: false
       animation:
         type: steps
         loop_count: -1
         steps:
             - type: curve
-              time: 0.05
-              variable: Position
-              curve:
-                  type: linear
-                  a: [1.5, 0.0, 0.0]
-                  b: [1.4, 0.0, 0.0]
-            - type: curve
-              time: 0.05
-              variable: Position
-              curve:
-                  type: linear
-                  b: [1.5, 0.0, 0.0]
-                  a: [1.4, 0.0, 0.0]
-            - type: constant
               time: 0.15
               variable: Position
-              value: [1.5, 0., 0.0]
+              curve:
+                  type: linear
+                  a: [2.5, 0.0, 0.0]
+                  b: [2.2, 0.0, 0.0]
+            - type: curve
+              time: 0.15
+              variable: Position
+              curve:
+                  type: linear
+                  b: [2.5, 0.0, 0.0]
+                  a: [2.2, 0.0, 0.0]
+            - type: constant
+              time: 0.20
+              variable: Position
+              value: [2.5, 0., 0.0]
 camera:
     position: [0.0, 0.0, -5.0]
     generate_at_render: true
     animation:
-        type: group
-        elements:
-            - type: curve
-              time: 2
-              variable: Position
-              smoothing:
-                  begin: 0.20
-                  end: 0.80
-              curve:
-                  type: bezier
-                  control_points:
-                      - [0.0, 0.5, -1.5]
-                      - [2.0, 1.5, -1.5]
-                      - [2.0, 1.5, 1.0]
-                      - [0.0, 0.5, 1.0]
-            - type: lookat
-              position: [0.0, -0.5, 0.0]
+        type: lookat
+        position: [0.0, -0.5, 0.0]
 liquids_blocks:
     - type: block
-      from: [-1.0, -0.500, -0.200]
-      to: [1.0, -0.100, 0.200]
+      from: [-2.0, -1.0, -0.400]
+      to: [2.0, -0.2, 0.400]
 liquids_add_blocks:
     - type: block
       from:  [-0.100, 0.200, -0.100]

@@ -57,9 +57,11 @@ impl AnimationHandler for AirAnimationHandler {
         }
     }
 
-    fn look_at(&mut self, at: Vector3<f32>) {
+    fn look_at(&mut self, _: Vector3<f32>) {
         unimplemented!();
     }
+
+    fn set_emit(&mut self, _: bool) { }
 }
 
 impl ExternalForce for DragForce {

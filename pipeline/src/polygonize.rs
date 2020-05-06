@@ -35,8 +35,6 @@ pub fn snapshot_simulation(simulation: &Simulation, anisotropic_radius: Option<f
             densities.push(all_densities[i]);
         });
 
-    assert!(mass.is_some());
-
     let mut neighbours_struct = HashGrid::new(simulation.kernel_radius());
     neighbours_struct.insert(&particles);
 
@@ -52,7 +50,7 @@ pub fn snapshot_simulation(simulation: &Simulation, anisotropic_radius: Option<f
         neighbours_struct,
         anisotropic_neighbours,
         kernel: CubicSpine::new(simulation.kernel_radius()),
-        mass: mass.unwrap(),
+        mass: mass.unwrap_or(0.1),
     }
 }
 

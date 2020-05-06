@@ -9,6 +9,7 @@ pub struct Ray {
     sign: Vector3<usize>,
 }
 
+#[derive(Clone)]
 pub struct Intersection {
     pub distance: f32,
     pub u: f32,
@@ -69,8 +70,12 @@ impl<T: Clone> IntersectionGroup<T> {
     }
 
     #[inline]
-    pub fn get(&self, i: usize) -> Option<&(Intersection, T)> {
-        self.intersections.get(i)
+    pub fn get(&self, i: usize) -> Option<(Intersection, T)> {
+        if let Some(v) = self.intersections.get(i) {
+            Some((v.0.clone(), v.1.clone()))
+        } else {
+            None
+        }
     }
 
     #[inline]
