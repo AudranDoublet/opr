@@ -1,0 +1,113 @@
+config:
+    particle_radius: 0.02
+simulation_config:
+    max_time: 5.0
+    fps: 24.0
+    enable_bubbler: false
+fluids:
+    green_liquid:
+        debug_color: [0.0, 1.0, 0.0]
+        material: data/materials/green_liquid.mtl
+        simulation:
+            density: 1000.0
+        meshing:
+            cube_size: 0.04
+    red_liquid:
+        debug_color: [1.0, 0.0, 0.0]
+        material: data/materials/red_liquid.mtl
+        simulation:
+            density: 3000.
+        meshing:
+            cube_size: 0.04
+solids:
+    - mesh: objects/box.obj
+      material: data/materials/white_box.mtl
+      density: 1000
+      dynamic: false
+      mesh_invert: true
+      resolution: [11, 11, 11]
+      scale: [2.0, 3.0, 2.0]
+      position: [0.0, 0.0, 0.0]
+      rotation_axis: [0.0, 0.0, 0.0]
+      rotation_angle: 0.0
+      display: true
+      particle_size: 0.08
+    - mesh: objects/sphere.obj
+      material: data/materials/red.mtl
+      density: 900
+      dynamic: true
+      mesh_invert: false
+      resolution: [31, 31, 31]
+      scale: [0.01, 0.01, 0.01]
+      position: [0.0, 0.0, -0.5]
+      rotation_axis: [0.0, 0.0, 0.0]
+      rotation_angle: 0.0
+      display: true
+      particle_size: 0.01
+    - mesh: objects/sphere.obj
+      material: data/materials/green.mtl
+      density: 2900
+      dynamic: true
+      mesh_invert: false
+      resolution: [31, 31, 31]
+      scale: [0.01, 0.01, 0.01]
+      position: [0.0, 0.0, 0.0]
+      rotation_axis: [0.0, 0.0, 0.0]
+      rotation_angle: 0.0
+      display: true
+      particle_size: 0.01
+    - mesh: objects/sphere.obj
+      material: data/materials/chocolate.mtl
+      density: 5000
+      dynamic: true
+      mesh_invert: false
+      resolution: [31, 31, 31]
+      scale: [0.01, 0.01, 0.01]
+      position: [0.0, 0.0, 0.5]
+      rotation_axis: [0.0, 0.0, 0.0]
+      rotation_angle: 0.0
+      display: true
+      particle_size: 0.01
+
+liquids_blocks: []
+liquids_add_blocks: []
+
+render_config:
+    max_rec: 4
+
+camera:
+    position: [-3.0, 0.0, 0.0]
+    generate_at_render: true
+    animation:
+        type: lookat
+        position: [0.0, 0.0, 0.0]
+
+emitters:
+    - shape:
+        type: ellipse
+        x_radius: 0.7
+        y_radius: 0.7
+      position: [-0.5, 0.2, -0.96]
+      velocity: 3.0
+      fluid_type: green_liquid
+      animation:
+          type: group
+          elements:
+              - type: lookat_relative
+                position: [0.0, 0.0, 1.0]
+              - type: emit
+                time: 3.0
+    - shape:
+        type: ellipse
+        x_radius: 0.7
+        y_radius: 0.7
+      position: [0.5, 0.2, 0.96]
+      velocity: 3.0
+      fluid_type: red_liquid
+      animation:
+          type: group
+          elements:
+              - type: lookat_relative
+                position: [0.0, 0.0, -1.0]
+              - type: emit
+                time: 3.0

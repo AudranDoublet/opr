@@ -185,7 +185,7 @@ impl AnimationHandler for Emitter {
         self.rotation = *UnitQuaternion::face_towards(&dir, &y).quaternion();
     }
 
-    fn set_emit(&mut self, _: bool) {
-        self.emitting = true;
+    fn set_emit(&mut self, emit: bool) {
+        self.emitting = emit;
     }
 }
