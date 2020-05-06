@@ -467,6 +467,8 @@ impl AnimationHandler for RAnimationHandler {
             VariableType::AngularAcceleration => self.angular_acceleration,
             VariableType::Acceleration => self.acceleration,
             VariableType::Position => self.position,
+            VariableType::LookAtRelative => unimplemented!(),
+            VariableType::LookAt => unimplemented!(),
             VariableType::Rotation => {
                 let (x, y, z) = UnitQuaternion::from_quaternion(self.rotation).euler_angles();
                 Vector3::new(x, y, z)
@@ -482,6 +484,8 @@ impl AnimationHandler for RAnimationHandler {
             VariableType::Acceleration => self.acceleration = value,
             VariableType::Position => self.position = value,
             VariableType::Rotation => self.rotation = *UnitQuaternion::from_euler_angles(value.x, value.y, value.z).quaternion(),
+            VariableType::LookAtRelative => unimplemented!(),
+            VariableType::LookAt => unimplemented!(),
         }
     }
 
