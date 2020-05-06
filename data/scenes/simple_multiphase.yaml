@@ -1,8 +1,7 @@
 config:
-    kernel_radius: 0.08
     particle_radius: 0.02
 simulation_config:
-    max_time: 4.0
+    max_time: 5.0
     fps: 24.0
     enable_bubbler: false
 fluids:
@@ -52,7 +51,7 @@ liquids_add_blocks:
       from:  [-0.100, 0.200, -0.100]
       to:  [0.100, 0.400, 0.100]
 render_config:
-    max_rec: 2
+    max_rec: 4
 
 bubbler:
     lifetime: [0.01, 0.03]
@@ -83,7 +82,7 @@ camera:
         type: group
         elements:
             - type: curve
-              time: 2
+              time: 3
               variable: Position
               smoothing:
                   begin: 0.20

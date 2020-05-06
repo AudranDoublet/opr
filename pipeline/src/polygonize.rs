@@ -35,8 +35,6 @@ pub fn snapshot_simulation(simulation: &Simulation, anisotropic_radius: Option<f
             densities.push(all_densities[i]);
         });
 
-    assert!(mass.is_some());
-
     let mut neighbours_struct = HashGrid::new(simulation.kernel_radius());
     neighbours_struct.insert(&particles);
 
@@ -52,7 +50,7 @@ pub fn snapshot_simulation(simulation: &Simulation, anisotropic_radius: Option<f
         neighbours_struct,
         anisotropic_neighbours,
         kernel: CubicSpine::new(simulation.kernel_radius()),
-        mass: mass.unwrap(),
+        mass: mass.unwrap_or(0.1),
     }
 }
 
@@ -103,6 +101,7 @@ fn generate_rigid_objects(scene: &Scene, simulation: &Simulation) -> Vec<MeshCon
                     rotation: v.euler_angle(),
                     position: v.final_position(),
                     override_material: scene.solids[i].material.clone(),
+                    center_of_mass: v.center_of_mass,
                 })
             } else {
                 None
@@ -185,6 +184,7 @@ fn generate_fluid_mesh(conf: &FluidConfiguration, simulation: &Simulation, fluid
         scale: Vector3::new(1., 1., 1.),
         rotation: Vector3::zeros(),
         position: Vector3::zeros(),
+        center_of_mass: Vector3::zeros(),
         override_material: conf.material.clone(),
     }
 }

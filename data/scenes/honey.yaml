@@ -1,25 +1,54 @@
 config:
-    particle_radius: 0.01
+    particle_radius: 0.02
 fluids:
     honey:
-        density: 1000.
-        viscosity:
-            type: weiler2018
-            coefficient: 1000.0
-            surface_coefficient: 1000.0
-            max_iteration: 100
-            tolerance: 0.01
+        simulation:
+            density: 1000.
+            viscosity:
+                type: weiler2018
+                coefficient: 2000.0
+                surface_coefficient: 2000.0
+                max_iteration: 100
+                tolerance: 0.01
+        meshing:
+            cube_size: 0.02
+            ks: 700
+        material: data/materials/honey.mtl
+simulation_config:
+    fps: 48.0
+    max_time: 8
+    enable_bubble: false
+render_config:
+    fps: 24.0
+    max_rec: 4
+    planes:
+        - axis: 1
+          position: -5.
+          material: data/materials/metal_ground.mtl
+    sky_color:
+        type: color
+        color: [0.149, 0.6471, 0.7961]
 solids:
     - mesh: objects/box.obj
       density: 1000
       dynamic: false
       mesh_invert: true
       resolution: [11, 11, 11]
-      scale: [3.0, 1.0, 1.0]
+      scale: [6.0, 1.0, 1.0]
       position: [0.0, 0.0, 0.0]
       rotation_axis: [0.0, 0.0, 0.0]
       rotation_angle: 0.0
       display: false
+render_config:
+    fps: 24.0
+    max_rec: 4
+    planes:
+        - axis: 1
+          position: -5.
+          material: data/materials/metal_ground.mtl
+    sky_color:
+        type: color
+        color: [0.149, 0.6471, 0.7961]
 liquids_blocks: []
 liquids_add_blocks:
     - type: block
@@ -30,18 +59,55 @@ emitters:
         type: ellipse
         x_radius: 0.2
         y_radius: 0.12
-      position: [1.4, 0.0, 0.0]
-      velocity: 1.0
+      position: [2.4, 0.0, 0.0]
+      velocity: 4.0
       animation:
           type: steps
           loop_count: 1
           steps:
-              - type: lookat
-                position: [0.5, -1.0, 0.0]
+              - type: lookat_relative
+                position: [0.0, -1.0, 0.0]
+              - type: group
+                elements:
+                  - type: emit
+                    time: 5.
+                  - type: curve
+                    time: 5.
+                    variable: Position
+                    curve:
+                        type: linear
+                        a: [2.4, 0.0, 0.0]
+                        b: [-2.4, 0.0, 0.0]
+              - type: constant
+                time: 20.
+                variable: Position
+                value: [0.0, 0.0, 0.0]
+camera:
+    position: [0.0, 0.0, -5.0]
+    generate_at_render: true
+    animation:
+      type: steps
+      loop_count: 1
+      steps:
+        - type: group
+          elements:
+              - type: lookat_relative
+                position: [0.0, -0.2, -1.0]
               - type: curve
-                time: 6.
+                time: 5.
                 variable: Position
                 curve:
                     type: linear
-                    a: [1.4, 0.0, 0.0]
-                    b: [-1.4, 0.0, 0.0]
+                    a: [2.4, 0.0, 0.8]
+                    b: [-2.3, 0.0, 0.8]
+        - type: group
+          elements:
+              - type: lookat_relative
+                position: [0.0, -0.2, -1.0]
+              - type: curve
+                time: 3.
+                variable: Position
+                curve:
+                    type: linear
+                    a: [-2.3, 0.0, 0.8]
+                    b: [0.0, 0.0, 3.0]

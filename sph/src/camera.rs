@@ -66,6 +66,8 @@ impl AnimationHandler for Camera {
                 let (x, y, z) = UnitQuaternion::from_quaternion(self.rotation).euler_angles();
                 Vector3::new(x, y, z)
             },
+            VariableType::LookAtRelative => unimplemented!(),
+            VariableType::LookAt => unimplemented!(),
         }
     }
 
@@ -77,6 +79,8 @@ impl AnimationHandler for Camera {
             VariableType::Acceleration => self.acceleration = value,
             VariableType::Position => self.position = value,
             VariableType::Rotation => self.rotation = *UnitQuaternion::from_euler_angles(value.x, value.y, value.z).quaternion(),
+            VariableType::LookAtRelative => self.look_at(value + self.position),
+            VariableType::LookAt => self.look_at(value),
         }
     }
 
@@ -84,10 +88,12 @@ impl AnimationHandler for Camera {
         let mut y = Vector3::y();
         let dir = at - self.position;
 
-        if dir.normalize().dot(&y).abs() < 0.001 {
+        if dir.normalize().dot(&y).abs() > 0.99 {
             y = Vector3::x();
         }
 
         self.rotation = *UnitQuaternion::face_towards(&dir, &y).quaternion();
     }
+
+    fn set_emit(&mut self, _: bool) { }
 }

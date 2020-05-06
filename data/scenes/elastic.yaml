@@ -2,19 +2,41 @@ config:
     particle_radius: 0.02
 fluids:
     cloth:
-        density: 1000.
-        elasticity:
-            alpha: 0.005
-            young_modulus: 100000000
-            poisson_ratio: 50000000
-            max_iteration: 100
-            tolerance: 0.0001
+        simulation:
+            density: 1000.
+            elasticity:
+                alpha: 0.005
+                young_modulus: 100000000
+                poisson_ratio: 50000000
+                max_iteration: 100
+                tolerance: 0.0001
+        meshing:
+            cube_size: 0.02
+            ks: 4000
+        material: data/materials/red.mtl
 simulation_config:
     fps: 168
     max_time: 4.0
 render_config:
     fps: 24
     resolution: [1024, 1024]
+    max_rec: 4
+    planes:
+        - axis: 1
+          position: -5.
+          material: data/materials/metal_ground.mtl
+    sky_color:
+        type: color
+        color: [0.149, 0.6471, 0.7961]
+    lights:
+      - type: ambient
+        color: [0.3, 0.3, 0.3]
+      - type: directional
+        color: [0.5, 0.5, 0.5]
+        direction: [-1., 1, -1.]
+      - type: directional
+        color: [0.5, 0.5, 0.5]
+        direction: [1., -1., 1.]
 camera:
     position: [0.0, 1.0, -2.0]
     generate_at_render: true
@@ -46,6 +68,7 @@ solids:
       rotation_angle: 0.0
       display: true
       particle_size: 0.1
+      material: data/materials/jade.mtl
 liquids_blocks:
     - type: block
       from: [-1.880, 1.0, -1.880]

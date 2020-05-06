@@ -200,7 +200,7 @@ impl Scene {
 
     pub fn load_mesh(&mut self, conf: MeshConfig, shader: Option<usize>) -> Result<(), Box<dyn Error>> {
         let r = UnitQuaternion::from_euler_angles(conf.rotation.x, conf.rotation.y, conf.rotation.z);
-        self.load_obj(Path::new(&conf.path), conf.position, r, conf.scale, conf.override_material, shader)
+        self.load_obj(Path::new(&conf.path), conf.position, r, conf.center_of_mass, conf.scale, conf.override_material, shader)
     }
 
     pub fn load_particles(&mut self, path: String, material: Option<String>) -> Result<(), Box<dyn Error>>  {
@@ -251,6 +251,7 @@ impl Scene {
     }
 
     pub fn load_obj(&mut self, path: &Path, position: Vector3<f32>, rotation: UnitQuaternion<f32>, 
+        center_of_mass: Vector3<f32>,
         scale: Vector3<f32>, 
         override_material: Option<String>, 
         shader: Option<usize>) -> Result<(), Box<dyn Error>> {
@@ -297,9 +298,17 @@ impl Scene {
 
             for i in (0..mesh.positions.len()).step_by(3)
             {
-                let pos = rotation * Vector3::new(mesh.positions[i + 0],
-                                                  mesh.positions[i + 1],
-                                                  mesh.positions[i + 2]).component_mul(&scale) + position;
+                // apply scale
+                let pos = Vector3::new(mesh.positions[i + 0],
+                                          mesh.positions[i + 1],
+                                          mesh.positions[i + 2]).component_mul(&scale);
+
+                // apply rotation
+                let pos = rotation * (pos - center_of_mass) + center_of_mass;
+
+                // apply trnaslation
+                let pos = pos + position;
+
                 vertices.push(pos);
             }
 

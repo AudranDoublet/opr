@@ -11,6 +11,8 @@ pub enum VariableType {
     Acceleration,
     Position,
     Rotation,
+    LookAt,
+    LookAtRelative,
 }
 
 fn smooth_strength() -> f32 {
@@ -109,6 +111,13 @@ pub enum Animation {
     LookAtRelative {
         position: Vector3<f32>,
     },
+    #[serde(rename = "emit")]
+    Emit {
+        time: f32,
+
+        #[serde(skip_deserializing)]
+        current_time: f32,
+    },
     Blank,
 }
 
@@ -118,6 +127,8 @@ pub trait AnimationHandler {
     fn set_variable(&mut self, variable: &VariableType, value: Vector3<f32>);
 
     fn look_at(&mut self, at: Vector3<f32>);
+
+    fn set_emit(&mut self, emit: bool);
 }
 
 fn timer(current: &mut f32, max: f32, dt: &mut f32) -> f32 {
@@ -146,6 +157,9 @@ impl Animation {
             },
             Animation::Group { elements } => {
                 elements.iter_mut().for_each(|v| v.reset())
+            },
+            Animation::Emit { current_time, ..} => {
+                *current_time = 0.0
             },
             Animation::Constant { current_time, .. } => {
                 *current_time = 0.0
@@ -192,6 +206,12 @@ impl Animation {
             Animation::Constant { variable, value, time, current_time } => {
                 timer(current_time, *time, &mut dt);
                 handler.set_variable(variable, *value);
+
+                Some(dt)
+            },
+            Animation::Emit { time, current_time } => {
+                timer(current_time, *time, &mut dt);
+                handler.set_emit(dt == 0.0);
 
                 Some(dt)
             },
