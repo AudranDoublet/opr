@@ -488,4 +488,6 @@ impl AnimationHandler for RAnimationHandler {
     fn look_at(&mut self, _: Vector3<f32>) {
 
     }
+
+    fn set_emit(&mut self, _: bool) { }
 }

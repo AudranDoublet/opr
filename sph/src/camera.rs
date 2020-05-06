@@ -84,10 +84,12 @@ impl AnimationHandler for Camera {
         let mut y = Vector3::y();
         let dir = at - self.position;
 
-        if dir.normalize().dot(&y).abs() < 0.001 {
+        if dir.normalize().dot(&y).abs() > 0.99 {
             y = Vector3::x();
         }
 
         self.rotation = *UnitQuaternion::face_towards(&dir, &y).quaternion();
     }
+
+    fn set_emit(&mut self, _: bool) { }
 }
