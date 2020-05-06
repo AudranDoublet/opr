@@ -2,6 +2,7 @@ config:
     particle_radius: 0.02
 fluids:
     cloth:
+        material: data/materials/red.mtl
         simulation:
             density: 1000.
             elasticity:
@@ -18,48 +19,58 @@ fluids:
                     loop_count: -1
                     steps:
                         - type: curve
-                          time: 0.5
                           curve:
-                              type: bezier
-                              control_points:
-                                  - [0.0, 20., 0.0]
-                                  - [30.0, 20., 0.0]
-                                  - [30.0, -20.0, 0.0]
-                                  - [0.0, -20.0, 0.0]
+                              type: linear
+                              a: [0.0, 20., 10.0]
+                              b: [0.0, 10.0, 10.0]
+                          time: 0.3
                           variable: Position
                         - type: curve
                           time: 0.5
                           curve:
                               type: bezier
                               control_points:
-                                  - [0.0, -20., 0.0]
-                                  - [-30.0, -20., 0.0]
-                                  - [-30.0, 20.0, 0.0]
-                                  - [0.0, 20.0, 0.0]
+                                  - [-20.0, 15., 10.0]
+                                  - [-20.0, 20., 10.0]
+                                  - [20.0, 20.0, 5.0]
+                                  - [20.0, 15.0, 5.0]
+                          variable: Position
+                        - type: curve
+                          curve:
+                              type: linear
+                              a: [0.0, -10., -10.0]
+                              b: [0.0, -20.0, -10.0]
+                          time: 0.3
                           variable: Position
         meshing: 
-            cube_size: 0.01
+            cube_size: 0.02
 simulation_config:
-    fps: 168
+    fps: 96
     max_time: 4.0
 render_config:
     fps: 24
     resolution: [1024, 1024]
+    lights:
+      - type: ambient
+        color: [0.3, 0.3, 0.3]
+      - type: directional
+        color: [0.5, 0.5, 0.5]
+        direction: [1., 1, 1.]
 camera:
-    position: [0.0, 1.0, -2.0]
+    position: [0.0, -0.5, -3.0]
     generate_at_render: true
     animation:
       type: group
       elements:
           - type: lookat
-            position: [0.0, 0.3, 0.0]
+            position: [0.0, 0.5, 0.0]
 solids: []
 liquids_blocks:
     - type: mesh
       mesh: objects/armadillo.obj
       dynamic: true
       resolution: [31, 31, 31]
-      scale: [0.2, 0.2, 0.2]
+      scale: [1.0, 1.0, 1.0]
       position: [0.0, -0.4, 0.0]
       rotation_axis: [0.0, 0.0, 0.0]
       rotation_angle: 0.0
