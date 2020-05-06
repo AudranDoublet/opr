@@ -11,6 +11,8 @@ pub enum VariableType {
     Acceleration,
     Position,
     Rotation,
+    LookAt,
+    LookAtRelative,
 }
 
 fn smooth_strength() -> f32 {
