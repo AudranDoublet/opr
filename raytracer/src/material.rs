@@ -1,6 +1,6 @@
 extern crate tobj;
 
-use nalgebra::Vector3;
+use nalgebra::{Vector3, Vector2};
 use search::IntersectsBVHShape;
 
 use crate::vector3_from_array;
@@ -87,15 +87,16 @@ impl Material
     {
         if let Some(tex) = self.diffuse_tex
         {
-            let coords = shape.get_tex_coords(u, v);
+            let coords = nalgebra::clamp(shape.get_tex_coords(u, v), Vector2::zeros(), Vector2::new(1., 1.));
             let texture = &textures[tex];
 
-            let x = coords.x * texture.width;
-            let y = ((texture.height - coords.y * texture.height) as isize) * texture.width as isize;
+            let (h, w) = (texture.height - 1.0, texture.width - 1.0);
+            let x = coords.x * w;
+            let y = (h - coords.y * h) * texture.width;
 
-            let pos = (x as isize) + (y as isize);
+            let pos = (x as usize) + (y as usize);
 
-            texture.data[pos as usize]
+            texture.data[pos]
         } else {
             self.diffuse
         }

@@ -181,8 +181,11 @@ impl Solid {
 
         let mut object = RigidObject::new(grid, self.dynamic, self.particle_size, properties);
 
+        object.set_rotation(self.rotation_axis());
         object.set_position(self.position());
         object.set_animation(self.animation.clone());
+
+        println!("obj_rotation: {:?}", object.rotation());
 
         Ok(object)
     }

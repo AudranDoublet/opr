@@ -32,6 +32,7 @@ fn add_meshes(dfsph: &Simulation, config: &sph_scene::Scene, scene: &mut debug_r
         let solid = &config.solids[i];
         let center = dfsph.solid(i).center_of_mass.component_div(&solid.scale());
         let position = dfsph.solid(i).position();
+        let rotation = dfsph.solid(i).rotation();
 
         if !solid.display {
             result.push(None);
@@ -45,6 +46,7 @@ fn add_meshes(dfsph: &Simulation, config: &sph_scene::Scene, scene: &mut debug_r
             });
 
             obj.set_local_translation(Translation3::new(position[0], position[1], position[2]));
+            obj.set_local_rotation(rotation);
 
             result.push(Some(obj));
         }

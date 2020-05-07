@@ -8,12 +8,12 @@ use clap::App;
 use crate::polygonization::main_polygonization;
 use crate::simulation::main_simulation;
 use crate::viewer::main_viewer;
-use crate::raytrace::main_render;
+use crate::render::main_render;
 
 mod polygonization;
 mod simulation;
 mod viewer;
-mod raytrace;
+mod render;
 mod pipeline;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

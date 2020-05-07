@@ -44,6 +44,8 @@ pub trait FluidSnapshot {
     /// * `i` - index of the particle
     fn neighbours_anisotropic_kernel(&self, i: usize) -> &Vec<usize>; //dyn std::iter::Iterator<Item=Vector3<f32>>;
 
+    fn is_inside_solid(&self, x: &VertexWorld) -> Option<(f32, Vector3<f32>)>;
+
     /// Returns an iterator over all neighbours of the given particle
     /// * `x` - center of the sphere of research
     fn neighbours_kernel(&self, x: &VertexWorld) -> Vec<usize>;

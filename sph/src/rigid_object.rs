@@ -96,6 +96,37 @@ impl RigidObject
         res
     }
 
+    pub fn copy(&self) -> RigidObject {
+        RigidObject {
+            dynamic: self.dynamic,
+
+            position: self.position,
+            angular_velocity: self.angular_velocity,
+            velocity: self.velocity,
+            rotation: self.rotation,
+            acceleration: self.acceleration,
+            angular_acceleration: self.angular_acceleration,
+
+            grid: self.grid.clone(),
+            bvh: BVH::build(&vec![]),
+            volume: Vec::new(),
+            boundary_x: Vec::new(),
+            forces: Vec::new(),
+            torques: Vec::new(),
+
+            center_of_mass: self.center_of_mass,
+            body_inertia_tensor: self.body_inertia_tensor,
+            inv_body_inertia_tensor: self.inv_body_inertia_tensor,
+            mass: self.mass,
+
+            animation: Animation::Blank,
+        }
+    }
+
+    pub fn load_grid_from(&mut self, other: &RigidObject) {
+        self.grid = other.grid.clone();
+    }
+
     pub fn to_particles(&self, kr: f32, radius: f32) -> Vec<Vector3<f32>> {
         let (&min, &max) = self.grid.get_domain_definition();
         let kr = Vector3::new(kr, kr, kr);
@@ -282,6 +313,11 @@ impl RigidObject
 
     pub fn position(&self) -> Vector3<f32> {
         self.position
+    }
+
+    pub fn set_rotation(&mut self, r: Vector3<f32>) {
+        self.rotation = *UnitQuaternion::from_euler_angles(r.x, r.y, r.z)
+            .quaternion();
     }
 
     pub fn set_position(&mut self, position: Vector3<f32>) {

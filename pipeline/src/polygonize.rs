@@ -8,7 +8,7 @@ use rayon::prelude::*;
 use raytracer::{Camera, scene_config};
 use raytracer::scene_config::{MeshConfig, BubbleConfig, VolumeConfig, FoamConfig};
 use search::HashGrid;
-use sph::{Simulation, SimulationFluidSnapshot, Fluid};
+use sph::{Simulation, SimulationFluidSnapshot, Fluid, RigidObject};
 use sph_scene::{ConfigurationAnisotropication, Scene, FluidConfiguration};
 use utils::kernels::CubicSpine;
 
@@ -17,7 +17,7 @@ use mesher::anisotropication::Anisotropicator;
 use mesher::interpolation::InterpolationAlgorithms;
 use mesher::Mesher;
 
-pub fn snapshot_simulation(simulation: &Simulation, anisotropic_radius: Option<f32>, fluid_idx: usize) -> SimulationFluidSnapshot {
+pub fn snapshot_simulation(simulation: &Simulation, solids: &Vec<RigidObject>, anisotropic_radius: Option<f32>, fluid_idx: usize) -> SimulationFluidSnapshot {
     let all_positions = simulation.positions.read().unwrap();
     let all_densities = simulation.density.read().unwrap();
 
@@ -44,9 +44,18 @@ pub fn snapshot_simulation(simulation: &Simulation, anisotropic_radius: Option<f
         an_grid.find_all_neighbours(&particles)
     } else { vec![] };
 
+    let solids_advected = simulation.solids().iter().enumerate()
+        .map(|(i, s)| {
+            let mut s = s.copy();
+            s.load_grid_from(&solids[i]); 
+            s
+        })
+        .collect();
+
     SimulationFluidSnapshot {
         particles,
         densities,
+        solids: solids_advected,
         neighbours_struct,
         anisotropic_neighbours,
         kernel: CubicSpine::new(simulation.kernel_radius()),
@@ -166,7 +175,7 @@ fn generate_fluid_foam(conf: &FluidConfiguration, fluid: &Fluid, path: &Path)  -
 }
 
 
-fn generate_fluid_mesh(conf: &FluidConfiguration, simulation: &Simulation, fluid_idx: usize, path: &Path) -> MeshConfig {
+fn generate_fluid_mesh(conf: &FluidConfiguration, simulation: &Simulation, solids: &Vec<RigidObject>, fluid_idx: usize, path: &Path) -> MeshConfig {
     let buffer = &mut fs::File::create(path).unwrap();
 
     let interpolation_algorithm = get_interpolation_algorithm(conf.meshing.enable_interpolation);
@@ -174,7 +183,7 @@ fn generate_fluid_mesh(conf: &FluidConfiguration, simulation: &Simulation, fluid
     conf.meshing.enable_anisotropication,
     &conf.meshing.anisotropication_config);
 
-    let snapshot = snapshot_simulation(simulation, anisotropic_radius, fluid_idx);
+    let snapshot = snapshot_simulation(simulation, solids, anisotropic_radius, fluid_idx);
 
     let mesher = Mesher::new(conf.meshing.iso_value, conf.meshing.cube_size, interpolation_algorithm, anisotropicator);
     mesher.clone().convert_into_obj(&snapshot, buffer);
@@ -189,7 +198,7 @@ fn generate_fluid_mesh(conf: &FluidConfiguration, simulation: &Simulation, fluid
     }
 }
 
-fn generate_fluid_objects(scene: &Scene, simulation: &Simulation, dump_directory: &Path, idx: usize) -> Vec<VolumeConfig> {
+fn generate_fluid_objects(scene: &Scene, simulation: &Simulation, solids: &Vec<RigidObject>, dump_directory: &Path, idx: usize) -> Result<Vec<VolumeConfig>, Box<dyn std::error::Error>> {
     let mut result = vec![];
 
     let fluids_map = scene.load_fluids_map();
@@ -198,7 +207,7 @@ fn generate_fluid_objects(scene: &Scene, simulation: &Simulation, dump_directory
         let fluid = &simulation.fluids()[fluid_idx];
         let template_path = |s| dump_directory.join(format!("{:08}_{}_{}.obj", idx, name, s));
 
-        let mesh = generate_fluid_mesh(conf, simulation, fluid_idx, &template_path("mesh"));
+        let mesh = generate_fluid_mesh(conf, simulation, solids, fluid_idx, &template_path("mesh"));
         let foam = generate_fluid_foam(conf, fluid, &template_path("foam"));
         let bubble = generate_fluid_bubble(conf, fluid, &template_path("bubble"));
 
@@ -209,7 +218,7 @@ fn generate_fluid_objects(scene: &Scene, simulation: &Simulation, dump_directory
         });
     }
 
-    result
+    Ok(result)
 }
 
 pub fn pipeline_polygonize(scene: &Scene, input_directory: &Path, dump_directory: &Path) -> Result<(), Box<dyn std::error::Error>> {
@@ -222,6 +231,8 @@ pub fn pipeline_polygonize(scene: &Scene, input_directory: &Path, dump_directory
         .template("[{elapsed_precise}] [{per_sec}] [{eta_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7}"));
     pb.tick();
 
+    let solids = &scene.load_solids()?;
+
     simulations.par_iter().enumerate().for_each(|(idx, path)| {
         let simulation = match Simulation::load(&path) {
             Err(e) => {panic!(format!("error (path:{:?}): {:?}", path, e))},
@@ -233,7 +244,7 @@ pub fn pipeline_polygonize(scene: &Scene, input_directory: &Path, dump_directory
         let camera = &simulation.camera;
 
         let rigid_objects = generate_rigid_objects(scene, &simulation);
-        let volumes = generate_fluid_objects(scene, &simulation, dump_directory, idx);
+        let volumes = generate_fluid_objects(scene, &simulation, &solids, dump_directory, idx).unwrap();
 
         let config = scene_config::SceneConfig {
             meshes: rigid_objects,

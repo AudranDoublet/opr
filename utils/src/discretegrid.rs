@@ -8,7 +8,7 @@ use rayon::prelude::*;
 
 use std::fs::File;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DiscreteGridFunction {
     weights: Vec<f32>,
     cells: Vec<Vec<u32>>,
@@ -27,7 +27,7 @@ impl DiscreteGridFunction {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DiscreteGrid {
     domain_min: Vector3<f32>,
     domain_max: Vector3<f32>,
