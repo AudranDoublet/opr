@@ -21,7 +21,7 @@ impl Mesh {
         }
     }
 
-    fn add_edge(&mut self, cube_vertices: &CubeVertices, e: &EdgeIndices, interpolator: &Box<dyn Fn(&CubeVertices, &EdgeIndices) -> VertexWorld>) -> usize {
+    fn add_edge<'a>(&mut self, cube_vertices: &CubeVertices, e: &EdgeIndices, interpolator: &Box<dyn Fn(&CubeVertices, &EdgeIndices) -> VertexWorld + 'a>) -> usize {
         let idx = self.edge_map.len();
         let entry = self.edge_map.entry(cube_vertices.edge_indices_to_local_positions(e));
         *match entry {
@@ -58,7 +58,7 @@ impl Mesh {
         self.normals[triangle.2].push(normal);
     }
 
-    pub fn add_triangle(&mut self, cube_vertices: &CubeVertices, e1: &EdgeIndices, e2: &EdgeIndices, e3: &EdgeIndices, interpolator: &Box<dyn Fn(&CubeVertices, &EdgeIndices) -> VertexWorld>) {
+    pub fn add_triangle<'a>(&mut self, cube_vertices: &CubeVertices, e1: &EdgeIndices, e2: &EdgeIndices, e3: &EdgeIndices, interpolator: &Box<dyn Fn(&CubeVertices, &EdgeIndices) -> VertexWorld + 'a>) {
         let triangle = (
             self.add_edge(cube_vertices, e1, interpolator),
             self.add_edge(cube_vertices, e2, interpolator),

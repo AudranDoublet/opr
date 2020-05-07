@@ -1,5 +1,6 @@
 use nalgebra::Vector3;
 use utils::kernels::{Kernel, CubicSpine};
+use crate::RigidObject;
 
 use mesher::types::{FluidSnapshot, VertexWorld};
 
@@ -9,6 +10,7 @@ pub struct SimulationFluidSnapshot
 {
     pub particles: Vec<Vector3<f32>>,
     pub densities: Vec<f32>,
+    pub solids: Vec<RigidObject>,
     pub neighbours_struct: HashGrid,
     pub anisotropic_neighbours: Vec<Vec<usize>>,
     pub kernel: CubicSpine,
@@ -18,6 +20,10 @@ pub struct SimulationFluidSnapshot
 impl FluidSnapshot for SimulationFluidSnapshot {
     fn len(&self) -> usize {
         self.particles.len()
+    }
+
+    fn is_inside_solid(&self, x: &VertexWorld) -> Option<(f32, Vector3<f32>)> {
+        self.solids.iter().find_map(|s| s.is_inside(*x, 0.0001))
     }
 
     fn position(&self, i: usize) -> VertexWorld {

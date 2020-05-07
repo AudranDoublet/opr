@@ -110,14 +110,23 @@ impl Mesher {
         index
     }
 
-    fn compute_mesh(&mut self, snapshot: &impl FluidSnapshot) -> Mesh {
+    fn compute_mesh<'a>(&mut self, snapshot: &'a impl FluidSnapshot) -> Mesh {
         let (borders, cell_discretization) = snapshot.get_borders();
 
         let iso_value = self.iso_value;
         let interpolation_algorithm = self.interpolation_algorithm;
-        let interpolator: Box<dyn Fn(&CubeVertices, &EdgeIndices) -> VertexWorld>
-            = Box::new(move |cube_vertices, edge_indices|
-            interpolate(interpolation_algorithm, iso_value, cube_vertices, edge_indices));
+        let interpolator: Box<dyn Fn(&CubeVertices, &EdgeIndices) -> VertexWorld + 'a>
+            = Box::new(move |cube_vertices, edge_indices| {
+                let mut x = interpolate(interpolation_algorithm, iso_value, cube_vertices, edge_indices);
+
+                // if the interpolated point is inside a solid object, we move it outside from the object
+                // to avoid weird artifact on the rendering (due to overlapping meshes)
+                if let Some((distance, normal)) = snapshot.is_inside_solid(&x) {
+                    x += (distance.abs() + 0.001) * normal.normalize();
+                }
+
+                x
+            });
 
         let mut mesh = Mesh::new();
 

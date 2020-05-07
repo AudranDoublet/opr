@@ -157,6 +157,10 @@ impl Simulation
         self.solids.len()
     }
 
+    pub fn solids(&self) -> &Vec<RigidObject> {
+        &self.solids
+    }
+
     pub fn solid(&self, i: usize) -> &RigidObject {
         &self.solids[i]
     }
