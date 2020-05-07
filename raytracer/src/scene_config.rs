@@ -45,6 +45,10 @@ pub struct PlaneConfig {
     pub material: Option<String>,
 }
 
+fn default_center_of_mass() -> Vector3<f32> {
+    Vector3::zeros()
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct MeshConfig
 {
@@ -53,6 +57,8 @@ pub struct MeshConfig
     pub rotation: Vector3<f32>,
     pub position: Vector3<f32>,
     pub scale: Vector3<f32>,
+    #[serde(default = "default_center_of_mass")]
+    pub center_of_mass: Vector3<f32>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

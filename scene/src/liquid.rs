@@ -105,14 +105,10 @@ impl LiquidZone
         }
     }
 
-    pub fn create_particles(&self, config: &Scene, scene: &mut Simulation) -> Result<(), Box<dyn std::error::Error>>
-    {
-        let fluid_type = self.fluid_type(config);
-        let fixed_strategy = self.fixed_strategy();
-
-        let positions = match self {
+    pub fn particle_list(&self, config: &Scene) -> Result<Vec<Vector3<f32>>, Box<dyn std::error::Error>> {
+        Ok(match self {
             LiquidZone::Block { from, to, density, .. } => {
-                let radius = scene.particle_radius() * density;
+                let radius = config.config.particle_radius * density;
                 let step_count = (to - from) / radius;
 
                 let mut particles = Vec::new();
@@ -151,12 +147,19 @@ impl LiquidZone
                 let solid = solid.load(config)?;
                 let position = solid.position();
 
-                solid.to_particles(scene.kernel_radius(), scene.particle_radius() * density)
+                solid.to_particles(config.kernel_radius(), config.config.particle_radius * density)
                      .iter().map(|v| v + position)
                      .collect()
             }
-        };
+        })
+    }
 
+    pub fn create_particles(&self, config: &Scene, scene: &mut Simulation) -> Result<(), Box<dyn std::error::Error>>
+    {
+        let fluid_type = self.fluid_type(config);
+        let fixed_strategy = self.fixed_strategy();
+
+        let positions = self.particle_list(config)?;
         let count = positions.len();
 
         for (fixed, position) in fixed_strategy.fixed(positions) {

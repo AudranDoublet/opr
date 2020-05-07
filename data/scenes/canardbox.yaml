@@ -1,8 +1,8 @@
 config:
-    particle_radius: 0.01
+    particle_radius: 0.02
 simulation_config:
     fps: 24.0
-    max_time: 1.0
+    max_time: 27.0
     enable_bubbler: false
 render_config:
   max_rec: 5
@@ -31,7 +31,7 @@ solids:
       dynamic: false
       mesh_invert: true
       resolution: [31, 31, 31]
-      scale: [0.5, 0.5, 0.25]
+      scale: [1.0, 1.0, 0.5]
       position: [0.0, 0.0, 0.0]
       rotation_axis: [0.0, 0.0, 0.0]
       rotation_angle: 0.0
@@ -44,11 +44,12 @@ solids:
       dynamic: false
       mesh_invert: false
       resolution: [31, 31, 31]
-      scale: [0.4, 0.4, 0.5]
+      scale: [0.5, 0.5, 0.7]
       position: [0.0, 0.0, 0.0]
       rotation_axis: [0.0, 0.0, 0.0]
       rotation_angle: 0.0
       display: true
+      material: data/materials/red.mtl
       animation:
         type: steps
         loop_count: 1
@@ -58,26 +59,38 @@ solids:
               variable: Rotation
               value: [0.0, 0.0, 0.0]
             - type: curve
-              time: 0.5
+              time: 7.0
               curve:
                   type: linear
                   a: [0.0, 0.0, 0.0]
                   b: [0.0, 0.0, 100.0]
               variable: AngularVelocity
             - type: constant
-              time: 10.
+              time: 15.
               variable: AngularVelocity
               value: [0.0, 0.0, 100.0]
+            - type: curve
+              time: 1.0
+              curve:
+                  type: linear
+                  a: [0.0, 0.0, 100.0]
+                  b: [0.0, 0.0, 0.0]
+              variable: AngularVelocity
+            - type: constant
+              time: 10.
+              variable: AngularVelocity
+              value: [0.0, 0.0, 0.0]
+
 liquids_blocks:
     - type: block
-      from: [-0.5, -0.05, -0.65]
-      to: [0.5, 0.85, -0.15]
+      from: [-0.9, -0.1, -1.25]
+      to: [0.9, 1.6, -0.35]
     - type: block
-      from: [-0.5, -0.05, 0.15]
-      to: [0.5, 0.85, 0.65]
+      from: [-0.9, -0.1, 0.35]
+      to: [0.9, 1.6, 1.25]
     - type: block
-      from: [-0.2, -0.05, -0.15]
-      to: [0.2, 0.2, 0.15]
+      from: [-0.4, -0.1, -0.3]
+      to: [0.4, 0.4, 0.3]
 liquids_add_blocks:
     - type: block
       from:  [-0.100, 0.200, -0.100]
@@ -105,7 +118,7 @@ bubbler:
             cube_size: 0.04
         material: data/materials/white.mtl
 camera:
-    position: [-1.5, 0.5, -0.2]
+    position: [-3.0, 1.0, -0.4]
     generate_at_render: true
     animation:
         type: group
