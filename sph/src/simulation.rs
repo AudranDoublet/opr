@@ -45,11 +45,15 @@ pub struct Simulation
 
     solids: Vec<RigidObject>,
 
+    pub positions: RwLock<Vec<Vector3<f32>>>,
+
     // Particle data
     pub density: RwLock<Vec<f32>>,
+    #[serde(skip_serializing, skip_deserializing)]
     neighbours: Vec<Vec<usize>>,
+    #[serde(skip_serializing, skip_deserializing)]
     pub velocities: RwLock<Vec<Vector3<f32>>>,
-    pub positions: RwLock<Vec<Vector3<f32>>>,
+    #[serde(skip_serializing, skip_deserializing)]
     pub accelerations: RwLock<Vec<Vector3<f32>>>,
 
     pub particles_fluid_type: Vec<usize>,
