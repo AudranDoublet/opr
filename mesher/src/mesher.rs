@@ -122,7 +122,7 @@ impl Mesher {
                 // if the interpolated point is inside a solid object, we move it outside from the object
                 // to avoid weird artifact on the rendering (due to overlapping meshes)
                 if let Some((distance, normal)) = snapshot.is_inside_solid(&x) {
-                    x += (distance.abs() + 0.001) * normal.normalize();
+                    x += (distance.abs() + 0.01) * normal.normalize();
                 }
 
                 x
