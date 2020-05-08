@@ -138,9 +138,15 @@ impl RigidObject
 
         let step = (max - min) / radius;
 
-        (0..step.x as u32, 0..step.y as u32, 0..step.z as u32)
+        (0..step.x as u32 * step.y as u32 * step.z as u32)
             .into_par_iter()
-            .filter_map(|(x, y, z)| {
+            .filter_map(|i| {
+                let z = i / (step.x as u32 * step.y as u32);
+                let y = i % (step.x as u32 * step.y as u32);
+
+                let y = y / step.x as u32;
+                let x = i % step.x as u32;
+
             let pos = min + Vector3::new(x as f32, y as f32, z as f32) * radius;
             let v = self.grid.interpolate(0, pos, false);
 
