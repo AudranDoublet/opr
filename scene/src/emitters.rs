@@ -98,7 +98,6 @@ impl EmitterConfig {
     }
 
     pub fn load(&self, scene: &Scene) -> Result<(Emitter, Animation), Box<dyn std::error::Error>> {
-        let radius = scene.config.particle_radius;
         let particles = self.shape.generate_particles(scene)?;
 
         let emitter = Emitter::new(self.fluid_type(scene), self.position,

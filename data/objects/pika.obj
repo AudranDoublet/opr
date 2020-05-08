@@ -1,5 +1,7 @@
 # Blender v2.79 (sub 6) OBJ File: ''
 # www.blender.org
+mtllib ../materials/picka.mtl
+o polygon4
 v -0.155486 1.106107 1.315822
 v -0.125942 0.983853 0.724944
 v -0.088583 0.923629 0.749651
