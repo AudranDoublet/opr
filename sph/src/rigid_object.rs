@@ -8,6 +8,8 @@ use serde::{Deserialize, Serialize};
 use utils::{DiscreteGrid, mesh::MassProperties};
 use crate::{Animation, VariableType, AnimationHandler};
 
+use rayon::prelude::*;
+
 use search::*;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -136,23 +138,23 @@ impl RigidObject
 
         let step = (max - min) / radius;
 
-        let mut res = vec![];
-        for z in 0..step.z as u32 {
-            for y in 0..step.y as u32 {
-                for x in 0..step.x as u32 {
-                    let pos = min + Vector3::new(x as f32, y as f32, z as f32) * radius;
-                    let v = self.grid.interpolate(0, pos, false);
+        (0..step.x as u32, 0..step.y as u32, 0..step.z as u32)
+            .into_par_iter()
+            .filter_map(|(x, y, z)| {
+            let pos = min + Vector3::new(x as f32, y as f32, z as f32) * radius;
+            let v = self.grid.interpolate(0, pos, false);
 
-                    if let Some((d, _)) = v {
-                        if d <= 0.00 {
-                            res.push(pos);
-                        }
-                    }
+            if let Some((d, _)) = v {
+                if d <= 0.00 {
+                    Some(pos)
+                } else {
+                    None
                 }
+            } else {
+                None
             }
-        }
 
-        res
+        }).collect()
     }
 
     pub fn to_particle_tree(&self, radius: f32) -> BVH<Sphere> {
