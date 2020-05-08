@@ -149,8 +149,8 @@ fn timer(current: &mut f32, max: f32, dt: &mut f32) -> f32 {
 impl Animation {
     pub fn reset(&mut self) {
         match self {
-            Animation::Steps { loop_num, loop_count, steps, current, .. } => {
-                *loop_num = *loop_count;
+            Animation::Steps { loop_num, steps, current, .. } => {
+                *loop_num = 0;
                 *current = 0;
 
                 steps.iter_mut().for_each(|v| v.reset())
@@ -173,7 +173,7 @@ impl Animation {
 
     pub fn step(&mut self, handler: &mut dyn AnimationHandler, mut dt: f32) -> Option<f32> {
         match self {
-            Animation::Steps { loop_num, steps, current, .. } => {
+            Animation::Steps { loop_num, loop_count, steps, current, .. } => {
                 while *current < steps.len() && dt > 0.0 {
                     dt = steps[*current].step(handler, dt).unwrap_or(dt);
 
@@ -183,10 +183,10 @@ impl Animation {
                 }
 
                 if *current >= steps.len() {
-                    *loop_num -= 1;
+                    *loop_num += 1;
                     *current = 0;
 
-                    if *loop_num == 0 {
+                    if loop_num == loop_count {
                         Some(dt)
                     } else {
                         steps.iter_mut().for_each(|v| v.reset());
