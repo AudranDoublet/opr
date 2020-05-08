@@ -1,7 +1,7 @@
 config:
     particle_radius: 0.02
 simulation_config:
-    fps: 24.0
+    fps: 30.0
     max_time: 27.0
     enable_bubbler: false
 render_config:
@@ -44,7 +44,7 @@ solids:
       dynamic: false
       mesh_invert: false
       resolution: [31, 31, 31]
-      scale: [0.5, 0.5, 0.7]
+      scale: [0.7, 0.7, 1.2]
       position: [0.0, 0.0, 0.0]
       rotation_axis: [0.0, 0.0, 0.0]
       rotation_angle: 0.0
@@ -63,17 +63,17 @@ solids:
               curve:
                   type: linear
                   a: [0.0, 0.0, 0.0]
-                  b: [0.0, 0.0, 100.0]
+                  b: [0.0, 0.0, -50.0]
               variable: AngularVelocity
             - type: constant
               time: 15.
               variable: AngularVelocity
-              value: [0.0, 0.0, 100.0]
+              value: [0.0, 0.0, -50.0]
             - type: curve
               time: 1.0
               curve:
                   type: linear
-                  a: [0.0, 0.0, 100.0]
+                  a: [0.0, 0.0, -50.0]
                   b: [0.0, 0.0, 0.0]
               variable: AngularVelocity
             - type: constant
@@ -83,14 +83,13 @@ solids:
 
 liquids_blocks:
     - type: block
-      from: [-0.9, -0.1, -1.25]
-      to: [0.9, 1.6, -0.35]
+      from: [-1.0, -0.2, -1.25]
+      to: [1.0, 1.6, -0.35]
+      density: 1.8
     - type: block
-      from: [-0.9, -0.1, 0.35]
-      to: [0.9, 1.6, 1.25]
-    - type: block
-      from: [-0.4, -0.1, -0.3]
-      to: [0.4, 0.4, 0.3]
+      from: [-1.0, -0.2, 0.35]
+      to: [1.0, 1.6, 1.25]
+      density: 1.8
 liquids_add_blocks:
     - type: block
       from:  [-0.100, 0.200, -0.100]
