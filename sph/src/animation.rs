@@ -187,10 +187,8 @@ impl Animation {
                     *current = 0;
 
                     if loop_num == loop_count {
-                        println!("mega");
                         Some(dt)
                     } else {
-                        println!("loop_num: {}", loop_num);
                         steps.iter_mut().for_each(|v| v.reset());
                         self.step(handler, dt)
                     }
