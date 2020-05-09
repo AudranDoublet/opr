@@ -6,6 +6,11 @@ subcommands:
     -   simulate:
             about: run a DFSPH simulation of the given scene
             args:
+                -   camera_from_simulation:
+                        long: camera_from_simulation
+                        short: cs
+                        help: move the camera according to the camera animations inside the simulation scene
+                        takes_value: false
                 -   nocache:
                         long: --no-cache
                         help: Should the simulator use cache

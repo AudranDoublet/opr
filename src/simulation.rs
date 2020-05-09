@@ -7,7 +7,7 @@ use std::time::Instant;
 use sph::bubbler::{DiffuseParticle, DiffuseParticleType};
 use clap::ArgMatches;
 use kiss3d::{camera::camera::Camera, scene::SceneNode};
-use nalgebra::{Point3, Translation3};
+use nalgebra::{Point3, Translation3, Vector3};
 use sph_scene::Scene;
 use sph::Simulation;
 
@@ -73,6 +73,10 @@ fn add_diffuse(renderer: &mut debug_renderer::scene::Scene, bubbles: &Vec<Diffus
     let radius = renderer.get_particle_radius();
 
     for diffuse in bubbles {
+        if diffuse.kind != DiffuseParticleType::Bubble {
+            continue;
+        }
+
         let diffuse_radius = match diffuse.kind {
             DiffuseParticleType::Spray => radius * 0.4,
             DiffuseParticleType::Bubble => radius * 0.8,
@@ -98,7 +102,19 @@ fn clear_diffuse(renderer: &mut debug_renderer::scene::Scene) {
     renderer.diffuse = renderer.window.add_group();
 }
 
-fn simulate(scene: &Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Result<(), Box<dyn std::error::Error>> {
+
+fn update_cam_from_simulation(renderer: &mut debug_renderer::scene::Scene, sim: &Simulation) {
+    let (cam_eye, cam_dir, cam_up) = (
+        Point3::from(sim.camera.position()),
+        Point3::from(sim.camera.forward()),
+        sim.camera.up()
+    );
+
+    renderer.camera.look_at(cam_eye, cam_dir);
+    renderer.camera.set_up_axis(cam_up);
+}
+
+fn simulate(scene: &Scene, dump_all: bool, camera_from_simulation: bool, dump_folder: &Path, fps: f32) -> Result<(), Box<dyn std::error::Error>> {
     let mut fluid_simulation = scene.load()?;
     let mut total_time = 0.0;
     let mut time_simulated_since_last_frame = fps;
@@ -108,8 +124,9 @@ fn simulate(scene: &Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Resu
     let mut collision_size = 5.;
 
     let mut renderer = debug_renderer::scene::Scene::new(fluid_simulation.particle_radius());
-    renderer.camera.look_at(Point3::new(0.0, 1., -2.), Point3::new(0., 0., 5.)); //FIXME make camera configurable
+    update_cam_from_simulation(&mut renderer, &fluid_simulation);
     renderer.window.set_point_size(collision_size);
+    renderer.camera.set_move_step(0.10);
 
     add_particles(0..fluid_simulation.len(), &fluid_simulation, &mut renderer);
     fluid_simulation.init_forces();
@@ -122,6 +139,9 @@ fn simulate(scene: &Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Resu
     let mut hide_solids = false;
     let mut pause: bool = true;
     let mut frame_idx: usize = 0;
+    let mut __debug_nb_diffuse = 0;
+
+    let mut last_dump_camera: Option<(f32, Vector3<f32>, Vector3<f32>)> = None;
 
     while renderer.render() {
         let timer = Instant::now();
@@ -148,6 +168,20 @@ fn simulate(scene: &Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Resu
                             if let Some(mesh) = &mut meshes[i] {
                                 mesh.set_visible(!hide_solids);
                             }
+                        }
+                    }
+                    debug_renderer::event::Key::N => {
+                        let curr_cam = (
+                            total_time,
+                            renderer.camera.eye().coords,
+                            renderer.camera.eye_dir()
+                        );
+
+                        if let Some(last_cam) = last_dump_camera {
+                            println!("- {} -> {:?} => {:?}", curr_cam.0 - last_cam.0, [last_cam.1, last_cam.2], [curr_cam.1, curr_cam.2]);
+                            last_dump_camera = None;
+                        } else {
+                            last_dump_camera = Some(curr_cam);
                         }
                     }
                     debug_renderer::event::Key::C => {
@@ -194,7 +228,6 @@ fn simulate(scene: &Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Resu
 
             let prev = fluid_simulation.len();
             time_simulated_since_last_frame += fluid_simulation.tick();
-            add_particles(prev..fluid_simulation.len(), &fluid_simulation, &mut renderer);
 
             if scene.simulation_config.enable_bubbler {
                 let nb_bubbler_updated = fluid_simulation
@@ -202,6 +235,12 @@ fn simulate(scene: &Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Resu
                     .iter()
                     .filter(|f| f.bubbler_tick(&fluid_simulation))
                     .count();
+
+                 __debug_nb_diffuse = fluid_simulation
+                    .fluids()
+                    .iter()
+                    .map(|f| f.bubbler().unwrap().read().unwrap().get_particles().len())
+                    .fold(0, |a, b| a + b);
 
                 // FIXME: I was supposed to implement a lazy algorithm to only update the diffuse
                 //        particles that have changed, however I've been the lazy one => it update
@@ -215,6 +254,9 @@ fn simulate(scene: &Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Resu
                 }
                 // FIXME-END
             }
+
+            fluid_simulation.tick_others();
+            add_particles(prev..fluid_simulation.len(), &fluid_simulation, &mut renderer);
 
             let d_v_mean_sq = fluid_simulation.compute_vmean();
             let d_v_max_sq_deviation = fluid_simulation.compute_vmax().powi(2) / d_v_mean_sq;
@@ -262,6 +304,10 @@ fn simulate(scene: &Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Resu
                 }
             }
 
+            if camera_from_simulation {
+                update_cam_from_simulation(&mut renderer, &fluid_simulation);
+            }
+
             total_time += fluid_simulation.get_time_step();
         }
 
@@ -283,14 +329,13 @@ fn simulate(scene: &Scene, dump_all: bool, dump_folder: &Path, fps: f32) -> Resu
                 collision_size: {:.3}\n\
                 nb_solid_collisions: {}\n\
                 fps: {:.3} frame/s\n\
-                eye: {}\
+                nb_diffuse: {}\n\
+                eye_position: {}\n\
+                eye_dir: {:?}\n\
                 ", frame_idx, fluid_simulation.get_time_step(), total_time, fluid_simulation.len(), fluid_simulation.compute_vmax(),
-                                         !hide_solids,
-                                         show_collisions,
-                                         collision_size,
-                                         fluid_simulation.debug_get_solid_collisions().len(),
-                                         1. / timer.elapsed().as_secs_f32(),
-                                         renderer.camera.eye()));
+                !hide_solids, show_collisions, collision_size, fluid_simulation.debug_get_solid_collisions().len(),
+                1. / timer.elapsed().as_secs_f32(), __debug_nb_diffuse, renderer.camera.eye_dir(),
+                renderer.camera.at()));
         }
 
         renderer.update();
@@ -318,6 +363,7 @@ pub fn main_simulation(args: &ArgMatches) -> Result<(), Box<dyn std::error::Erro
         scene_c.global_config.cache_path = cache_dir.to_string();
     }
 
+    let camera_from_simulation = args.is_present("camera_from_simulation");
     let dump_all = args.is_present("dump_all");
     let dump_folder = match args.value_of("dump_directory") {
         Some(d) => Path::new(d),
@@ -332,6 +378,6 @@ pub fn main_simulation(args: &ArgMatches) -> Result<(), Box<dyn std::error::Erro
     if args.is_present("no_gui") {
         pipeline::simulate::pipeline_simulate(&scene_c, dump_folder)
     } else {
-        simulate(&scene_c, dump_all, dump_folder, 1. / scene_c.simulation_config.fps)
+        simulate(&scene_c, dump_all, camera_from_simulation, dump_folder, 1. / scene_c.simulation_config.fps)
     }
 }

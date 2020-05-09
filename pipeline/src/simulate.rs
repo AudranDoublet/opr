@@ -49,6 +49,8 @@ pub fn pipeline_simulate(scene: &Scene, dump_folder: &Path) -> Result<(), Box<dy
                 .for_each(|f| { f.bubbler_tick(&fluid_simulation); });
         }
 
+        fluid_simulation.tick_others();
+
         let old = perc(total_time);
         total_time += fluid_simulation.get_time_step();
 
