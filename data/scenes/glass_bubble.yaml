@@ -1,0 +1,940 @@
+config:
+    particle_radius: 0.02
+
+simulation_config:
+    fps: 120.0
+    max_time: 1.2
+    enable_bubbler: false
+
+fluids:
+    water:
+        material: data/materials/transparent_water.mtl
+        simulation:
+            density: 1000.
+        meshing:
+            cube_size: 0.04
+            iso_value: 0.025
+        bubbler:
+            config:
+                tau_k: [0.08, 2.0]
+                lifetime: [0.05, 0.30]
+                #k_wc: 1000
+                #k_ta: 1000
+                k_b: 2.6
+                k_d: 1.7
+            bubble:
+                radius: 0.006
+                material: data/materials/white_transparent.mtl
+                ignore: false
+            foam:
+                radius: 0.01
+                material: data/materials/white.mtl
+                ignore: true
+
+render_config:
+    max_rec: 1
+    fps: 60
+    planes:
+        - axis: 1
+          position: -5.
+          material: data/materials/metal_ground.mtl
+    sky_color:
+        type: color
+        color: [0.149, 0.6471, 0.7961]
+    lights:
+      - type: ambient
+        color: [0.3, 0.3, 0.3]
+      - type: directional
+        color: [1.0, 1.0, 1.0]
+        direction: [1., -1., 1.]
+      - type: directional
+        color: [0.5, 0.5, 0.5]
+        direction: [0.5, 1, -0.5]
+
+
+emitters:
+    - shape:
+        type: ellipse
+        x_radius: 0.3
+        y_radius: 0.3
+      position: [0., 1.6, -1.15]
+      velocity: 6.0
+      fluid_type: water
+      animation:
+          type: group
+          elements:
+              - type: lookat_relative
+                position: [0.2, -1.5, 1.8]
+              - type: emit
+                time: 3.0
+
+solids:
+    - mesh: objects/box.obj
+      density: 1000
+      dynamic: false
+      mesh_invert: true
+      resolution: [11, 11, 11]
+      scale: [3.0, 5.0, 3.0]
+      position: [0.0, 1.9, 0.0]
+      rotation_axis: [0.0, 0.0, 0.0]
+      rotation_angle: 0.0
+      display: false
+
+    - mesh: objects/earth/earth.obj
+      density: 1350
+      dynamic: true
+      mesh_invert: false
+      resolution: [31, 31, 31]
+      scale: [0.0004, 0.0004, 0.0004]
+      position: [0.0, 1.25, 0.0]
+      rotation_axis: [0.0, 0.0, 0.0]
+      rotation_angle: 0.0
+      display: true
+      particle_size: 0.01
+      animation:
+          type: steps
+          loop_count: 1
+          steps:
+              - type: group
+                elements:
+                    - type: constant
+                      time: 3.5
+                      variable: Velocity
+                      value: [0., 0., 0.]
+                    - type: constant
+                      time: 4.0
+                      variable: AngularVelocity
+                      value: [0.26, 4.14, 0.05]
+              - type: constant
+                time: 0.01
+                variable: Velocity
+                value: [0., -4.5, 0.]
+
+    - mesh: objects/glass.obj
+      material: data/materials/glass.mtl
+      density: 1000
+      dynamic: false
+      mesh_invert: false
+      resolution: [21, 21, 21]
+      scale: [0.015, 0.015, 0.015]
+      position: [0.0, 0., 0.0]
+      rotation_axis: [0.0, 0.0, 0.0]
+      rotation_angle: 0.0
+      display: true
+
+camera:
+    position:
+      - -2.0
+      - 0.0
+      - 0.0
+    generate_at_render: true
+    animation:
+      type: steps
+      loop_count: 1
+      steps:
+        - type: group
+          elements:
+            - type: curve
+              variable: Position
+              curve:
+                type: linear
+                a:
+                  - -2.0
+                  - 0.0
+                  - 0.0
+                b:
+                  - -2.0
+                  - 0.0
+                  - 0.0
+              time: 0.051060400903224948
+              smoothing:
+                begin: 0.20000000298023225
+                end: 1.0
+                begin_strength: 2.0
+                end_strength: 2.0
+              current_time: 0.0
+            - type: curve
+              variable: LookAt
+              curve:
+                type: linear
+                a:
+                  - -1.053408145904541
+                  - 0.32062795758247378
+                  - -0.03408023342490196
+                b:
+                  - -1.053408145904541
+                  - 0.32062795758247378
+                  - -0.03408023342490196
+              time: 0.051060400903224948
+              smoothing:
+                begin: 0.20000000298023225
+                end: 1.0
+                begin_strength: 2.0
+                end_strength: 2.0
+              current_time: 0.0
+        - type: group
+          elements:
+            - type: curve
+              variable: Position
+              curve:
+                type: linear
+                a:
+                  - -2.0
+                  - 0.0
+                  - 0.0
+                b:
+                  - -2.0
+                  - 0.0
+                  - 0.0
+              time: 0.05074355751276016
+              smoothing: ~
+              current_time: 0.0
+            - type: curve
+              variable: LookAt
+              curve:
+                type: linear
+                a:
+                  - -1.053408145904541
+                  - 0.32062795758247378
+                  - -0.03408023342490196
+                b:
+                  - -1.053408145904541
+                  - 0.32062795758247378
+                  - -0.03408023342490196
+              time: 0.05074355751276016
+              smoothing: ~
+              current_time: 0.0
+        - type: group
+          elements:
+            - type: curve
+              variable: Position
+              curve:
+                type: linear
+                a:
+                  - -2.0
+                  - 0.0
+                  - 0.0
+                b:
+                  - -1.8968546390533448
+                  - -5.960465010446114e-9
+                  - 1.294457197189331
+              time: 0.051691994071006778
+              smoothing: ~
+              current_time: 0.0
+            - type: curve
+              variable: LookAt
+              curve:
+                type: linear
+                a:
+                  - -1.053408145904541
+                  - 0.32062795758247378
+                  - -0.03408023342490196
+                b:
+                  - -0.9770961403846741
+                  - 0.3504575490951538
+                  - 1.1177544593811036
+              time: 0.051691994071006778
+              smoothing: ~
+              current_time: 0.0
+        - type: group
+          elements:
+            - type: curve
+              variable: Position
+              curve:
+                type: linear
+                a:
+                  - -1.8968546390533448
+                  - -5.960465010446114e-9
+                  - 1.294457197189331
+                b:
+                  - -0.9277594089508057
+                  - -7.450584149637507e-9
+                  - 2.778563976287842
+              time: 0.05240188539028168
+              smoothing: ~
+              current_time: 0.0
+            - type: curve
+              variable: LookAt
+              curve:
+                type: linear
+                a:
+                  - -0.9770961403846741
+                  - 0.3504575490951538
+                  - 1.1177544593811036
+                b:
+                  - -0.27654075622558596
+                  - 0.433594286441803
+                  - 2.1557395458221437
+              time: 0.05240188539028168
+              smoothing: ~
+              current_time: 0.0
+        - type: group
+          elements:
+            - type: curve
+              variable: Position
+              curve:
+                type: linear
+                a:
+                  - -0.9277594089508057
+                  - -7.450584149637507e-9
+                  - 2.778563976287842
+                b:
+                  - 0.5597080588340759
+                  - -7.0780550309734739e-9
+                  - 3.698314905166626
+              time: 0.05022111535072327
+              smoothing: ~
+              current_time: 0.0
+            - type: curve
+              variable: LookAt
+              curve:
+                type: linear
+                a:
+                  - -0.27654075622558596
+                  - 0.433594286441803
+                  - 2.1557395458221437
+                b:
+                  - 0.671266496181488
+                  - 0.33060160279273989
+                  - 2.7611610889434816
+              time: 0.05022111535072327
+              smoothing: ~
+              current_time: 0.0
+        - type: group
+          elements:
+            - type: curve
+              variable: Position
+              curve:
+                type: linear
+                a:
+                  - 0.5597080588340759
+                  - -7.0780550309734739e-9
+                  - 3.698314905166626
+                b:
+                  - 2.4341981410980226
+                  - -7.695056147838386e-9
+                  - 3.583279848098755
+              time: 0.05086854100227356
+              smoothing: ~
+              current_time: 0.0
+            - type: curve
+              variable: LookAt
+              curve:
+                type: linear
+                a:
+                  - 0.671266496181488
+                  - 0.33060160279273989
+                  - 2.7611610889434816
+                b:
+                  - 2.148526430130005
+                  - 0.3376503884792328
+                  - 2.6864051818847658
+              time: 0.05086854100227356
+              smoothing: ~
+              current_time: 0.0
+        - type: group
+          elements:
+            - type: curve
+              variable: Position
+              curve:
+                type: linear
+                a:
+                  - 2.4341981410980226
+                  - -7.695056147838386e-9
+                  - 3.583279848098755
+                b:
+                  - 4.140361785888672
+                  - -5.832410554518219e-9
+                  - 2.568108081817627
+              time: 0.05135306715965271
+              smoothing: ~
+              current_time: 0.0
+            - type: curve
+              variable: LookAt
+              curve:
+                type: linear
+                a:
+                  - 2.148526430130005
+                  - 0.3376503884792328
+                  - 2.6864051818847658
+                b:
+                  - 3.5480825901031496
+                  - 0.31667616963386538
+                  - 1.8272156715393067
+              time: 0.05135306715965271
+              smoothing: ~
+              current_time: 0.0
+        - type: group
+          elements:
+            - type: curve
+              variable: Position
+              curve:
+                type: linear
+                a:
+                  - 4.140361785888672
+                  - -5.832410554518219e-9
+                  - 2.568108081817627
+                b:
+                  - 5.6724853515625
+                  - -5.087350096744103e-9
+                  - 0.7516171932220459
+              time: 0.05013614892959595
+              smoothing: ~
+              current_time: 0.0
+            - type: curve
+              variable: LookAt
+              curve:
+                type: linear
+                a:
+                  - 3.5480825901031496
+                  - 0.31667616963386538
+                  - 1.8272156715393067
+                b:
+                  - 4.782871246337891
+                  - 0.21397675573825837
+                  - 0.3481318950653076
+              time: 0.05013614892959595
+              smoothing: ~
+              current_time: 0.0
+        - type: group
+          elements:
+            - type: curve
+              variable: Position
+              curve:
+                type: linear
+                a:
+                  - 5.6724853515625
+                  - -5.087350096744103e-9
+                  - 0.7516171932220459
+                b:
+                  - 6.169167518615723
+                  - 2.3632318324473546e-9
+                  - -1.3819661140441895
+              time: 0.051061034202575687
+              smoothing: ~
+              current_time: 0.0
+            - type: curve
+              variable: LookAt
+              curve:
+                type: linear
+                a:
+                  - 4.782871246337891
+                  - 0.21397675573825837
+                  - 0.3481318950653076
+                b:
+                  - 5.1845784187316898
+                  - 0.15572257339954377
+                  - -1.3023767471313477
+              time: 0.051061034202575687
+              smoothing: ~
+              current_time: 0.0
+        - type: group
+          elements:
+            - type: curve
+              variable: Position
+              curve:
+                type: linear
+                a:
+                  - 6.169167518615723
+                  - 2.3632318324473546e-9
+                  - -1.3819661140441895
+                b:
+                  - 5.688449859619141
+                  - 2.363232720625774e-9
+                  - -3.3196144104003908
+              time: 0.05080997943878174
+              smoothing: ~
+              current_time: 0.0
+            - type: curve
+              variable: LookAt
+              curve:
+                type: linear
+                a:
+                  - 5.1845784187316898
+                  - 0.15572257339954377
+                  - -1.3023767471313477
+                b:
+                  - 4.79150915145874
+                  - 0.17107990384101869
+                  - -2.9119021892547609
+              time: 0.05080997943878174
+              smoothing: ~
+              current_time: 0.0
+        - type: group
+          elements:
+            - type: curve
+              variable: Position
+              curve:
+                type: linear
+                a:
+                  - 5.688449859619141
+                  - 2.363232720625774e-9
+                  - -3.3196144104003908
+                b:
+                  - 4.540030479431152
+                  - 4.5984074326099748e-9
+                  - -4.935712814331055
+              time: 0.05075615644454956
+              smoothing: ~
+              current_time: 0.0
+            - type: curve
+              variable: LookAt
+              curve:
+                type: linear
+                a:
+                  - 4.79150915145874
+                  - 0.17107990384101869
+                  - -2.9119021892547609
+                b:
+                  - 3.847705841064453
+                  - 0.16987259685993195
+                  - -4.2344069480896
+              time: 0.05075615644454956
+              smoothing: ~
+              current_time: 0.0
+        - type: group
+          elements:
+            - type: curve
+              variable: Position
+              curve:
+                type: linear
+                a:
+                  - 4.540030479431152
+                  - 4.5984074326099748e-9
+                  - -4.935712814331055
+                b:
+                  - 2.857722282409668
+                  - 5.343465669938041e-9
+                  - -5.983211517333984
+              time: 0.050750732421875
+              smoothing:
+                begin: 0.0
+                end: 0.800000011920929
+                begin_strength: 2.0
+                end_strength: 2.0
+              current_time: 0.0
+            - type: curve
+              variable: LookAt
+              curve:
+                type: linear
+                a:
+                  - 3.847705841064453
+                  - 0.16987259685993195
+                  - -4.2344069480896
+                b:
+                  - 2.4671030044555666
+                  - 0.2022356241941452
+                  - -5.085148334503174
+              time: 0.050750732421875
+              smoothing:
+                begin: 0.0
+                end: 0.800000011920929
+                begin_strength: 2.0
+                end_strength: 2.0
+              current_time: 0.0
+        - type: group
+          elements:
+            - type: curve
+              variable: Position
+              curve:
+                type: linear
+                a:
+                  - 2.857722282409668
+                  - 5.343465669938041e-9
+                  - -5.983211517333984
+                b:
+                  - 1.0640029907226563
+                  - 0.11135964095592499
+                  - -5.840638637542725
+              time: 0.05087155103683472
+              smoothing:
+                begin: 0.0
+                end: 1.0
+                begin_strength: 2.0
+                end_strength: 2.0
+              current_time: 0.0
+            - type: curve
+              variable: LookAt
+              curve:
+                type: linear
+                a:
+                  - 2.4671030044555666
+                  - 0.2022356241941452
+                  - -5.085148334503174
+                b:
+                  - 0.9205994009971619
+                  - 0.272521048784256
+                  - -4.864184379577637
+              time: 0.05087155103683472
+              smoothing:
+                begin: 0.0
+                end: 1.0
+                begin_strength: 2.0
+                end_strength: 2.0
+              current_time: 0.0
+        - type: group
+          elements:
+            - type: curve
+              variable: Position
+              curve:
+                type: linear
+                a:
+                  - 1.0640029907226563
+                  - 0.11135964095592499
+                  - -5.840638637542725
+                b:
+                  - -0.3989392817020416
+                  - 0.3372364640235901
+                  - -4.516266345977783
+              time: 0.05087238550186157
+              smoothing:
+                begin: 0.0
+                end: 1.0
+                begin_strength: 2.0
+                end_strength: 2.0
+              current_time: 0.0
+            - type: curve
+              variable: LookAt
+              curve:
+                type: linear
+                a:
+                  - 0.9205994009971619
+                  - 0.272521048784256
+                  - -4.864184379577637
+                b:
+                  - -0.23359957337379456
+                  - 0.48397403955459597
+                  - -3.5410070419311525
+              time: 0.05087238550186157
+              smoothing:
+                begin: 0.0
+                end: 1.0
+                begin_strength: 2.0
+                end_strength: 2.0
+              current_time: 0.0
+        - type: group
+          elements:
+            - type: curve
+              variable: Position
+              curve:
+                type: linear
+                a:
+                  - -0.3989392817020416
+                  - 0.3372364640235901
+                  - -4.516266345977783
+                b:
+                  - -1.4278600215911866
+                  - 0.5356621146202087
+                  - -2.815967559814453
+              time: 0.05046266317367554
+              smoothing:
+                begin: 0.0
+                end: 1.0
+                begin_strength: 2.0
+                end_strength: 2.0
+              current_time: 0.0
+            - type: curve
+              variable: LookAt
+              curve:
+                type: linear
+                a:
+                  - -0.23359957337379456
+                  - 0.48397403955459597
+                  - -3.5410070419311525
+                b:
+                  - -1.065151572227478
+                  - 0.6392963528633118
+                  - -1.8898452520370484
+              time: 0.05046266317367554
+              smoothing:
+                begin: 0.0
+                end: 1.0
+                begin_strength: 2.0
+                end_strength: 2.0
+              current_time: 0.0
+        - type: group
+          elements:
+            - type: curve
+              variable: Position
+              curve:
+                type: linear
+                a:
+                  - -1.4278600215911866
+                  - 0.5356621146202087
+                  - -2.815967559814453
+                b:
+                  - -2.0235695838928224
+                  - 0.577215313911438
+                  - -2.0164036750793459
+              time: 0.05092340707778931
+              smoothing:
+                begin: 0.0
+                end: 1.0
+                begin_strength: 2.0
+                end_strength: 2.0
+              current_time: 0.0
+            - type: curve
+              variable: LookAt
+              curve:
+                type: linear
+                a:
+                  - -1.065151572227478
+                  - 0.6392963528633118
+                  - -1.8898452520370484
+                b:
+                  - -1.426657795906067
+                  - 0.5869025588035584
+                  - -1.2141551971435547
+              time: 0.05092340707778931
+              smoothing:
+                begin: 0.0
+                end: 1.0
+                begin_strength: 2.0
+                end_strength: 2.0
+              current_time: 0.0
+        - type: group
+          elements:
+            - type: curve
+              variable: Position
+              curve:
+                type: linear
+                a:
+                  - -2.0235695838928224
+                  - 0.577215313911438
+                  - -2.0164036750793459
+                b:
+                  - -2.739863872528076
+                  - 0.5655903816223145
+                  - -2.9791007041931154
+              time: 0.050216615200042728
+              smoothing:
+                begin: 0.0
+                end: 1.0
+                begin_strength: 2.0
+                end_strength: 2.0
+              current_time: 0.0
+            - type: curve
+              variable: LookAt
+              curve:
+                type: linear
+                a:
+                  - -1.426657795906067
+                  - 0.5869025588035584
+                  - -1.2141551971435547
+                b:
+                  - -2.1429519653320314
+                  - 0.5752776265144348
+                  - -2.176852226257324
+              time: 0.050216615200042728
+              smoothing:
+                begin: 0.0
+                end: 1.0
+                begin_strength: 2.0
+                end_strength: 2.0
+              current_time: 0.0
+        - type: group
+          elements:
+            - type: curve
+              variable: Position
+              curve:
+                type: linear
+                a:
+                  - -2.739863872528076
+                  - 0.5655903816223145
+                  - -2.9791007041931154
+                b:
+                  - -2.997065305709839
+                  - 0.5655903816223145
+                  - -2.563023090362549
+              time: 0.05043607950210571
+              smoothing:
+                begin: 0.0
+                end: 1.0
+                begin_strength: 2.0
+                end_strength: 2.0
+              current_time: 0.0
+            - type: curve
+              variable: LookAt
+              curve:
+                type: linear
+                a:
+                  - -2.1429519653320314
+                  - 0.5752776265144348
+                  - -2.176852226257324
+                b:
+                  - -2.048516035079956
+                  - 0.5828724503517151
+                  - -2.2468652725219728
+              time: 0.05043607950210571
+              smoothing:
+                begin: 0.0
+                end: 1.0
+                begin_strength: 2.0
+                end_strength: 2.0
+              current_time: 0.0
+        - type: group
+          elements:
+            - type: curve
+              variable: Position
+              curve:
+                type: linear
+                a:
+                  - -2.997065305709839
+                  - 0.5655903816223145
+                  - -2.563023090362549
+                b:
+                  - -2.872594118118286
+                  - 0.5655903816223145
+                  - -0.4869028627872467
+              time: 0.052362918853759769
+              smoothing:
+                begin: 0.0
+                end: 1.0
+                begin_strength: 2.0
+                end_strength: 2.0
+              current_time: 0.0
+            - type: curve
+              variable: LookAt
+              curve:
+                type: linear
+                a:
+                  - -2.048516035079956
+                  - 0.5828724503517151
+                  - -2.2468652725219728
+                b:
+                  - -1.9290385246276856
+                  - 0.5961073637008667
+                  - -0.8167080879211426
+              time: 0.052362918853759769
+              smoothing:
+                begin: 0.0
+                end: 1.0
+                begin_strength: 2.0
+                end_strength: 2.0
+              current_time: 0.0
+        - type: group
+          elements:
+            - type: curve
+              variable: Position
+              curve:
+                type: linear
+                a:
+                  - -2.872594118118286
+                  - 0.5655903816223145
+                  - -0.4869028627872467
+                b:
+                  - -2.5149037837982179
+                  - 0.5471928715705872
+                  - 1.4834108352661133
+              time: 0.052133142948150638
+              smoothing:
+                begin: 0.0
+                end: 1.0
+                begin_strength: 2.0
+                end_strength: 2.0
+              current_time: 0.0
+            - type: curve
+              variable: LookAt
+              curve:
+                type: linear
+                a:
+                  - -1.9290385246276856
+                  - 0.5961073637008667
+                  - -0.8167080879211426
+                b:
+                  - -1.7764075994491578
+                  - 0.5577144026756287
+                  - 0.8092352747917175
+              time: 0.052133142948150638
+              smoothing:
+                begin: 0.0
+                end: 1.0
+                begin_strength: 2.0
+                end_strength: 2.0
+              current_time: 0.0
+        - type: group
+          elements:
+            - type: curve
+              variable: Position
+              curve:
+                type: linear
+                a:
+                  - -2.5149037837982179
+                  - 0.5471928715705872
+                  - 1.4834108352661133
+                b:
+                  - -2.2696852684020998
+                  - 0.5429892539978027
+                  - 3.463193893432617
+              time: 0.05059385299682617
+              smoothing:
+                begin: 0.0
+                end: 1.0
+                begin_strength: 2.0
+                end_strength: 2.0
+              current_time: 0.0
+            - type: curve
+              variable: LookAt
+              curve:
+                type: linear
+                a:
+                  - -1.7764075994491578
+                  - 0.5577144026756287
+                  - 0.8092352747917175
+                b:
+                  - -1.7012008428573609
+                  - 0.5434456467628479
+                  - 2.640500068664551
+              time: 0.05059385299682617
+              smoothing:
+                begin: 0.0
+                end: 1.0
+                begin_strength: 2.0
+                end_strength: 2.0
+              current_time: 0.0
+        - type: group
+          elements:
+            - type: curve
+              variable: Position
+              curve:
+                type: linear
+                a:
+                  - -2.2696852684020998
+                  - 0.5429892539978027
+                  - 3.463193893432617
+                b:
+                  - -1.8354790210723878
+                  - 0.5426667928695679
+                  - 4.5084099769592289
+              time: 0.05045604705810547
+              smoothing:
+                begin: 0.0
+                end: 1.0
+                begin_strength: 2.0
+                end_strength: 2.0
+              current_time: 0.0
+            - type: curve
+              variable: LookAt
+              curve:
+                type: linear
+                a:
+                  - -1.7012008428573609
+                  - 0.5434456467628479
+                  - 2.640500068664551
+                b:
+                  - -1.4397974014282227
+                  - 0.543123185634613
+                  - 3.590022325515747
+              time: 0.05045604705810547
+              smoothing:
+                begin: 0.0
+                end: 1.0
+                begin_strength: 2.0
+                end_strength: 2.0
+              current_time: 0.0
+      current: 0
+      loop_num: 0
+
+
+liquids_blocks: []
+liquids_add_blocks: []
