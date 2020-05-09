@@ -1,12 +1,13 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::collections::HashSet;
 
 use sph::bubbler::DiffuseParticleType;
 use indicatif::{ProgressBar, ProgressStyle};
 use nalgebra::Vector3;
 use rayon::prelude::*;
 use raytracer::{Camera, scene_config};
-use raytracer::scene_config::{MeshConfig, BubbleConfig, VolumeConfig, FoamConfig};
+use raytracer::scene_config::{MeshConfig, BubbleConfig, VolumeConfig};
 use search::HashGrid;
 use sph::{Simulation, SimulationFluidSnapshot, Fluid, RigidObject};
 use sph_scene::{ConfigurationAnisotropication, Scene, FluidConfiguration};
@@ -123,17 +124,46 @@ fn generate_rigid_objects(scene: &Scene, simulation: &Simulation) -> Vec<MeshCon
 
 fn generate_fluid_bubble(conf: &FluidConfiguration, fluid: &Fluid, path: &Path) -> Option<BubbleConfig> {
     if let Some(conf) = &conf.bubbler {
-        if conf.bubble.ignore {
-            return None;
-        }
-
         assert!(fluid.bubbler().is_some());
 
-        let positions: Vec<Vector3<f32>> = fluid.bubbler().unwrap().read().unwrap().get_particles().iter()
+        let bubbler = fluid.bubbler().unwrap().read().unwrap();
+        let bubbles : Vec<(Vector3<f32>, f32, f32)> = bubbler.get_particles()
+            .par_iter()
             .filter(|&p| p.kind == DiffuseParticleType::Bubble)
-            .map(|p| p.position).collect();
+            .map(|p| (p.position, p.radius, p.power))
+            .collect();
 
-        Particles::new_cst_radius(positions, conf.bubble.radius)
+        let positions: Vec<Vector3<f32>> = bubbles
+            .par_iter() 
+            .map(|(pos, _, _)| *pos).collect();
+
+        let mut hash_grid = HashGrid::new(bubbler.hp.radius_range.1);
+        hash_grid.insert(&positions);
+
+        let selected_bubbles: HashSet<usize> = hash_grid
+            .find_all_neighbours(&positions)
+            .par_iter()
+            .enumerate()
+            .map(|(idx_curr_bubble, v)| {
+                let (mut idx_max, mut power_max) = (idx_curr_bubble, bubbles[idx_curr_bubble].2);
+                v.iter().for_each(|&i| {
+                    let power_i = bubbles[i].2;
+                    if power_i > power_max {
+                        idx_max = i;
+                        power_max = power_i;
+                    }
+                });
+                idx_max
+            })
+            .collect();
+
+        let positions: Vec<Vector3<f32>> = selected_bubbles.par_iter()
+            .map(|&i| bubbles[i].0).collect();
+
+        let radii: Vec<f32> = selected_bubbles.par_iter()
+            .map(|&i| bubbles[i].1).collect();
+
+        Particles::new(positions, radii)
             .dump(path)
             .unwrap();
 
@@ -146,34 +176,6 @@ fn generate_fluid_bubble(conf: &FluidConfiguration, fluid: &Fluid, path: &Path) 
         None
     }
 }
-
-fn generate_fluid_foam(conf: &FluidConfiguration, fluid: &Fluid, path: &Path)  -> Option<FoamConfig> {
-    if let Some(conf) = &conf.bubbler {
-        if conf.foam.ignore {
-            return None;
-        }
-
-        assert!(fluid.bubbler().is_some());
-
-        let positions: Vec<Vector3<f32>> = fluid.bubbler().unwrap().read().unwrap().get_particles().iter()
-            .filter(|&p| p.kind == DiffuseParticleType::Foam)
-            .map(|p| p.position).collect();
-
-        Particles::new_cst_radius(positions, conf.foam.radius)
-            .dump(path)
-            .unwrap();
-
-        Some(FoamConfig{
-            path: path.to_str().unwrap().to_string(),
-            color: conf.foam.color,
-            radius: conf.foam.radius,
-            density_scaling_factor: conf.foam.density_scaling_factor
-        })
-    } else {
-        None
-    }
-}
-
 
 fn generate_fluid_mesh(conf: &FluidConfiguration, simulation: &Simulation, solids: &Vec<RigidObject>, fluid_idx: usize, path: &Path) -> MeshConfig {
     let buffer = &mut fs::File::create(path).unwrap();
@@ -208,12 +210,10 @@ fn generate_fluid_objects(scene: &Scene, simulation: &Simulation, solids: &Vec<R
         let template_path = |s| dump_directory.join(format!("{:08}_{}_{}.obj", idx, name, s));
 
         let mesh = generate_fluid_mesh(conf, simulation, solids, fluid_idx, &template_path("mesh"));
-        let foam = generate_fluid_foam(conf, fluid, &template_path("foam"));
         let bubble = generate_fluid_bubble(conf, fluid, &template_path("bubble"));
 
         result.push(VolumeConfig {
             mesh,
-            foam,
             bubble
         });
     }

@@ -2,6 +2,10 @@ use serde_derive::*;
 
 #[derive(Clone, Copy, Debug, Deserialize)]
 pub struct BubblerConfig {
+    /// Range for the random radius of bubble (used on redering only)
+    #[serde(default = "default_radius_range")]
+    pub radius_range: (f32, f32),
+
     /// Minimum delta time used for the simulation, smaller is the value, stabler but slower is the simulation
     #[serde(default = "default_dt_min")]
     pub dt_min: f32,
@@ -50,6 +54,8 @@ pub struct BubblerConfig {
     pub threshold_wc_normal_direction: f32,
 }
 
+fn default_radius_range() -> (f32, f32) { (0.001, 0.01) }
+
 fn default_dt_min() -> f32 { 1. / 120.0 }
 
 fn default_tau_wc() -> (f32, f32) { (1.0, 6.0) }
@@ -80,6 +86,8 @@ impl Default for BubblerConfig {
     fn default() -> Self {
         let dt_min = default_dt_min();
         BubblerConfig {
+            radius_range: default_radius_range(),
+
             dt_min,
 
             tau_wc: default_tau_wc(),
@@ -117,6 +125,7 @@ fn range_overlaps(x: &(usize, usize), y: &(usize, usize)) -> bool {
 
 impl BubblerConfig {
     pub fn assert_valid(&self) {
+        assert!(is_valid_range(&self.radius_range));
         assert!(is_valid_range(&self.lifetime));
         assert!(is_valid_range(&self.interval_neighbours_bubble));
         assert!(is_valid_range(&self.interval_neighbours_foam));

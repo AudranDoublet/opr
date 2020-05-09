@@ -98,54 +98,30 @@ impl Default for FluidConfigurationMeshing {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct BubblerFluidConfiguration {
-    // FIXME: the interpretation of the radius for Foam differs from Bubbles/Spray
-    #[serde(default = "bubbler_fluid_conf_default_color")]
-    pub color: Vector3<f32>,
+pub struct FluidBubbleConfiguration {
     #[serde(default = "bubbler_fluid_conf_default_radius")]
-    pub radius: f32,
-    // FIXME-END
-
-    // FIXME: this field is ignore for Foam
+    pub radius: (f32, f32),
     #[serde(default)]
     pub material: Option<String>,
-    // FIXME-END
-
-    // FIXME: this is specific to Foam particles
-    #[serde(default = "bubbler_fluid_conf_default_density_scaling_factor")]
-    pub density_scaling_factor: f32,
-    // FIXME-END
-
-    #[serde(default)]
-    pub ignore: bool,
 }
 
-impl Default for BubblerFluidConfiguration {
+impl Default for FluidBubbleConfiguration {
     fn default() -> Self {
-        BubblerFluidConfiguration {
-            color: bubbler_fluid_conf_default_color(),
+        FluidBubbleConfiguration {
             radius: bubbler_fluid_conf_default_radius(),
             material: None,
-            density_scaling_factor: 1.,
-            ignore: false,
         }
     }
 }
 
-fn bubbler_fluid_conf_default_color() -> Vector3<f32> { Vector3::new(1., 1., 1.) }
-fn bubbler_fluid_conf_default_radius() -> f32 { 0.002 }
-fn bubbler_fluid_conf_default_density_scaling_factor() -> f32 { 1. }
+fn bubbler_fluid_conf_default_radius() -> (f32, f32) { (0.001, 0.01) }
 
 #[derive(Debug, Deserialize, Default)]
 pub struct FluidBubblerConfig {
     #[serde(default)]
     pub config: BubblerConfig,
     #[serde(default)]
-    pub foam: BubblerFluidConfiguration,
-    //#[serde(default)]
-    //pub spray: BubblerFluidConfiguration,
-    #[serde(default)]
-    pub bubble: BubblerFluidConfiguration,
+    pub bubble: FluidBubbleConfiguration,
 }
 
 

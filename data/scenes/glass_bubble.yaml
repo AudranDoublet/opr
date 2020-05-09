@@ -16,20 +16,16 @@ fluids:
             iso_value: 0.025
         bubbler:
             config:
-                tau_k: [0.08, 2.0]
+                tau_k: [0.1, 2.0]
                 lifetime: [0.05, 0.30]
-                #k_wc: 1000
-                #k_ta: 1000
+                k_wc: 900
+                k_ta: 900
                 k_b: 2.6
                 k_d: 1.7
             bubble:
-                radius: 0.006
+                radius: [0.0015, 0.007]
                 material: data/materials/white_transparent.mtl
-                ignore: false
-            foam:
-                radius: 0.01
-                material: data/materials/white.mtl
-                ignore: true
+
 
 render_config:
     max_rec: 4

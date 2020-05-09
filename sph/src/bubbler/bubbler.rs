@@ -15,7 +15,7 @@ use crate::fluid::Fluid;
 #[derive(Deserialize, Serialize)]
 pub struct Bubbler {
     #[serde(skip_serializing, skip_deserializing)]
-    hp: BubblerConfig,
+    pub hp: BubblerConfig,
 
     #[serde(skip_serializing, skip_deserializing)]
     /// Time elapsed between the last and the current tick
@@ -212,7 +212,15 @@ impl Bubbler {
 
                     let phase_idx = fluid.idx();
                     let neighbours = simulation.find_neighbours(&x_d, phase_idx);
-                    res.push(DiffuseParticle { position: x_d, velocity: v_d, lifetime, kind: self.infer_diffuse_particle_type(&neighbours) });
+                    res.push(DiffuseParticle { 
+                        position: x_d, 
+                        velocity: v_d, 
+                        kind: self.infer_diffuse_particle_type(&neighbours),
+                        radius: self.hp.radius_range.0 
+                            + rng.gen::<f32>() * (self.hp.radius_range.1 - self.hp.radius_range.0),
+                        power: rng.gen::<f32>(),
+                        lifetime, 
+                    });
                 }
 
                 res
@@ -288,6 +296,8 @@ impl Bubbler {
                     velocity: new_velocity,
                     lifetime: p.lifetime,
                     kind: p_type,
+                    radius: p.radius,
+                    power: p.power,
                 }
             })
             .fold(|| vec![], |mut a, b| {
