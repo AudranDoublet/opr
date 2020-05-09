@@ -8,8 +8,9 @@ use sph::bubbler::{DiffuseParticle, DiffuseParticleType};
 use clap::ArgMatches;
 use kiss3d::{camera::camera::Camera, scene::SceneNode};
 use nalgebra::{Point3, Translation3, Vector3};
-use sph_scene::Scene;
-use sph::Simulation;
+use sph_scene::{Scene, CameraConfiguration};
+use sph::{Simulation, Animation, Smoothing, VariableType};
+use utils::Curve;
 
 pub fn add_particles(range: std::ops::Range<usize>, dfsph: &Simulation, scene: &mut debug_renderer::scene::Scene) {
     let particles = &dfsph.positions.read().unwrap();
@@ -115,6 +116,9 @@ fn update_cam_from_simulation(renderer: &mut debug_renderer::scene::Scene, sim: 
 }
 
 fn simulate(scene: &Scene, dump_all: bool, camera_from_simulation: bool, dump_folder: &Path, fps: f32) -> Result<(), Box<dyn std::error::Error>> {
+    let camera_dump_interval = 0.25;
+    let mut time_simulated_since_last_camera_dump = camera_dump_interval;
+
     let mut fluid_simulation = scene.load()?;
     let mut total_time = 0.0;
     let mut time_simulated_since_last_frame = fps;
@@ -126,7 +130,11 @@ fn simulate(scene: &Scene, dump_all: bool, camera_from_simulation: bool, dump_fo
     let mut renderer = debug_renderer::scene::Scene::new(fluid_simulation.particle_radius());
     update_cam_from_simulation(&mut renderer, &fluid_simulation);
     renderer.window.set_point_size(collision_size);
-    renderer.camera.set_move_step(0.10);
+    let keyboard_steps = 0.01;
+    let mouse_steps = 0.005;
+    renderer.camera.set_move_step(keyboard_steps);
+    renderer.camera.set_yaw_step(mouse_steps);
+    renderer.camera.set_pitch_step(mouse_steps);
 
     add_particles(0..fluid_simulation.len(), &fluid_simulation, &mut renderer);
     fluid_simulation.init_forces();
@@ -141,6 +149,7 @@ fn simulate(scene: &Scene, dump_all: bool, camera_from_simulation: bool, dump_fo
     let mut frame_idx: usize = 0;
     let mut __debug_nb_diffuse = 0;
 
+    let mut camera_positions : Vec<(f32, Vector3<f32>, Vector3<f32>)> = vec![];
     let mut last_dump_camera: Option<(f32, Vector3<f32>, Vector3<f32>)> = None;
 
     while renderer.render() {
@@ -174,7 +183,7 @@ fn simulate(scene: &Scene, dump_all: bool, camera_from_simulation: bool, dump_fo
                         let curr_cam = (
                             total_time,
                             renderer.camera.eye().coords,
-                            renderer.camera.eye_dir()
+                            renderer.camera.at().coords,
                         );
 
                         if let Some(last_cam) = last_dump_camera {
@@ -229,8 +238,21 @@ fn simulate(scene: &Scene, dump_all: bool, camera_from_simulation: bool, dump_fo
                 frame_idx += 1;
             }
 
+            if time_simulated_since_last_camera_dump >= camera_dump_interval {
+                camera_positions.push((
+                        total_time,
+                        renderer.camera.eye().coords,
+                        renderer.camera.at().coords
+                ));
+
+                time_simulated_since_last_camera_dump = 0.;
+            }
+
             let prev = fluid_simulation.len();
-            time_simulated_since_last_frame += fluid_simulation.tick();
+            let sim_tick_dt = fluid_simulation.tick();
+
+            time_simulated_since_last_frame += sim_tick_dt;
+            time_simulated_since_last_camera_dump += sim_tick_dt;
 
             if scene.simulation_config.enable_bubbler {
                 let nb_bubbler_updated = fluid_simulation
@@ -338,11 +360,87 @@ fn simulate(scene: &Scene, dump_all: bool, camera_from_simulation: bool, dump_fo
                 ", frame_idx, fluid_simulation.get_time_step(), total_time, fluid_simulation.len(), fluid_simulation.compute_vmax(),
                 !hide_solids, show_collisions, collision_size, fluid_simulation.debug_get_solid_collisions().len(),
                 1. / timer.elapsed().as_secs_f32(), __debug_nb_diffuse, 
-                renderer.camera.eye_dir().data,
+                renderer.camera.eye().coords.data,
                 renderer.camera.at().coords.data));
         }
 
         renderer.update();
+    }
+    if true && camera_positions.len() > 0 {
+        let mut last_cam_info = camera_positions[0];
+
+        let last_chunk_idx = (camera_positions.len() - 1) / 3;
+
+        let cam_animation_elems: Vec<Animation> = 
+            camera_positions[1..]
+            .chunks(3)
+            .enumerate()
+            .map(|(chunk_idx, control_points)| {
+                let control_points = [
+                    last_cam_info,
+                    control_points[0],
+                    control_points[1.min(control_points.len()-1)],
+                    control_points[2.min(control_points.len()-1)],
+                ];
+
+                last_cam_info = *control_points.last().unwrap();
+
+                let time = control_points[3].0 - control_points[0].0;
+
+                let mut positions = [Vector3::zeros(); 4];
+                control_points.iter()
+                    .enumerate().for_each(|(i, (_, pos, _))| positions[i] = *pos);
+
+                let mut directions = [Vector3::zeros(); 4];
+                control_points.iter()
+                    .enumerate().for_each(|(i, (_, _, dir))| directions[i] = *dir);
+
+                let smoothing = if chunk_idx > 0 && chunk_idx < last_chunk_idx {
+                    None
+                } else {
+                    let (mut smoothing_begin, mut smoothing_end) = (0., 1.);
+                    if chunk_idx == 0 { smoothing_begin = 0.2; }
+                    if chunk_idx == last_chunk_idx { smoothing_end = 0.8; }
+                    Some(Smoothing {
+                        begin: smoothing_begin,
+                        end: smoothing_end,
+                        ..Default::default()
+                    })
+                };
+
+                let positions = Animation::Evolution {
+                    variable: VariableType::Position,
+                    curve: Curve::Bezier {control_points: positions},
+                    current_time: 0.,
+                    time,
+                    smoothing: smoothing.clone(),
+                };
+
+                let directions = Animation::Evolution {
+                    variable: VariableType::LookAt,
+                    curve: Curve::Bezier {control_points: directions},
+                    current_time: 0.,
+                    time,
+                    smoothing,
+                };
+
+                Animation::Group { elements: vec![positions, directions] }
+            }).collect();
+
+        let camera_animation = Animation::Steps{
+            loop_count: 1, 
+            steps: cam_animation_elems, 
+            current: 0, 
+            loop_num: 0,
+        };
+
+        let camera_config = CameraConfiguration { 
+            position: camera_positions[0].1, 
+            generate_at_render: true, 
+            animation: camera_animation 
+        };
+
+        println!("camera_track:\n{}", serde_yaml::to_string(&camera_config).unwrap());
     }
 
     Ok(())
