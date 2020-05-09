@@ -116,17 +116,7 @@ impl Mesher {
         let iso_value = self.iso_value;
         let interpolation_algorithm = self.interpolation_algorithm;
         let interpolator: Box<dyn Fn(&CubeVertices, &EdgeIndices) -> VertexWorld + 'a>
-            = Box::new(move |cube_vertices, edge_indices| {
-                let mut x = interpolate(interpolation_algorithm, iso_value, cube_vertices, edge_indices);
-
-                // if the interpolated point is inside a solid object, we move it outside from the object
-                // to avoid weird artifact on the rendering (due to overlapping meshes)
-                if let Some((distance, normal)) = snapshot.is_inside_solid(&x) {
-                    x += (distance.abs() + 0.01) * normal.normalize();
-                }
-
-                x
-            });
+            = Box::new(move |cube_vertices, edge_indices| interpolate(interpolation_algorithm, iso_value, cube_vertices, edge_indices));
 
         let mut mesh = Mesh::new();
 
