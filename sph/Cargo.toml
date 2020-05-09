@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 # Maths
-nalgebra = { version = "0.20.0", features = ["serde-serialize"] }
+nalgebra = { version = "0.21.0", features = ["serde-serialize"] }
 rand = "*"
 
 # compression

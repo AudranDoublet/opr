@@ -5,7 +5,7 @@ authors = ["Audran Doublet <audran.doublet@epita.fr>"]
 edition = "2018"
 
 [dependencies]
-nalgebra = { version = "0.20.0", features = ["serde-serialize"] }
+nalgebra = { version = "0.21.0", features = ["serde-serialize"] }
 
 flate2 = { version = "*", features = ["cloudflare_zlib"], default-features = false }
 
