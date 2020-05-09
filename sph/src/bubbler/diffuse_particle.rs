@@ -7,6 +7,8 @@ pub struct DiffuseParticle {
     pub velocity: Vector3<f32>,
     pub lifetime: f32,
     pub kind: DiffuseParticleType,
+    pub radius: f32,
+    pub power: f32,
 }
 
 #[derive(Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]

@@ -1,7 +1,7 @@
 use serde_derive::*;
 use nalgebra::Vector3;
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "type")]
 pub enum Curve {
     #[serde(rename = "linear")]

@@ -1,0 +1,45 @@
+config:
+    particle_radius: 0.02
+simulation_config:
+    fps: 24.0
+    max_time: 4.0
+    enable_bubbler: false
+render_config:
+    fps: 24.0
+    planes:
+        - axis: 1
+          position: -5.
+          material: data/materials/metal_ground.mtl
+    sky_color:
+        type: color
+        color: [0.149, 0.6471, 0.7961]
+fluids:
+    water:
+        simulation:
+            density: 1000.
+        meshing:
+            cube_size: 0.02
+solids:
+    - mesh: objects/pika.obj
+      density: 1000
+      dynamic: true
+      mesh_invert: false
+      resolution: [11, 11, 11]
+      scale: [0.2, 0.2, 0.2]
+      position: [0.0, 1.1, 0.0]
+      rotation_axis: [0.0, 0.0, 0.0]
+      rotation_angle: 0.0
+      display: true
+liquids_blocks: []
+liquids_add_blocks:
+    - type: block
+      from:  [-0.100, 0.200, -0.100]
+      to:  [0.100, 0.400, 0.100]
+camera:
+    position: [0.0, 0.0, -2.0]
+    generate_at_render: true
+    animation:
+        type: group
+        elements:
+            - type: lookat
+              position: [0.0, 0.0, 0.0]

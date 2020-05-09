@@ -1,0 +1,83 @@
+config:
+    kernel_radius: 0.08
+    particle_radius: 0.02
+simulation_config:
+    fps: 24.0
+    max_time: 5.0
+    enable_bubbler: false
+render_config:
+    mac_rec: 4
+    fps: 24.0
+    planes:
+        - axis: 1
+          position: -1.6
+          material: data/materials/metal_ground.mtl
+    sky_color:
+        type: color
+        color: [0.149, 0.6471, 0.7961]
+fluids:
+    water:
+        material: data/materials/transparent_water.mtl
+        simulation:
+            density: 1000.
+            drag:
+                air_velocity: [10.0, 0.0, 0.0]
+                drag_coefficient: 1.0
+                air_animation:
+                    type: steps
+                    loop_count: -1
+                    steps:
+                        - type: curve
+                          curve:
+                              type: linear
+                              a: [20.0, 0.0, 0.0]
+                              b: [2.0, 0.0, 0.0]
+                          time: 0.5
+                          variable: Position
+                        - type: curve
+                          curve:
+                              type: linear
+                              a: [2.0, 0.0, 0.0]
+                              b: [20.0, 0.0, 0.0]
+                          time: 0.5
+                          variable: Position
+        meshing:
+            cube_size: 0.04
+solids:
+    - mesh: objects/box.obj
+      density: 1000
+      dynamic: false
+      mesh_invert: true
+      resolution: [11, 11, 11]
+      scale: [1.0, 3.0, 1.0]
+      position: [0.0, 0.0, 0.0]
+      rotation_axis: [0.0, 0.0, 0.0]
+      rotation_angle: 0.0
+      display: true
+      material: data/materials/white_box.mtl
+liquids_blocks:
+    - type: block
+      from: [-0.430, -0.450, -0.430]
+      to: [-0.130, 1.450, -0.130]
+    - type: block
+      from: [0.130, -0.450, -0.430]
+      to: [0.430, 1.450, -0.130]
+    - type: block
+      from: [0.130, -0.450, 0.130]
+      to: [0.430, 1.450, 0.430]
+    - type: block
+      from: [-0.430, -0.450, 0.130]
+      to: [-0.130, 1.450, 0.430]
+liquids_add_blocks:
+    - type: block
+      from:  [-0.100, 0.200, -0.100]
+      to:  [0.100, 0.400, 0.100]
+
+camera:
+    position: [0.0, 0.1, -2.0]
+    generate_at_render: true
+    animation:
+        type: group
+        elements:
+            - type: lookat
+              position: [0.0, 0.0, 0.0]

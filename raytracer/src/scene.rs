@@ -362,22 +362,7 @@ impl Scene {
             self.load_particles(bubble.path, bubble.material)?;
         }
 
-        let mut foam_shader = None;
-
-        if let Some(foam) = config.foam {
-            let color = foam.color;
-            let particles = Particles::load(&Path::new(&foam.path))?;
-
-            let shader = FoamFragmentShader::new(particles, color, foam.radius, foam.density_scaling_factor);
-
-            foam_shader = Some(self.shaders.len());
-
-            self.shaders.push(Box::new(
-                shader
-            ));
-        }
-
-        self.load_mesh(config.mesh, foam_shader)
+        self.load_mesh(config.mesh, None)
     }
 
     pub fn add_triangles(&mut self, triangles: &Vec<shapes::Triangle>) {

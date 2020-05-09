@@ -5,7 +5,7 @@ use std::fs::File;
 use std::path::Path;
 
 use nalgebra::Vector3;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sph::{Animation, Emitter, Fluid, RigidObject, Simulation};
 
 use crate::{EmitterConfig, FluidConfiguration, LiquidZone, Solid};
@@ -16,7 +16,7 @@ fn default_gravity() -> [f32; 3] {
     [0.0, -9.81, 0.0]
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CameraConfiguration
 {
     pub position: Vector3<f32>,

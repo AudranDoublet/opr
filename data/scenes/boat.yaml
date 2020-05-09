@@ -1,0 +1,207 @@
+config:
+    kernel_radius: 0.08
+    particle_radius: 0.02
+render_config:
+    build_max_depth: 16
+    max_rec: 6
+    fps: 60
+simulation_config:
+    fps: 120.0
+    max_time: 3.0
+    enable_bubbler: false
+fluids:
+    water:
+        material: data/materials/transparent.mtl
+        simulation:
+            density: 1000.
+        meshing:
+            cube_size: 0.04
+solids:
+    - mesh: objects/box.obj
+      material: data/materials/green.mtl
+      density: 1000
+      dynamic: false
+      mesh_invert: true
+      resolution: [11, 11, 11]
+      scale: [2.0, 3.0, 2.0]
+      position: [0.0, 0.0, 0.0]
+      rotation_axis: [0.0, 0.0, 0.0]
+      rotation_angle: 0.0
+      display: true
+
+    - mesh: objects/lighthouse/lighthouse.obj
+      density: 1850
+      dynamic: false
+      mesh_invert: false
+      resolution: [11, 11, 11]
+      scale: [0.0006, 0.0006, 0.00035]
+      position: [0.3, -1.35, -0.1]
+      rotation_axis: [-1.5708, 0.0, 0.0]
+      rotation_angle: 0.0
+      display: true
+
+    - mesh: objects/boat/OldBoat.obj
+      density: 1850
+      dynamic: true
+      mesh_invert: false
+      resolution: [11, 11, 11]
+      scale: [0.010, 0.010, 0.010]
+      position: [-0.723, -1.26, -0.724]
+      rotation_axis: [0.0, 0.89, 0.0]
+      rotation_angle: 1.0
+      display: true
+      animation:
+          type: steps
+          loop_count: 1
+          steps:
+              - type: constant
+                time: 0.25
+                variable: Acceleration
+                value: [0.8, 0., 1.0]
+
+    # Lateral left wave engine
+    - mesh: objects/box.obj
+      material: data/materials/red.mtl
+      density: 1000
+      dynamic: false
+      mesh_invert: false
+      resolution: [11, 11, 11]
+      scale: [0.01, 0.2, 1.3]
+      position: [1.0, -1.35, 0.0]
+      rotation_axis: [0.0, 0.0, 0.0]
+      rotation_angle: 0.0
+      display: false
+      animation:
+          type: steps
+          loop_count: 1
+          steps:
+              - type: constant
+                time: 0.95
+                variable: Position
+                value: [-1.0, -1.35, 0.0]
+              - type: steps
+                loop_count: -1
+                steps:
+                    - type: curve
+                      time: 0.35
+                      variable: Position
+                      curve:
+                          type: linear
+                          a: [1.0, -1.35, 0.0]
+                          b: [0.8, -1.35, 0.0]
+                    - type: constant
+                      time: 0.45
+                      variable: Position
+                      value: [1.0, -1.0, 0.0]
+
+    # Lateral right wave engine
+    - mesh: objects/box.obj
+      material: data/materials/red.mtl
+      density: 1000
+      dynamic: false
+      mesh_invert: false
+      resolution: [11, 11, 11]
+      scale: [0.01, 0.2, 1.3]
+      position: [-1.0, -1.35, 0.0]
+      rotation_axis: [0.0, 0.0, 0.0]
+      rotation_angle: 0.0
+      display: false
+      animation:
+          type: steps
+          loop_count: 1
+          steps:
+              - type: constant
+                time: 0.4
+                variable: Position
+                value: [-1.0, -1.35, 0.0]
+              - type: steps
+                loop_count: -1
+                steps:
+                    - type: curve
+                      time: 0.45
+                      variable: Position
+                      curve:
+                          type: linear
+                          a: [-1.0, -1.35, 0.0]
+                          b: [-0.8, -1.35, 0.0]
+                    - type: constant
+                      time: 0.95
+                      variable: Position
+                      value: [-1.0, -1.35, 0.0]
+
+    # Frontal wave engine
+    - mesh: objects/box.obj
+      material: data/materials/red.mtl
+      density: 1000
+      dynamic: false
+      mesh_invert: false
+      resolution: [11, 11, 11]
+      scale: [1.3, 0.2, 0.01]
+      position: [0.0, -1.35, 1.0]
+      rotation_axis: [0.0, 0.0, 0.0]
+      rotation_angle: 0.0
+      display: false
+      animation:
+          type: steps
+          loop_count: 1
+          steps:
+              - type: constant
+                time: 1.25
+                variable: Position
+                value: [0.0, -1.35, 1.0]
+              - type: steps
+                loop_count: -1
+                steps:
+                    - type: curve
+                      time: 0.35
+                      variable: Position
+                      curve:
+                          type: linear
+                          a: [0.0, -1.35, 1.0]
+                          b: [0.0, -1.35, 0.5]
+                    - type: constant
+                      time: 0.95
+                      variable: Position
+                      value: [0.0, -1.35, 1.0]
+
+liquids_blocks:
+    - type: block
+      from: [-1.0, -1.5, -1.0]
+      to: [1.0, -1.2, 1.0]
+liquids_add_blocks:
+    - type: block
+      from:  [-0.100, 0.200, -0.100]
+      to:  [0.100, 0.400, 0.100]
+camera:
+    position: [-0.88, -1.36, -0.88]
+    generate_at_render: true
+    animation:
+         type: group
+         elements:
+             - type: curve
+               time: 2.0
+               variable: Position
+               smoothing:
+                   begin: 0.30
+                   end: 0.80
+               curve:
+                   type: bezier
+                   control_points:
+                       - [-0.88, -1.36, -0.88]
+                       - [-0.72, -1.16, -0.92]
+                       - [-0.12, -1.16, -0.76]
+                       - [0.22, -1.06, -0.96]
+             - type: curve
+               time: 2.0
+               variable: LookAt
+               smoothing:
+                   begin: 0.30
+                   end: 0.80
+               curve:
+                   type: bezier
+                   control_points:
+                       - [0.3, -1.5, 0.9]
+                       - [0.5, -1.2, 0.8]
+                       - [-0.9, -1.35, -2.3]
+                       - [0.3, -1.3, 1.0]
+

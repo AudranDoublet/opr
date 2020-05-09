@@ -460,6 +460,14 @@ impl Simulation
             self.solids[i].update_vel(dt);
         }
 
+        self.debug_solid_collisions = collisions;
+        self.total_time += dt;
+
+        dt
+    }
+
+    pub fn tick_others(&mut self) {
+        let dt = self.time_step();
         // update camera
         self.camera.tick(dt, &mut self.camera_animation);
 
@@ -472,11 +480,8 @@ impl Simulation
         for (t, p, v) in particles {
             self.add_particle_with_velocity(false, t, p, v);
         }
-
-        self.debug_solid_collisions = collisions;
-        self.total_time += dt;
-        dt
     }
+
 
     pub fn dump(&self, path: &Path) -> Result<(), std::io::Error> {
         let buffer = BufWriter::new(File::create(path)?);

@@ -51,8 +51,15 @@ solids:
         type: steps
         loop_count: -1
         steps:
+            - type: curve
+              curve:
+                  type: linear
+                  a: [0.0, 0.0, 0.0]
+                  b: [0.0, 25.0, 0.0]
+              time: 1.0
+              variable: AngularVelocity
             - type: constant
-              time: 1
+              time: 20
               variable: AngularVelocity
               value: [0.0, 25.0, 0.0]
 camera:

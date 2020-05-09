@@ -78,27 +78,10 @@ pub struct SphereConfig
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct FoamConfig {
-    pub path: String,
-    #[serde(default = "default_foam_config_radius")]
-    pub radius: f32,
-    #[serde(default = "default_foam_config_color")]
-    pub color: Vector3<f32>,
-    #[serde(default = "default_foam_config_density_scaling_factor")]
-    pub density_scaling_factor: f32,
-}
-
-fn default_foam_config_radius() -> f32 { 0.5 }
-fn default_foam_config_color() -> Vector3<f32> { Vector3::new(1., 1., 1.) }
-fn default_foam_config_density_scaling_factor() -> f32 { 1.0 }
-
-#[derive(Debug, Deserialize, Serialize)]
 pub struct VolumeConfig {
     pub mesh: MeshConfig,
     #[serde(default)]
     pub bubble: Option<BubbleConfig>,
-    #[serde(default)]
-    pub foam: Option<FoamConfig>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

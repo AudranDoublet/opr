@@ -1,17 +1,19 @@
 config:
     particle_radius: 0.02
 simulation_config:
-    max_time: 4.0
-    fps: 48.0
+    max_time: 2.0
+    fps: 74.0
     enable_bubbler: false
+render_config:
+    fps: 24.0
 fluids:
     honey:
         simulation:
             density: 1000.
             viscosity:
                 type: weiler2018
-                coefficient: 3000.0
-                surface_coefficient: 3000.0
+                coefficient: 2000.0
+                surface_coefficient: 500.0
                 max_iteration: 100
                 tolerance: 0.01
         meshing:
@@ -39,7 +41,7 @@ emitters:
         x_radius: 0.2
         y_radius: 0.2
       position: [0.0, 2.4, 0.0]
-      velocity: 5.0
+      velocity: 7.0
       animation:
           type: steps
           loop_count: 1
@@ -47,12 +49,16 @@ emitters:
               - type: lookat
                 position: [0.0, -1.0, 0.0]
               - type: emit
-                time: 2.5
+                time: 1.1
+              - type: constant
+                variable: Position
+                value: [0.0, 0.0, 0.0]
+                time: 100.
 camera:
-    position: [0.0, 0.5, -1.0]
+    position: [0.0, -0.5, -2.0]
     generate_at_render: true
     animation:
         type: group
         elements:
             - type: lookat
-              position: [0.0, 0.0, 0.0]
+              position: [0.0, -2.5, 0.0]

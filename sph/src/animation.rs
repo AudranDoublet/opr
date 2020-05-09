@@ -3,7 +3,7 @@ use serde_derive::*;
 
 use utils::Curve;
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum VariableType {
     AngularVelocity,
     Velocity,
@@ -19,14 +19,25 @@ fn smooth_strength() -> f32 {
     2.
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Smoothing {
-    begin: f32,
-    end: f32,
+    pub begin: f32,
+    pub end: f32,
     #[serde(default = "smooth_strength")]
-    begin_strength: f32,
+    pub begin_strength: f32,
     #[serde(default = "smooth_strength")]
-    end_strength: f32,
+    pub end_strength: f32,
+}
+
+impl Default for Smoothing {
+    fn default() -> Self {
+        Smoothing {
+            begin: 0.,
+            end: 1.,
+            begin_strength: smooth_strength(),
+            end_strength: smooth_strength(),
+        }
+    }
 }
 
 impl Smoothing {
@@ -56,7 +67,7 @@ impl Smoothing {
     }
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "type")]
 pub enum Animation {
     #[serde(rename = "steps")]

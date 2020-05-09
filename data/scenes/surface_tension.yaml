@@ -1,0 +1,58 @@
+config:
+    kernel_radius: 0.08
+    particle_radius: 0.02
+simulation_config:
+    fps: 24.0
+    max_time: 1.0
+    enable_bubbler: false
+render_config:
+    mac_rec: 4
+    fps: 24.0
+    planes:
+        - axis: 1
+          position: -1.6
+          material: data/materials/metal_ground.mtl
+    sky_color:
+        type: color
+        color: [0.149, 0.6471, 0.7961]
+fluids:
+    water:
+        material: data/materials/transparent_water.mtl
+        simulation:
+            density: 1000.
+            surface_tension: 0.0
+            visquosity:
+                type: basic
+                coefficient: 0.0
+                surface_coefficient: 0.0
+            surface_adhesion: 0.0
+        meshing:
+            cube_size: 0.04
+solids:
+    - mesh: objects/box.obj
+      density: 1000
+      dynamic: false
+      mesh_invert: true
+      resolution: [11, 11, 11]
+      scale: [1.0, 1.0, 1.0]
+      position: [0.0, 0.0, 0.0]
+      rotation_axis: [0.0, 0.0, 0.0]
+      rotation_angle: 0.0
+      display: false
+      material: data/materials/white_box.mtl
+liquids_blocks:
+    - type: block
+      from:  [-0.100, -0.5, -0.100]
+      to:  [0.100, -0.3, 0.100]
+liquids_add_blocks:
+    - type: block
+      from:  [-0.100, -0.5, -0.100]
+      to:  [0.100, -0.3, 0.100]
+camera:
+    position: [0.0, 0.1, -2.0]
+    generate_at_render: true
+    animation:
+        type: group
+        elements:
+            - type: lookat
+              position: [0.0, 0.0, 0.0]
