@@ -1,4 +1,4 @@
-#![feature(in_band_lifetimes)]
+#![feature(in_band_lifetimes, clamp)]
 
 mod camera;
 mod material;
