@@ -53,7 +53,7 @@ pub fn pipeline_simulate(scene: &Scene, dump_folder: &Path) -> Result<(), Box<dy
         total_time += fluid_simulation.get_time_step();
 
         let percent = perc(total_time);
-        pb.set_message(format!("vmax: {}, timestep: {}", fluid_simulation.compute_vmax(), fluid_simulation.get_time_step()).as_str());
+        pb.set_message(format!("vmax: {}, timestep: {}, time: {}", fluid_simulation.compute_vmax(), fluid_simulation.get_time_step(), total_time).as_str());
         pb.inc(percent - old);
     }
 
