@@ -2,7 +2,7 @@ config:
     particle_radius: 0.02
 simulation_config:
     fps: 24.0
-    max_time: 27.0
+    max_time: 35.0
     enable_bubbler: false
 render_config:
   max_rec: 5
@@ -44,7 +44,7 @@ solids:
       dynamic: false
       mesh_invert: false
       resolution: [31, 31, 31]
-      scale: [0.5, 0.5, 0.7]
+      scale: [0.7, 0.7, 1.2]
       position: [0.0, 0.0, 0.0]
       rotation_axis: [0.0, 0.0, 0.0]
       rotation_angle: 0.0
@@ -55,7 +55,7 @@ solids:
         loop_count: 1
         steps:
             - type: constant
-              time: 2
+              time: 5.0
               variable: Rotation
               value: [0.0, 0.0, 0.0]
             - type: curve
@@ -63,17 +63,17 @@ solids:
               curve:
                   type: linear
                   a: [0.0, 0.0, 0.0]
-                  b: [0.0, 0.0, 100.0]
+                  b: [0.0, 0.0, -50.0]
               variable: AngularVelocity
             - type: constant
               time: 15.
               variable: AngularVelocity
-              value: [0.0, 0.0, 100.0]
+              value: [0.0, 0.0, -50.0]
             - type: curve
-              time: 1.0
+              time: 3.0
               curve:
                   type: linear
-                  a: [0.0, 0.0, 100.0]
+                  a: [0.0, 0.0, -50.0]
                   b: [0.0, 0.0, 0.0]
               variable: AngularVelocity
             - type: constant
@@ -81,42 +81,12 @@ solids:
               variable: AngularVelocity
               value: [0.0, 0.0, 0.0]
 
-liquids_blocks:
-    - type: block
-      from: [-0.9, -0.1, -1.25]
-      to: [0.9, 1.6, -0.35]
-    - type: block
-      from: [-0.9, -0.1, 0.35]
-      to: [0.9, 1.6, 1.25]
-    - type: block
-      from: [-0.4, -0.1, -0.3]
-      to: [0.4, 0.4, 0.3]
+liquids_blocks: []
 liquids_add_blocks:
     - type: block
       from:  [-0.100, 0.200, -0.100]
       to:  [0.100, 0.400, 0.100]
-bubbler:
-    lifetime: [0.01, 0.03]
-    k_b: 1.4
-    spray:
-        kernel_radius: 0.001
-        meshing:
-            enable_anisotropic: false
-            cube_size: 0.0005
-        material: data/materials/white.mtl
-    bubble:
-        kernel_radius: 0.001
-        meshing:
-            enable_anisotropic: false
-            cube_size: 0.0008
-        material: data/materials/white_transparent.mtl
-    foam:
-        mass: 0.001
-        kernel_radius: 0.1
-        meshing:
-            enable_anisotropic: true
-            cube_size: 0.04
-        material: data/materials/white.mtl
+
 camera:
     position: [-3.0, 1.0, -0.4]
     generate_at_render: true
@@ -125,3 +95,33 @@ camera:
         elements:
             - type: lookat
               position: [0.0, 0.0, 0.0]
+
+emitters:
+    - shape:
+        type: ellipse
+        x_radius: 0.7
+        y_radius: 0.7
+      position: [-0.5, 0.9, -1.26]
+      velocity: 5.0
+      fluid_type: water
+      animation:
+          type: group
+          elements:
+              - type: lookat_relative
+                position: [0.0, 0.0, 1.0]
+              - type: emit
+                time: 3.0
+    - shape:
+        type: ellipse
+        x_radius: 0.7
+        y_radius: 0.7
+      position: [0.5, 0.9, 1.26]
+      velocity: 5.0
+      fluid_type: water
+      animation:
+          type: group
+          elements:
+              - type: lookat_relative
+                position: [0.0, 0.0, -1.0]
+              - type: emit
+                time: 3.0
