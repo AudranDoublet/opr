@@ -330,12 +330,13 @@ fn simulate(scene: &Scene, dump_all: bool, camera_from_simulation: bool, dump_fo
                 nb_solid_collisions: {}\n\
                 fps: {:.3} frame/s\n\
                 nb_diffuse: {}\n\
-                eye_position: {}\n\
+                eye_position: {:?}\n\
                 eye_dir: {:?}\n\
                 ", frame_idx, fluid_simulation.get_time_step(), total_time, fluid_simulation.len(), fluid_simulation.compute_vmax(),
                 !hide_solids, show_collisions, collision_size, fluid_simulation.debug_get_solid_collisions().len(),
-                1. / timer.elapsed().as_secs_f32(), __debug_nb_diffuse, renderer.camera.eye_dir(),
-                renderer.camera.at()));
+                1. / timer.elapsed().as_secs_f32(), __debug_nb_diffuse, 
+                renderer.camera.eye_dir().data,
+                renderer.camera.at().coords.data));
         }
 
         renderer.update();
