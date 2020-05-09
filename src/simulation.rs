@@ -178,7 +178,10 @@ fn simulate(scene: &Scene, dump_all: bool, camera_from_simulation: bool, dump_fo
                         );
 
                         if let Some(last_cam) = last_dump_camera {
-                            println!("- {} -> {:?} => {:?}", curr_cam.0 - last_cam.0, [last_cam.1, last_cam.2], [curr_cam.1, curr_cam.2]);
+                            println!("- {} -> {:?} => {:?}",
+                                curr_cam.0 - last_cam.0,
+                                [last_cam.1.data, last_cam.2.data],
+                                [curr_cam.1.data, curr_cam.2.data]);
                             last_dump_camera = None;
                         } else {
                             last_dump_camera = Some(curr_cam);
