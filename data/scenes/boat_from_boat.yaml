@@ -1,0 +1,720 @@
+config:
+    kernel_radius: 0.04
+    particle_radius: 0.01
+render_config:
+    max_rec: 4
+    sky_color:
+        type: color
+        color: [0.69803, 0.69803, 0.63922]
+        fps: 60
+    lights:
+      - type: ambient
+        color: [0.1, 0.1, 0.1]
+      - type: directional
+        color: [0.4, 0.4, 0.4]
+        direction: [1., -1., 1.]
+      - type: directional
+        color: [0.3, 0.3, 0.3]
+        direction: [0.5, 1, -0.5]
+simulation_config:
+    fps: 200.0
+    max_time: 8.2
+    enable_bubbler: false
+fluids:
+    water:
+        material: data/materials/blue_sea.mtl
+        simulation:
+            density: 1000.
+        meshing:
+            cube_size: 0.02
+            iso_value: 0.025
+solids:
+    - mesh: objects/box.obj
+      density: 1000
+      dynamic: false
+      mesh_invert: true
+      resolution: [11, 11, 11]
+      scale: [2.0, 3.0, 2.0]
+      position: [0.0, 0.0, 0.0]
+      rotation_axis: [0.0, 0.0, 0.0]
+      rotation_angle: 0.0
+      particle_size: 0.2
+      display: false
+
+    - mesh: objects/lighthouse/lighthouse.obj
+      density: 1850
+      dynamic: false
+      mesh_invert: false
+      resolution: [11, 11, 11]
+      scale: [0.0006, 0.0006, 0.00035]
+      position: [0.3, -1.21, -0.1]
+      rotation_axis: [-1.5708, 0.0, 0.0]
+      rotation_angle: 0.0
+      display: true
+
+    - mesh: objects/boat/OldBoat.obj
+      density: 1900
+      dynamic: true
+      mesh_invert: false
+      resolution: [11, 11, 11]
+      scale: [0.012, 0.012, 0.012]
+      position: [-0.723, -1.31, -0.704]
+      rotation_axis: [-0.15, 0.89, 0.0]
+      rotation_angle: 1.0
+      display: true
+      animation:
+          type: steps
+          loop_count: 1
+          steps:
+              - type: constant
+                time: 0.2
+                variable: Acceleration
+                value: [0.7, 0., 0.9]
+
+
+    # Lateral left wave engine
+    - mesh: objects/box.obj
+      material: data/materials/red.mtl
+      density: 1000
+      dynamic: false
+      mesh_invert: false
+      resolution: [11, 11, 11]
+      scale: [0.01, 0.2, 1.3]
+      position: [1.0, -1.35, 0.0]
+      rotation_axis: [0.0, 0.0, 0.0]
+      rotation_angle: 0.0
+      display: false
+      animation:
+          type: steps
+          loop_count: 1
+          steps:
+              - type: constant
+                time: 0.95
+                variable: Position
+                value: [-1.0, -1.35, 0.0]
+              - type: steps
+                loop_count: -1
+                steps:
+                    - type: curve
+                      time: 0.35
+                      variable: Position
+                      curve:
+                          type: linear
+                          a: [1.0, -1.35, 0.0]
+                          b: [0.8, -1.35, 0.0]
+                    - type: constant
+                      time: 0.45
+                      variable: Position
+                      value: [1.0, -1.0, 0.0]
+
+    # Lateral right wave engine
+    - mesh: objects/box.obj
+      material: data/materials/red.mtl
+      density: 1000
+      dynamic: false
+      mesh_invert: false
+      resolution: [11, 11, 11]
+      scale: [0.01, 0.2, 1.3]
+      position: [-1.0, -1.35, 0.0]
+      rotation_axis: [0.0, 0.0, 0.0]
+      rotation_angle: 0.0
+      display: false
+      animation:
+          type: steps
+          loop_count: 1
+          steps:
+              - type: constant
+                time: 0.4
+                variable: Position
+                value: [-1.0, -1.35, 0.0]
+              - type: steps
+                loop_count: -1
+                steps:
+                    - type: curve
+                      time: 0.45
+                      variable: Position
+                      curve:
+                          type: linear
+                          a: [-1.0, -1.35, 0.0]
+                          b: [-0.8, -1.35, 0.0]
+                    - type: constant
+                      time: 0.95
+                      variable: Position
+                      value: [-1.0, -1.35, 0.0]
+
+    # Frontal wave engine
+    - mesh: objects/box.obj
+      material: data/materials/red.mtl
+      density: 1000
+      dynamic: false
+      mesh_invert: false
+      resolution: [11, 11, 11]
+      scale: [1.3, 0.2, 0.01]
+      position: [0.0, -1.35, 1.0]
+      rotation_axis: [0.0, 0.0, 0.0]
+      rotation_angle: 0.0
+      display: false
+      animation:
+          type: steps
+          loop_count: 1
+          steps:
+              - type: constant
+                time: 1.25
+                variable: Position
+                value: [0.0, -1.35, 1.0]
+              - type: steps
+                loop_count: -1
+                steps:
+                    - type: curve
+                      time: 0.35
+                      variable: Position
+                      curve:
+                          type: linear
+                          a: [0.0, -1.35, 1.0]
+                          b: [0.0, -1.35, 0.5]
+                    - type: constant
+                      time: 0.95
+                      variable: Position
+                      value: [0.0, -1.35, 1.0]
+
+liquids_blocks:
+    - type: block
+      from: [-1.0, -1.5, -1.0]
+      to: [1.0, -1.2, 1.0]
+liquids_add_blocks:
+    - type: block
+      from:  [-0.100, 0.200, -0.100]
+      to:  [0.100, 0.400, 0.100]
+camera:
+    position:
+      - -0.8215278387069702
+      - -1.178067922592163
+      - -0.8746215105056763
+    generate_at_render: true
+    animation:
+      type: steps
+      loop_count: 1
+      steps:
+        - type: group
+          elements:
+            - type: curve
+              variable: Position
+              curve:
+                type: bezier
+                control_points:
+                  - - -0.8215278387069702
+                    - -1.178067922592163
+                    - -0.8746215105056763
+                  - - -0.7538455128669739
+                    - -1.1888693571090699
+                    - -0.8019367456436157
+                  - - -0.6538933515548706
+                    - -1.1989436149597169
+                    - -0.6547428965568543
+                  - - -0.6447629332542419
+                    - -1.1989257335662842
+                    - -0.6458718180656433
+              time: 0.7649994492530823
+              smoothing:
+                begin: 0.20000000298023225
+                end: 1.0
+                begin_strength: 2.0
+                end_strength: 2.0
+              current_time: 0.0
+            - type: curve
+              variable: LookAt
+              curve:
+                type: bezier
+                control_points:
+                  - - -0.11866295337677002
+                    - -1.2075461149215699
+                    - -0.1639091968536377
+                  - - -0.06872594356536865
+                    - -1.2481956481933594
+                    - -0.07592606544494629
+                  - - -0.5093016624450684
+                    - -1.255715012550354
+                    - 0.3331185579299927
+                  - - -0.1979771852493286
+                    - -1.336066722869873
+                    - 0.23819541931152345
+              time: 0.7649994492530823
+              smoothing:
+                begin: 0.20000000298023225
+                end: 1.0
+                begin_strength: 2.0
+                end_strength: 2.0
+              current_time: 0.0
+        - type: group
+          elements:
+            - type: curve
+              variable: Position
+              curve:
+                type: bezier
+                control_points:
+                  - - -0.6447629332542419
+                    - -1.1989257335662842
+                    - -0.6458718180656433
+                  - - -0.5674765110015869
+                    - -1.2023425102233887
+                    - -0.6747171878814697
+                  - - -0.3762786388397217
+                    - -1.2158160209655762
+                    - -0.6716388463973999
+                  - - -0.2271585762500763
+                    - -1.2265275716781617
+                    - -0.6565394997596741
+              time: 0.7649993300437927
+              smoothing: ~
+              current_time: 0.0
+            - type: curve
+              variable: LookAt
+              curve:
+                type: bezier
+                control_points:
+                  - - -0.1979771852493286
+                    - -1.336066722869873
+                    - 0.23819541931152345
+                  - - 0.2447996735572815
+                    - -1.1890718936920167
+                    - -0.0915951132774353
+                  - - 0.41052931547164919
+                    - -1.3550246953964234
+                    - -0.07034516334533692
+                  - - 0.32622990012168887
+                    - -1.1949735879898072
+                    - 0.17578589916229249
+              time: 0.7649993300437927
+              smoothing: ~
+              current_time: 0.0
+        - type: group
+          elements:
+            - type: curve
+              variable: Position
+              curve:
+                type: bezier
+                control_points:
+                  - - -0.2271585762500763
+                    - -1.2265275716781617
+                    - -0.6565394997596741
+                  - - -0.1656055450439453
+                    - -1.2245975732803345
+                    - -0.5654358863830566
+                  - - -0.1515621542930603
+                    - -1.2033382654190064
+                    - -0.5482445359230042
+                  - - -0.11823689192533493
+                    - -1.1971220970153809
+                    - -0.7511659860610962
+              time: 0.7650063037872315
+              smoothing: ~
+              current_time: 0.0
+            - type: curve
+              variable: LookAt
+              curve:
+                type: bezier
+                control_points:
+                  - - 0.32622990012168887
+                    - -1.1949735879898072
+                    - 0.17578589916229249
+                  - - 0.3323342800140381
+                    - -1.1891131401062012
+                    - 0.3010494112968445
+                  - - 0.7832307815551758
+                    - -1.2388288974761963
+                    - -0.19482877850532533
+                  - - 0.5751534700393677
+                    - -1.3807250261306763
+                    - -0.05438786745071411
+              time: 0.7650063037872315
+              smoothing: ~
+              current_time: 0.0
+        - type: group
+          elements:
+            - type: curve
+              variable: Position
+              curve:
+                type: bezier
+                control_points:
+                  - - -0.11823689192533493
+                    - -1.1971220970153809
+                    - -0.7511659860610962
+                  - - -0.028652504086494447
+                    - -1.1681952476501465
+                    - -0.7787581086158752
+                  - - 0.09826352447271347
+                    - -1.160989761352539
+                    - -0.6844640374183655
+                  - - 0.2990286946296692
+                    - -1.171441674232483
+                    - -0.6680690050125122
+              time: 0.7609279155731201
+              smoothing: ~
+              current_time: 0.0
+            - type: curve
+              variable: LookAt
+              curve:
+                type: bezier
+                control_points:
+                  - - 0.5751534700393677
+                    - -1.3807250261306763
+                    - -0.05438786745071411
+                  - - 0.8702208995819092
+                    - -1.005298137664795
+                    - -0.37195196747779848
+                  - - 1.0352228879928589
+                    - -1.2261244058609009
+                    - -0.3411500155925751
+                  - - 0.3140936493873596
+                    - -1.2261910438537598
+                    - 0.3303174376487732
+              time: 0.7609279155731201
+              smoothing: ~
+              current_time: 0.0
+        - type: group
+          elements:
+            - type: curve
+              variable: Position
+              curve:
+                type: bezier
+                control_points:
+                  - - 0.2990286946296692
+                    - -1.171441674232483
+                    - -0.6680690050125122
+                  - - 0.14161992073059083
+                    - -1.1674816608428956
+                    - -0.7336907386779785
+                  - - 0.3056870102882385
+                    - -1.2080800533294678
+                    - -0.6215765476226807
+                  - - 0.25943300127983096
+                    - -1.1892175674438477
+                    - -0.8248569369316101
+              time: 0.7643508911132813
+              smoothing: ~
+              current_time: 0.0
+            - type: curve
+              variable: LookAt
+              curve:
+                type: bezier
+                control_points:
+                  - - 0.3140936493873596
+                    - -1.2261910438537598
+                    - 0.3303174376487732
+                  - - 0.40138107538223269
+                    - -1.2778152227401734
+                    - 0.2256583571434021
+                  - - 0.9845341444015503
+                    - -1.3481498956680298
+                    - 0.09921950101852417
+                  - - 0.6722431182861328
+                    - -1.2662996053695679
+                    - 0.08269262313842774
+              time: 0.7643508911132813
+              smoothing: ~
+              current_time: 0.0
+        - type: group
+          elements:
+            - type: curve
+              variable: Position
+              curve:
+                type: bezier
+                control_points:
+                  - - 0.25943300127983096
+                    - -1.1892175674438477
+                    - -0.8248569369316101
+                  - - 0.289550244808197
+                    - -1.186564564704895
+                    - -0.9122762084007263
+                  - - 0.46847769618034365
+                    - -1.2009496688842774
+                    - -0.6616172194480896
+                  - - 0.5306719541549683
+                    - -1.2116576433181763
+                    - -0.6566934585571289
+              time: 0.7587461471557617
+              smoothing: ~
+              current_time: 0.0
+            - type: curve
+              variable: LookAt
+              curve:
+                type: bezier
+                control_points:
+                  - - 0.6722431182861328
+                    - -1.2662996053695679
+                    - 0.08269262313842774
+                  - - 0.3596942126750946
+                    - -1.1226950883865357
+                    - 0.08321386575698853
+                  - - 0.44504302740097048
+                    - -1.3302724361419678
+                    - 0.3297083377838135
+                  - - 0.1676664650440216
+                    - -1.156184434890747
+                    - 0.27344077825546267
+              time: 0.7587461471557617
+              smoothing: ~
+              current_time: 0.0
+        - type: group
+          elements:
+            - type: curve
+              variable: Position
+              curve:
+                type: bezier
+                control_points:
+                  - - 0.5306719541549683
+                    - -1.2116576433181763
+                    - -0.6566934585571289
+                  - - 0.5137209892272949
+                    - -1.1959047317504883
+                    - -0.5419476628303528
+                  - - 0.5507531762123108
+                    - -1.1968371868133546
+                    - -0.5406984686851502
+                  - - 0.38989537954330447
+                    - -1.2044222354888917
+                    - -0.3822917640209198
+              time: 0.7650175094604492
+              smoothing: ~
+              current_time: 0.0
+            - type: curve
+              variable: LookAt
+              curve:
+                type: bezier
+                control_points:
+                  - - 0.1676664650440216
+                    - -1.156184434890747
+                    - 0.27344077825546267
+                  - - -0.3242499828338623
+                    - -1.2240334749221802
+                    - 0.0030417442321777345
+                  - - 0.2819615602493286
+                    - -1.3619558811187745
+                    - 0.4082413911819458
+                  - - 0.15254239737987519
+                    - -1.4712408781051636
+                    - 0.5517699718475342
+              time: 0.7650175094604492
+              smoothing: ~
+              current_time: 0.0
+        - type: group
+          elements:
+            - type: curve
+              variable: Position
+              curve:
+                type: bezier
+                control_points:
+                  - - 0.38989537954330447
+                    - -1.2044222354888917
+                    - -0.3822917640209198
+                  - - 0.38291484117507937
+                    - -1.229478120803833
+                    - -0.3919125199317932
+                  - - 0.441448837518692
+                    - -1.2375050783157349
+                    - -0.47932398319244387
+                  - - 0.6546353101730347
+                    - -1.222664713859558
+                    - -0.47412756085395815
+              time: 0.761725902557373
+              smoothing: ~
+              current_time: 0.0
+            - type: curve
+              variable: LookAt
+              curve:
+                type: bezier
+                control_points:
+                  - - 0.15254239737987519
+                    - -1.4712408781051636
+                    - 0.5517699718475342
+                  - - -0.33744722604751589
+                    - -0.8587155342102051
+                    - 0.19427311420440675
+                  - - -0.5221569538116455
+                    - -1.251348853111267
+                    - -0.7462924718856812
+                  - - -0.2358991503715515
+                    - -1.114349365234375
+                    - -0.03229472041130066
+              time: 0.761725902557373
+              smoothing: ~
+              current_time: 0.0
+        - type: group
+          elements:
+            - type: curve
+              variable: Position
+              curve:
+                type: bezier
+                control_points:
+                  - - 0.6546353101730347
+                    - -1.222664713859558
+                    - -0.47412756085395815
+                  - - 0.4332890808582306
+                    - -1.2073928117752076
+                    - -0.658595621585846
+                  - - 0.3772255778312683
+                    - -1.181374192237854
+                    - -0.7946176528930664
+                  - - 0.4600929021835327
+                    - -1.252580165863037
+                    - -0.5335567593574524
+              time: 0.762519359588623
+              smoothing: ~
+              current_time: 0.0
+            - type: curve
+              variable: LookAt
+              curve:
+                type: bezier
+                control_points:
+                  - - -0.2358991503715515
+                    - -1.114349365234375
+                    - -0.03229472041130066
+                  - - 0.0904194712638855
+                    - -1.463176965713501
+                    - 0.24529314041137696
+                  - - 0.3783301115036011
+                    - -1.3903608322143555
+                    - 0.1833001971244812
+                  - - 0.254530131816864
+                    - -1.3818178176879883
+                    - 0.4365161657333374
+              time: 0.762519359588623
+              smoothing: ~
+              current_time: 0.0
+        - type: group
+          elements:
+            - type: curve
+              variable: Position
+              curve:
+                type: bezier
+                control_points:
+                  - - 0.4600929021835327
+                    - -1.252580165863037
+                    - -0.5335567593574524
+                  - - 0.4350052773952484
+                    - -1.2184375524520875
+                    - -0.46680372953414919
+                  - - 0.43286630511283877
+                    - -1.2277463674545289
+                    - -0.4625377953052521
+                  - - 0.4375062584877014
+                    - -1.1784074306488038
+                    - -0.2943554222583771
+              time: 0.7638087272644043
+              smoothing: ~
+              current_time: 0.0
+            - type: curve
+              variable: LookAt
+              curve:
+                type: bezier
+                control_points:
+                  - - 0.254530131816864
+                    - -1.3818178176879883
+                    - 0.4365161657333374
+                  - - 0.36976924538612368
+                    - -1.099121332168579
+                    - 0.5239071249961853
+                  - - 1.2243609428405762
+                    - -1.5746651887893677
+                    - -0.965711236000061
+                  - - 1.0909535884857178
+                    - -1.1683157682418824
+                    - -1.051260232925415
+              time: 0.7638087272644043
+              smoothing: ~
+              current_time: 0.0
+        - type: group
+          elements:
+            - type: curve
+              variable: Position
+              curve:
+                type: bezier
+                control_points:
+                  - - 0.4375062584877014
+                    - -1.1784074306488038
+                    - -0.2943554222583771
+                  - - 0.4231329560279846
+                    - -1.186720609664917
+                    - -0.09334011375904083
+                  - - 0.7247528433799744
+                    - -1.191794753074646
+                    - -0.43372592329978945
+                  - - 0.4298870265483856
+                    - -1.1831064224243165
+                    - -1.0524364709854127
+              time: 0.7607846260070801
+              smoothing: ~
+              current_time: 0.0
+            - type: curve
+              variable: LookAt
+              curve:
+                type: bezier
+                control_points:
+                  - - 1.0909535884857178
+                    - -1.1683157682418824
+                    - -1.051260232925415
+                  - - 0.6113273501396179
+                    - -1.3151142597198487
+                    - -1.0670433044433594
+                  - - -0.2698904871940613
+                    - -1.262935996055603
+                    - -0.35873574018478396
+                  - - 0.2770228683948517
+                    - -1.1959507465362549
+                    - -0.06427276134490967
+              time: 0.7607846260070801
+              smoothing: ~
+              current_time: 0.0
+        - type: group
+          elements:
+            - type: curve
+              variable: Position
+              curve:
+                type: bezier
+                control_points:
+                  - - 0.4298870265483856
+                    - -1.1831064224243165
+                    - -1.0524364709854127
+                  - - -0.5174482464790344
+                    - -0.950695812702179
+                    - -1.4132710695266724
+                  - - -0.5174482464790344
+                    - -0.950695812702179
+                    - -1.4132710695266724
+                  - - -0.5174482464790344
+                    - -0.950695812702179
+                    - -1.4132710695266724
+              time: 0.2505655288696289
+              smoothing:
+                begin: 0.0
+                end: 0.800000011920929
+                begin_strength: 2.0
+                end_strength: 2.0
+              current_time: 0.0
+            - type: curve
+              variable: LookAt
+              curve:
+                type: bezier
+                control_points:
+                  - - 0.2770228683948517
+                    - -1.1959507465362549
+                    - -0.06427276134490967
+                  - - -0.01497507095336914
+                    - -1.2615476846694947
+                    - -0.6064924001693726
+                  - - -0.01497507095336914
+                    - -1.2615476846694947
+                    - -0.6064924001693726
+                  - - -0.01497507095336914
+                    - -1.2615476846694947
+                    - -0.6064924001693726
+              time: 0.2505655288696289
+              smoothing:
+                begin: 0.0
+                end: 0.800000011920929
+                begin_strength: 2.0
+                end_strength: 2.0
+              current_time: 0.0
+      current: 0
+      loop_num: 0
+
