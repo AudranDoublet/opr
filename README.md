@@ -1,6 +1,10 @@
 # Previews
 
 ## Images
+<img src="/data/samples/water.png" width="250" height="250"> <img src="/data/samples/chocolate.jpg" width="250" height="250">
+<img src="/data/samples/cloth.jpg" width="250" height="250"> <img src="/data/samples/multiphase.jpg" width="250" height="250">
+<img src="/data/samples/debug.png" width="250" height="250"> <img src="/data/samples/tatou.jpg" width="250" height="250">
+
 
 ## Videos
 ### Demo
