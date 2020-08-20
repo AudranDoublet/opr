@@ -46,7 +46,7 @@ We implemented different functionalities in our simulation algorithm, including:
 * a surface tension force (based on `Versatile Surface Tension and Adhesion for SPH Fluids`; 2013; Akinci and al.)
 * a vorticity force (based on `Turbulent Micropolar SPH Fluids with Foam`; 2017; Bender and al.)
 * multiphase fluids interactions
-* fluid-solid interactions
+* fluid-solid interactions (based on `Volume Maps: An Implicit Boundary Representation for SPH`; 2019; Bender and al.)
 * basic solid object engine (using center of mass, inertia tensor and mass as physical properties for objects)
 * spray, bubble and foam simulation (based on `Unified spray, foam and air bubbles for particle-based fluids`; 2012; Ihmsen and al.)
 * simulation FPS
