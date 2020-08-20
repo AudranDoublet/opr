@@ -39,16 +39,16 @@ Rendering time for scene can be very high:
 All the listed functionalities can be configured in the scene YAML.
 
 We implemented different functionalities in our simulation algorithm, including:
-* a pressure solver named [`Divergence-free smoothed particle hydrodynamics.`; 2015; Jan Bender and Dan Koschier.](https://dl.acm.org/doi/abs/10.1145/2786784.2786796); another pressure solver can be easily implemented
-* an high viscosity solver (based on [A Physically Consistent Implicit Viscosity Solver for SPH Fluids`; 2018; Weiler and al.](https://onlinelibrary.wiley.com/doi/abs/10.1111/cgf.13349))
-* a drag force (based on [`Approximate Air-Fluid Interactions for SPH`; 2017; Glisser and al.](https://dl.acm.org/doi/abs/10.2312/vriphys.20171081))
-* an elasticity force (based on [`An Implicit SPH Formulation for Incompressible Linearly Elastic Solids`; 2018; Peer and al.](https://onlinelibrary.wiley.com/doi/abs/10.1111/cgf.13317))
-* a surface tension force (based on [`Versatile Surface Tension and Adhesion for SPH Fluids`; 2013; Akinci and al.](https://dl.acm.org/doi/abs/10.1145/2508363.2508395))
-* a vorticity force (based on [`Turbulent Micropolar SPH Fluids with Foam`; 2017; Bender and al.](https://ieeexplore.ieee.org/abstract/document/8353115/))
+* a pressure solver named Divergence Free SPH (DFSPH); another pressure solver can be easily implemented
+* an high viscosity solver (based on `A Physically Consistent Implicit Viscosity Solver for SPH Fluids`; 2018; Weiler and al.)
+* a drag force (based on `Approximate Air-Fluid Interactions for SPH`; 2017; Glisser and al.)
+* an elasticity force (based on `An Implicit SPH Formulation for Incompressible Linearly Elastic Solids`; 2018; Peer and al.)
+* a surface tension force (based on `Versatile Surface Tension and Adhesion for SPH Fluids`; 2013; Akinci and al.)
+* a vorticity force (based on `Turbulent Micropolar SPH Fluids with Foam`; 2017; Bender and al.)
 * multiphase fluids interactions
 * fluid-solid interactions (based on `Volume Maps: An Implicit Boundary Representation for SPH`; 2019; Bender and al.)
 * basic solid object engine (using center of mass, inertia tensor and mass as physical properties for objects)
-* spray, bubble and foam simulation (based on [`Unified spray, foam and air bubbles for particle-based fluids`; 2012; Ihmsen and al.](https://link.springer.com/article/10.1007/s00371-012-0697-9))
+* spray, bubble and foam simulation (based on `Unified spray, foam and air bubbles for particle-based fluids`; 2012; Ihmsen and al.)
 * simulation FPS
 
 We also implemented animation functionalities 
