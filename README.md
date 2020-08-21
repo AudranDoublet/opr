@@ -1,8 +1,7 @@
 # Introduction
 
-This project is originally an assignement for our **introduction to image synthesis** course, nothing serious.
-This project is a bunch of engines that allows the user to simulate and render scenes described into YAML language.
-
+Simply a bunch of engines that allows the user to simulate and render scenes described into YAML language.
+This project is originally an assignment for our **introduction to image synthesis** course, nothing serious.
 
 ### Samples
 
@@ -104,3 +103,12 @@ As it was a school project with a limited time, we didn't have the time to imple
 * spray and foam rendering
 
 A documentation for scenes configuration doesn't exists, but the scenes in `data/scenes` folder are exhaustive.
+
+# Conclusion
+
+This project took us a lot of time, coffee and health to realize, but we arrived to results we didn't originally expect and looking back, we learned a lot of things.
+
+A special thanks to **Jan Bender** and **Dan Koschier** for all there work in the field and more specifically for the paper `Smoothed Particle Hydrodynamics
+Techniques for the Physics Based Simulation of Fluids and Solids` that is an excellent introduction to fluid simulation.
+
+BTW, If you wonder where **OPR** comes from: it's the abbreviation of "On Peut Renommer" (in french), which means "We Can Rename". The day we created the repository, we had no inspiration, and we just forgot to rename the project since then.
