@@ -108,7 +108,7 @@ A documentation for scenes configuration doesn't exists, but the scenes in `data
 
 This project took us a lot of time, coffee and health to realize, but we arrived to results we didn't originally expect and looking back, we learned a lot of things.
 
-A special thanks to **Jan Bender** and **Dan Koschier** for all there work in the field and more specifically for the paper `Smoothed Particle Hydrodynamics
+A special thanks to **Jan Bender** and **Dan Koschier** for all their work in the field and more specifically for the paper `Smoothed Particle Hydrodynamics
 Techniques for the Physics Based Simulation of Fluids and Solids` that is an excellent introduction to fluid simulation.
 
 BTW, If you wonder where **OPR** comes from: it's the abbreviation of "On Peut Renommer" (in french), which means "We Can Rename". The day we created the repository, we had no inspiration, and we just forgot to rename the project since then.
