@@ -47,7 +47,7 @@ Our program is composed of a few steps:
 * Loading and preprocessing of objects (the time consuming part is computing a signed distance field for the mesh, which is used for collision handling; this part is cached)
 * Processing the simulation
 * Transformation of the particles into a mesh using a marching cube algorithm
-* Rendering of the final scene using a raytracinbg algorithm
+* Rendering of the final scene using a raytracing algorithm
 * Image to video conversion using ffmpeg
 
 Rendering time for scene can be very high:
